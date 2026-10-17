@@ -13,7 +13,16 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-BOARD = REPO / ".board"
+
+
+def shared_root():
+    """Main checkout root, so every git worktree of this repo shares one .board/."""
+    out = subprocess.run(["git", "-C", str(REPO), "rev-parse", "--git-common-dir"],
+                         capture_output=True, text=True).stdout.strip()
+    return (REPO / out).resolve().parent if out else REPO
+
+
+BOARD = shared_root() / ".board"
 TASKS, MSGS, ACKS = BOARD / "tasks", BOARD / "messages", BOARD / "acks"
 STATUSES = ("open", "claimed", "blocked", "review", "done")
 NOTIFY_ON = ("blocked", "review", "done")
