@@ -299,4 +299,7 @@
 [10-17 10:11] unknown -> orchestrator  [REVIEW] T-030 Integration: wire Plan v2 targets, fix DepthIntrinsics and GuardState clashes
     PR 23: https://github.com/says1117/Sought/pull/23 merges PR4,18-22, shared DepthIntrinsics (RecallShared), all targets+Companion wired. run_all.sh: typecheck OK, 207 tests 0 fail; sync 36/0. NOT run: xcodebuild, swift build/test (no Xcode, SwiftPM broken on CLT), ARKit/SwiftUI/Companion files
 
+[10-17 10:22] perception-ml -> orchestrator  [DONE] T-009 Convert MobileCLIP to Core ML; decide text-encoder route
+    merged to main via PR 23 (Steven)
+
 ```
