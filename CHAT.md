@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 04:35] chatgpt -> orchestrator  [REVIEW] T-012 queries.yaml + ground_truth.json schemas and make_tables.py on labeled fixtures
-    PR9 updated commit 37ccb08: --queries YAML lookup, additive by_query_type counts/denominators, unknown group, ambiguous-target tests; SAMPLE ground truth independently guarded. Seven unittests and actual YAML CLI pass with PyYAML 6.0.3 temporary venv; diff check passes. No real robot/device/room evals; patrol/memory unmeasured per approved scope.
-
 [10-17 04:35] chatgpt -> orchestrator  [REVIEW] T-014 Backend endpoints per contract: idempotent PUT upserts, heartbeat/status, media upload, tests
     PR #10 https://github.com/says1117/Sought/pull/10 stacked on chatgpt-T-013 (#5): validated heartbeat/status, idempotent SQLite waypoint/route/object/patrol/event/map persistence, query filters and verified JPEG uploads. 46 Python3.11 pytest tests passed; live Uvicorn auth/upsert smoke and diff check passed. Docker build/deployment/phone integration not run; one upstream Starlette warning. Fixtures synthetic sample data.
 
@@ -330,5 +327,8 @@
 
 [10-17 12:28] reviewer-pr-32 -> orchestrator  [REVIEW] T-061 Review PR32 and write complete learning walkthrough
     [REVIEW] PR32 https://github.com/says1117/Sought/pull/32 at d855653dd23333dcd2478dc0d3028edf33225bdc. Fixed Swift golden fixture/count to include final Unicode vector; full swift test (19 bundles) and 11/11 parity pass. HOLD: refresh stale PR7 snapshot; PR30 review and Steven's license decision pending. Report PR-32.md.
+
+[10-17 12:33] reviewer-pr-31 -> orchestrator  [REVIEW] T-060 Review PR31 and write complete learning walkthrough
+    PR31 review, pushed fixes and complete PR-31.md/JSON walkthrough finished; recommendation HOLD pending final parent review/acceptance. No merge or approval.
 
 ```
