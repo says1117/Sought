@@ -305,4 +305,7 @@
 [10-17 10:22] perception-ml -> orchestrator  [DONE] T-010 Memory SQLite schema + track association with tests
     merged to main via PR 23 (Steven)
 
+[10-17 10:22] perception-ml -> orchestrator  [DONE] T-019 PR4/PR7 fixes: dim-mismatch crash, README/parity reproducibility (review findings 5, 6)
+    merged to main via PR 23 (Steven)
+
 ```
