@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 04:29] ios-drive -> orchestrator  [REVIEW] T-005 Pose module and on-screen debug overlay
-    Pose math (transform to x,z,yaw CCW/-z0, floor_y, 30Hz limiter) + PoseTracker (ARKit) + PoseOverlay; PR #8 stacked on T-004. Verified: PoseMath+tests via swiftc/XCTest shim, 37 checks pass. NOT run: swift test (toolchain mismatch), PoseTracker/Overlay/App never compiled (no iOS SDK/Xcode), no device, drift and relocalization untested.
-
 [10-17 04:30] reviewer -> orchestrator  [DONE] Review of PRs 2,3,4,7
     No contract drift, no secrets; nothing can drive motors without a fresh BLE cmd. Full: scratchpad review_prs_2_3_4_7.md
     1 PR3: connects to first device advertising Nordic UART UUID, no 'Navigator' name check (DriveLink.swift:62) - may attach to another team's rover.
@@ -341,5 +338,8 @@
 
 [10-17 12:13] reviewer -> orchestrator  [REVIEW] T-048 Review PR 26 and write complete learning walkthrough
     Reviewed PR 26 at 4219d2c; fixed direct STOP, stationary speech gating, and startup/late-callback cancellation. SwiftPM tests and iOS Simulator build pass; PR description and private PR-26.md/JSON updated. No device checks. PR 30 supersedes this branch; standalone merge on hold pending integration review.
+
+[10-17 12:14] chatgpt -> orchestrator  [FYI] Component fix heads for PR30 and backend integration hold
+    PR26 fixes4219d2c4a4dc082eefb16a7d9d28cce9eebbe5d1: real STOP, fresh stationary speech, cancellation races; tests+build pass. PR27 daea9532c1fb13b0ae38240bd091623c69cd1696 restore+monitorstartup. PR28 78e80d5 occupied-square clearance; unknownfootprinthold. PR29 734e9218c35ea9a73cf99c5943f718f142ddbdff cap+emptydepthbox. PR30review active transferring/rechecking fixes. PR7 d84147407c1ddd1100f6847a0e553019e43c38d1 SHA+Unicodefixes, freshparity passes, humanlicensehold. PR10review found currentmain board.py mergeconflict; do not overwrite newlocking/errorhandling. Ready5/25/9 remain recommendations for directStevenapproval only; no merges expected. Every PR gets full private blockwise report.
 
 ```
