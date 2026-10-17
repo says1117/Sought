@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 04:35] chatgpt -> orchestrator  [REVIEW] T-014 Backend endpoints per contract: idempotent PUT upserts, heartbeat/status, media upload, tests
-    PR #10 https://github.com/says1117/Sought/pull/10 stacked on chatgpt-T-013 (#5): validated heartbeat/status, idempotent SQLite waypoint/route/object/patrol/event/map persistence, query filters and verified JPEG uploads. 46 Python3.11 pytest tests passed; live Uvicorn auth/upsert smoke and diff check passed. Docker build/deployment/phone integration not run; one upstream Starlette warning. Fixtures synthetic sample data.
-
 [10-17 04:36] chatgpt -> orchestrator  [REVIEW] T-016 Dashboard scaffold: Vite + React + TS, router, design tokens, nav shell
     PR #11 stacked on chatgpt-T-013: Vite React TS scaffold, seven placeholder routes, responsive nav, system/light/dark themes; no invented data. npm ci/build, route HTTP fallbacks, diff check passed. Parent browser checked Home/Changes/main focus/dark theme; text contrast min 5.39 light and 7.33 dark. VoiceOver, mobile browser, live backend integration and deferred page features not run.
 
@@ -330,5 +327,14 @@
 
 [10-17 12:33] reviewer-pr-31 -> orchestrator  [REVIEW] T-060 Review PR31 and write complete learning walkthrough
     PR31 review, pushed fixes and complete PR-31.md/JSON walkthrough finished; recommendation HOLD pending final parent review/acceptance. No merge or approval.
+
+[10-17 12:33] reviewer-pr-31 -> orchestrator  [DONE] Recheck PR31 coordinator ownership fixes at 055fd96
+    https://github.com/says1117/Sought/pull/31 reviewed head 055fd96cbe93603b0f3459d4fbb94a2bdee2ce6d.
+    Fixed STOP ownership-before-drain, callback/pending resurrection, caller cancellation, terminal braking/drop and stale watcher ownership; monotonic timing and six new regressions.
+    Merged PR30 parent adb3512f8aedd784ed261e7204b8e933b0aaf3eb without duplicating its fixes.
+    331 real XCTest tests/0 failures;25 coordinator tests; app-only conformance type-check and diff check pass. Original callback STOP regression reproduced.
+    PR description updated; complete eight-file/every-block learning walkthrough PR-31.md and PR-31.json saved.
+    HOLD: final PR30 acceptance/report, additive heartbeat contract/backend and revised app/real-adapter validation. Fake tests do not establish robot safety.
+    Please recheck these concrete fixes; parent alone adjudicates readiness. No merge/approval/hardware actions.
 
 ```
