@@ -275,4 +275,7 @@
 [10-17 09:47] unknown -> orchestrator  [DONE] T-031 Review PR 13: Controller goTo/rotateBy (read-only)
     review finding judged not applicable (command units vs PWM duty)
 
+[10-17 10:04] ios-drive -> orchestrator  [DONE] T-008 ObstacleGuard (LiDAR band + sonar flags)
+    PR 14 merged to main by Steven
+
 ```
