@@ -15,6 +15,10 @@ import PerceptionCore
 #if canImport(MLEncoders)
 @testable import MLEncoders
 #endif
+#if canImport(ImageIO)
+import ImageIO
+import CoreGraphics
+#endif
 
 // Helper names are prefixed ML32 because RecallTests compiles every test file into one module.
 struct ML32TextRunner: TextModelRunning {
@@ -38,6 +42,32 @@ func ml32TinyTokenizer() throws -> CLIPTokenizer {
     var vocab: [String: Int] = [:]
     for (i, s) in ["c", "a", "t", "c</w>", "a</w>", "t</w>", "ca", "cat</w>", "<start_of_text>", "<end_of_text>"].enumerated() { vocab[s] = i + 1 }
     return try CLIPTokenizer(vocab: vocab, merges: [("c", "a"), ("ca", "t</w>")])
+}
+
+/// The pre-fix resize (plain bilinear, no antialiasing), kept only so the measurement test can report old vs new.
+func ml32LegacyBilinear(_ image: RawImage, size: Int = 256) -> RawImage {
+    let w = Double(image.width), h = Double(image.height)
+    let side = min(w, h)
+    let sw = side, sh = side, sx = (w - side) / 2, sy = (h - side) / 2
+    func sample(_ x: Int, _ y: Int, _ c: Int) -> Double {
+        let cx = max(0, min(image.width - 1, x)), cy = max(0, min(image.height - 1, y))
+        return Double(image.rgba[(cy * image.width + cx) * 4 + c])
+    }
+    var out = [UInt8](repeating: 255, count: size * size * 4)
+    for y in 0..<size {
+        let fy = sy + (Double(y) + 0.5) * sh / Double(size) - 0.5
+        let y0 = Int(fy.rounded(.down)), ty = fy - Double(y0)
+        for x in 0..<size {
+            let fx = sx + (Double(x) + 0.5) * sw / Double(size) - 0.5
+            let x0 = Int(fx.rounded(.down)), tx = fx - Double(x0)
+            for c in 0..<3 {
+                let top = sample(x0, y0, c) * (1 - tx) + sample(x0 + 1, y0, c) * tx
+                let bot = sample(x0, y0 + 1, c) * (1 - tx) + sample(x0 + 1, y0 + 1, c) * tx
+                out[(y * size + x) * 4 + c] = UInt8(max(0, min(255, (top * (1 - ty) + bot * ty).rounded())))
+            }
+        }
+    }
+    return RawImage(width: size, height: size, rgba: out)
 }
 
 final class MLEncodersTests: XCTestCase {
@@ -296,6 +326,70 @@ final class MLEncodersTests: XCTestCase {
         let img = RawImage(width: 1, height: 1, rgba: [255, 0, 51, 255])
         XCTAssertEqual(ImagePreprocessing.prepare(img, size: 1).rgba, [255, 0, 51, 255])
         XCTAssertEqual(ImagePreprocessing.chwUnitScale(img), [1, 0, 0.2])
+    }
+
+    // MARK: antialiased resize (PIL bicubic port)
+    func testDownscaleOfHighFrequencyPatternAveragesOut() {
+        // 1-px checkerboard 768x768 -> 256 (factor 3): an antialiased resize gives ~mid-grey everywhere, while the
+        // old bilinear sampled single pixels and aliased (regression guard that FAILS on the pre-fix code).
+        let n = 768
+        var px = [UInt8](repeating: 255, count: n * n * 4)
+        for y in 0..<n { for x in 0..<n { let v: UInt8 = (x + y) % 2 == 0 ? 0 : 255; for c in 0..<3 { px[(y * n + x) * 4 + c] = v } } }
+        let img = RawImage(width: n, height: n, rgba: px)
+        func reds(_ r: RawImage) -> [Int] { stride(from: 0, to: r.rgba.count, by: 4).map { Int(r.rgba[$0]) } }
+        let mid = reds(ImagePreprocessing.prepare(img))
+        XCTAssertTrue(mid.allSatisfy { abs($0 - 127) <= 4 }, "min \(mid.min()!) max \(mid.max()!)")
+        XCTAssertTrue(reds(ml32LegacyBilinear(img)).contains { abs($0 - 127) > 60 }, "legacy bilinear should alias this pattern")
+    }
+
+    func testPILTapsAreNormalisedAndIdentityAtSameSize() {
+        for t in PILResample.table(inSize: 1000, outSize: 256, outStart: 0, outCount: 256) {
+            XCTAssertEqual(Int(t.weights.reduce(0, +)), 1 << PILResample.bits, accuracy: 8)
+        }
+        let id = PILResample.table(inSize: 10, outSize: 10, outStart: 0, outCount: 10)
+        for (i, t) in id.enumerated() { XCTAssertEqual(t.weights[i - t.start], Int32(1 << PILResample.bits)) }
+    }
+
+    func testCenterCropAspectMatchesTorchvision() {
+        // 300x200 -> short side 256, long side Int(256*300/200)=384, crop offset round((384-256)/2)=64: output is 256x256.
+        let img = RawImage(width: 300, height: 200, rgba: [UInt8](repeating: 9, count: 300 * 200 * 4))
+        let out = ImagePreprocessing.prepare(img)
+        XCTAssertEqual([out.width, out.height], [256, 256])
+        XCTAssertTrue(stride(from: 0, to: out.rgba.count, by: 4).allSatisfy { out.rgba[$0] == 9 })
+    }
+
+    /// Writes Swift outputs for tools/preproc_reference.py to compare against PIL. Set RECALL_PREPROC_DIR to the
+    /// directory produced by `preproc_reference.py make`.
+    func testMeasureAgainstPILReference() throws {
+        #if canImport(ImageIO)
+        guard let dir = ProcessInfo.processInfo.environment["RECALL_PREPROC_DIR"] else {
+            throw XCTSkip("RECALL_PREPROC_DIR not set")
+        }
+        let urls = try FileManager.default.contentsOfDirectory(at: URL(fileURLWithPath: dir), includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension == "png" }.sorted { $0.path < $1.path }
+        XCTAssertFalse(urls.isEmpty)
+        for u in urls {
+            let name = u.deletingPathExtension().lastPathComponent
+            guard let src = CGImageSourceCreateWithURL(u as CFURL, nil), let cg = CGImageSourceCreateImageAtIndex(src, 0, nil) else {
+                return XCTFail("cannot decode \(u.path)")
+            }
+            var rgba = [UInt8](repeating: 0, count: cg.width * cg.height * 4)
+            let ctx = CGContext(data: &rgba, width: cg.width, height: cg.height, bitsPerComponent: 8, bytesPerRow: cg.width * 4,
+                                space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+            ctx.draw(cg, in: CGRect(x: 0, y: 0, width: cg.width, height: cg.height))
+            let raw = RawImage(width: cg.width, height: cg.height, rgba: rgba)
+            let ref = try Data(contentsOf: u.deletingPathExtension().appendingPathExtension("ref.rgb"))
+            func rgb(_ r: RawImage) -> Data { Data(stride(from: 0, to: r.rgba.count, by: 4).flatMap { [r.rgba[$0], r.rgba[$0 + 1], r.rgba[$0 + 2]] }) }
+            func mae(_ a: Data, _ b: Data) -> Double { zip(a, b).reduce(0.0) { $0 + abs(Double($1.0) - Double($1.1)) } / Double(a.count) }
+            let new = rgb(ImagePreprocessing.prepare(raw)), old = rgb(ml32LegacyBilinear(raw))
+            try new.write(to: URL(fileURLWithPath: dir).appendingPathComponent("\(name).swift_new.rgb"))
+            try old.write(to: URL(fileURLWithPath: dir).appendingPathComponent("\(name).swift_old.rgb"))
+            print("PREPROC \(name): MAE old(bilinear)=\(String(format: "%.3f", mae(old, ref))) new(PIL port)=\(String(format: "%.3f", mae(new, ref)))")
+        }
+        #else
+        throw XCTSkip("ImageIO unavailable")
+        #endif
     }
 
     // MARK: locator

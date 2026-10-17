@@ -25,36 +25,46 @@ public enum CropFitMode: Equatable {
 public enum ImagePreprocessing {
     public static let inputSize = 256
 
+    /// Resize like the conversion reference (PIL `Image.resize(..., BICUBIC)`, which antialiases when downscaling):
+    /// `.centerCrop` resizes the short side to `size` (long side `Int(size * long / short)`, as torchvision
+    /// `Resize(size)`) and crops the centre; `.squash` resizes the whole image to `size` x `size`.
     public static func prepare(_ image: RawImage, mode: CropFitMode = .centerCrop, size: Int = inputSize) -> RawImage {
-        // Source window (in source pixels, floating) that maps onto the full output square.
-        let w = Double(image.width), h = Double(image.height)
-        var sx = 0.0, sy = 0.0, sw = w, sh = h
+        let w = image.width, h = image.height
+        var newW = size, newH = size
         if mode == .centerCrop {
-            let side = min(w, h)
-            sw = side; sh = side; sx = (w - side) / 2; sy = (h - side) / 2
+            if w <= h { newW = size; newH = max(size, Int(Double(size) * Double(h) / Double(w))) }
+            else { newH = size; newW = max(size, Int(Double(size) * Double(w) / Double(h))) }
+        }
+        // torchvision CenterCrop offsets: int(round((full - crop) / 2.0)); Python's round() is half-to-even.
+        let left = Int((Double(newW - size) / 2).rounded(.toNearestOrEven)), top = Int((Double(newH - size) / 2).rounded(.toNearestOrEven))
+        let xt = PILResample.table(inSize: w, outSize: newW, outStart: left, outCount: size)
+        let yt = PILResample.table(inSize: h, outSize: newH, outStart: top, outCount: size)
+
+        // Horizontal pass over only the source rows the vertical pass needs, rounded to 8 bits in between (as PIL).
+        let rowLo = yt.first?.start ?? 0, rowHi = yt.map { $0.start + $0.weights.count }.max() ?? h
+        var tmp = [UInt8](repeating: 0, count: (rowHi - rowLo) * size * 3)
+        image.rgba.withUnsafeBufferPointer { src in
+            for row in rowLo..<rowHi {
+                for (ox, t) in xt.enumerated() {
+                    for c in 0..<3 {
+                        var acc: Int64 = PILResample.half
+                        for (k, wgt) in t.weights.enumerated() { acc += Int64(wgt) * Int64(src[(row * w + t.start + k) * 4 + c]) }
+                        tmp[((row - rowLo) * size + ox) * 3 + c] = PILResample.clip8(acc)
+                    }
+                }
+            }
         }
         var out = [UInt8](repeating: 255, count: size * size * 4)
-        for y in 0..<size {
-            let fy = sy + (Double(y) + 0.5) * sh / Double(size) - 0.5
-            let y0 = Int(fy.rounded(.down)), ty = fy - Double(y0)
-            for x in 0..<size {
-                let fx = sx + (Double(x) + 0.5) * sw / Double(size) - 0.5
-                let x0 = Int(fx.rounded(.down)), tx = fx - Double(x0)
+        for (oy, t) in yt.enumerated() {
+            for ox in 0..<size {
                 for c in 0..<3 {
-                    let p00 = sample(image, x0, y0, c), p10 = sample(image, x0 + 1, y0, c)
-                    let p01 = sample(image, x0, y0 + 1, c), p11 = sample(image, x0 + 1, y0 + 1, c)
-                    let top = p00 * (1 - tx) + p10 * tx
-                    let bot = p01 * (1 - tx) + p11 * tx
-                    out[(y * size + x) * 4 + c] = UInt8(max(0, min(255, (top * (1 - ty) + bot * ty).rounded())))
+                    var acc: Int64 = PILResample.half
+                    for (k, wgt) in t.weights.enumerated() { acc += Int64(wgt) * Int64(tmp[((t.start + k - rowLo) * size + ox) * 3 + c]) }
+                    out[(oy * size + ox) * 4 + c] = PILResample.clip8(acc)
                 }
             }
         }
         return RawImage(width: size, height: size, rgba: out)
-    }
-
-    private static func sample(_ img: RawImage, _ x: Int, _ y: Int, _ c: Int) -> Double {
-        let cx = max(0, min(img.width - 1, x)), cy = max(0, min(img.height - 1, y))
-        return Double(img.rgba[(cy * img.width + cx) * 4 + c])
     }
 
     /// Planar CHW floats scaled by 1/255, for backends whose model takes a tensor instead of an image.
@@ -64,5 +74,40 @@ public enum ImagePreprocessing {
         var out = [Float](repeating: 0, count: 3 * n)
         for i in 0..<n { for c in 0..<3 { out[c * n + i] = Float(image.rgba[i * 4 + c]) / 255 } }
         return out
+    }
+}
+
+/// Port of Pillow's `Resample.c` (bicubic, a = -0.5, support scaled by the downscale factor = antialiasing, 22-bit
+/// fixed-point coefficients, 8-bit rounding after each pass). Reproduces `PIL.Image.resize(BICUBIC)` to within
+/// rounding, which is what MobileCLIP's torchvision transform uses.
+enum PILResample {
+    static let bits = 22
+    static let half: Int64 = 1 << 21
+
+    struct Taps { let start: Int; let weights: [Int32] }
+
+    static func clip8(_ acc: Int64) -> UInt8 { UInt8(max(0, min(255, acc >> Int64(bits)))) }
+
+    private static func bicubic(_ x: Double) -> Double {
+        let a = -0.5, x = abs(x)
+        if x < 1 { return ((a + 2) * x - (a + 3)) * x * x + 1 }
+        if x < 2 { return (((x - 5) * x + 8) * x - 4) * a }
+        return 0
+    }
+
+    /// Taps for output positions `outStart ..< outStart + outCount` of a resize `inSize -> outSize`.
+    static func table(inSize: Int, outSize: Int, outStart: Int, outCount: Int) -> [Taps] {
+        let scale = Double(inSize) / Double(outSize)
+        let filterScale = max(scale, 1.0)
+        let support = 2.0 * filterScale
+        return (outStart..<(outStart + outCount)).map { xx in
+            let center = (Double(xx) + 0.5) * scale
+            let xmin = max(0, Int(center - support + 0.5))
+            let xmax = min(inSize, Int(center + support + 0.5)) - xmin
+            var k = (0..<max(xmax, 1)).map { bicubic((Double($0 + xmin) - center + 0.5) / filterScale) }
+            let total = k.reduce(0, +)
+            if total != 0 { k = k.map { $0 / total } }
+            return Taps(start: xmin, weights: k.map { Int32(($0 * Double(1 << bits) + ($0 < 0 ? -0.5 : 0.5)).rounded(.towardZero)) })
+        }
     }
 }
