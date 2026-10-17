@@ -38,6 +38,14 @@ final class TeachViewModelTests: XCTestCase {
         XCTAssertEqual(m.waypoints[0].pose, Pose2D(x: 1, z: 2, yawDeg: 90))
     }
 
+    func testBeginSessionStartsRelocalizationWhenSavedMapExists() throws {
+        let m = try makeModel()
+        let monitor = RelocalizationMonitor()
+        m.beginSession(hasSavedMap: true, monitor: monitor)
+        XCTAssertEqual(monitor.state, .waiting(elapsed: 0))
+        XCTAssertEqual(m.waypoints.map(\.name), ["home"])
+    }
+
     func testBeginSessionWithoutPoseMakesNoHome() throws {
         pose = nil
         let m = try makeModel()

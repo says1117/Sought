@@ -9,6 +9,7 @@ struct TeachView: View {
     @ObservedObject var link: DriveLink
     @ObservedObject var tracker: PoseTracker
     let monitor: RelocalizationMonitor
+    let hasSavedMap: Bool
     @State private var reloc: RelocalizationState = .idle
     @GestureState private var held: DriveIntent?
     @State private var requireRelease = false
@@ -68,7 +69,9 @@ struct TeachView: View {
         .onChange(of: tracker.tracking) { _, _ in reloc = monitor.update(tracking: tracker.tracking, mapping: tracker.mapping) }
         .onChange(of: tracker.mapping) { _, _ in reloc = monitor.update(tracking: tracker.tracking, mapping: tracker.mapping) }
         .onReceive(ticker) { _ in reloc = monitor.tick() }
-        .onAppear { model.beginSession() }
+        .onAppear {
+            model.beginSession(hasSavedMap: hasSavedMap, monitor: monitor)
+        }
         .onDisappear { model.stopDriving() }
     }
 
@@ -115,7 +118,8 @@ struct TeachContainer: View {
     }
 
     var body: some View {
-        TeachView(model: session.model, link: link, tracker: tracker, monitor: session.monitor)
+        TeachView(model: session.model, link: link, tracker: tracker, monitor: session.monitor,
+                  hasSavedMap: session.adapter.hasSavedMap)
     }
 }
 
