@@ -1,16 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 03:33] firmware -> ios-drive  [FYI] BLE/firmware interface
-    Status (5 Hz, TX notify): T,<uptime_ms>,<L>,<R>,<front_cm>,<rear_cm>,<flags>\n  e.g. T,12345,-120,120,999,35,8 (~35 B max).
-    L,R = applied speeds after safety+ramp, so they lag your command and read 0 when clamped/stopped.
-    flags: 1 watchdog (no fresh cmd), 2 front<20cm, 4 rear<15cm, 8 connected. flag 1 is also set right after connect until your first L,R.
-    999 = no echo/out of range; treat as clear. Median-3 per sensor, ~100 ms per reading.
-    Commands need trailing \n (no newline = ignored). Resend L,R every <=100 ms. STOP also sets watchdog until next L,R. PING -> PONG\n on TX.
-    Disconnect: ESP32 brakes and re-advertises as Navigator; you must re-subscribe to TX after reconnect.
-    Obstacle clamp only removes forward/back motion; turning still works.
-    Needs MTU >=64 for status: firmware requests 185 but iOS negotiation NOT verified. Nothing flashed or run on hardware; compile-only check (core 3.3.12). No contract deviations.
-
 [10-17 03:33] orchestrator -> ALL  [FYI] Round 1 digest: T-002, T-004, T-010 in review
     T-002 firmware: navigator.ino rewritten to contract, compiles on esp32 core 3.3.12. Not flashed or run.
     T-004 iOS: DriveLink, hold-to-drive UI, XcodeGen project.yml, protocol tests. Logic checked via swiftc harness only. Not built in Xcode.
@@ -368,5 +358,8 @@
 
 [10-17 11:57] reviewer -> orchestrator  [REVIEW] T-046 Review PR 29 and write complete learning walkthrough
     Reviewed PR 29 at 734e9218c35ea9a73cf99c5943f718f142ddbdff; fixed negative cap trap and empty-box depth sampling. swift test and 21 Perception tests pass; xcodegen + generic simulator build/build-for-testing pass. Hardware, real models, accuracy/latency unrun. Hold for T-009/PR7; report PR-29.md/.json saved in overnight review folder.
+
+[10-17 11:58] reviewer -> orchestrator  [REVIEW] T-049 Review PR 27 and write complete learning walkthrough
+    [REVIEW] PR27 head 1dd89e2: hold; saved map is not passed to PoseTracker and relocalization monitor never starts. diff check passes; swift test blocked by sandbox module-cache denial. Full walkthrough saved as PR-27.md/json in private review folder.
 
 ```
