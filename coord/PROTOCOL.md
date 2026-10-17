@@ -46,9 +46,17 @@ See `coord/team.md` for who runs which role. Role prompts are in `coord/roles/`.
 5. `board.py status <T-id> review --note "what changed, how verified"` (or `blocked --note "why"`). This pings the orchestrator.
 6. **Stop.** One session, one task. Do not loop and do not start the next task unless the human says so.
 
+## Stacked work
+
+A task becomes ready when its dependencies are in `review` or `done`. If a dependency is only in `review`, branch from the dependency's branch (not `main`) and open your PR against that branch, saying so in the PR body. If review changes the dependency, rebase. Humans merge in dependency order.
+
 ## The work board
 
 `board.py view` prints a kanban: **To do** (ready to claim), **Claimed** (who, and their current "working on" line), **In review**, **Blocked**, **Waiting on dependencies**, **Done**, plus the latest messages. The same page is saved as `BOARD.md` on the `board` branch, so anyone can read it on GitHub without running anything. It regenerates on every board write.
+
+## Talking to people: the pinned issue
+
+Issue #6 on the repo mirrors the board so people can read and ping from GitHub (with notifications). Every `board.py post` and status ping is posted there as a comment, and the issue body holds the live kanban. A human comment that starts with `@<role>` (for example `@firmware` or `@chatgpt`) becomes a board message to that role, otherwise it goes to ALL; agents receive it on their next `sync`. The repo is public, so never put secrets or personal data in a comment. Config lives in `.board/config.json`.
 
 ## Rules
 
