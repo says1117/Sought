@@ -1,0 +1,318 @@
+import Foundation
+#if canImport(PlannerCore)
+@testable import PlannerCore
+#endif
+
+/// Runs planner tool calls one at a time. LLM-first control: the planner picks the tool, this class only
+/// sequences tasks and makes `stop` win. It never sets speeds or limits; those live in the ESP32 and guards.
+///
+/// Rules:
+/// - Exactly one task (explore, find, go_to_waypoint, come_to_me) runs at a time.
+/// - A second task request while one runs is held as the single pending request. If that slot is also full,
+///   or the request is mark_waypoint, it is refused with a spoken reason. Never throws for that.
+/// - `stopAll()` is synchronous: drive STOP first, cancel the owned task and adapter, clear pending,
+///   state idle. Movement ownership stays busy until the cancelled runner returns.
+/// - Tracking not normal for more than 1 s cancels the motion task and reports "need a rescan" (blocked).
+/// - Reported failures become `blocked`; a thrown error becomes `error` and is rethrown to the caller.
+final class RobotCoordinator {
+    private final class Request {
+        let id = UUID()
+        let kind: CoordinatorTaskKind
+        let label: String
+        let run: () async throws -> CoordinatorTaskResult
+        let cancel: () -> Void
+        var monitor: Task<Void, Never>?
+        var worker: Task<Void, Error>?
+        var cancelled = false
+        var started = false
+        init(kind: CoordinatorTaskKind, label: String, run: @escaping () async throws -> CoordinatorTaskResult,
+             cancel: @escaping () -> Void) {
+            self.kind = kind; self.label = label; self.run = run; self.cancel = cancel
+        }
+    }
+
+    private let deps: CoordinatorDependencies
+    private let config: CoordinatorConfig
+    // Lifecycle transitions and synchronous collaborator calls are serialized. Recursive so an
+    // onChange callback can call stopAll without deadlocking. Callbacks must never wait on
+    // another thread to re-enter the coordinator.
+    private let lock = NSRecursiveLock()
+    private var active: Request?
+    private var pending: Request?
+    private var _status = CoordinatorStatus.idle
+    private var _trace: [CoordinatorTraceEntry] = []
+
+    /// Synchronous, serialized status notification; may re-enter (e.g. STOP). Keep it brief;
+    /// dispatch UI updates asynchronously and never synchronously wait on another thread.
+    private var _onChange: (CoordinatorStatus) -> Void = { _ in }
+    var onChange: (CoordinatorStatus) -> Void {
+        get { synchronized { _onChange } }
+        set { synchronized { _onChange = newValue } }
+    }
+
+    private func synchronized<T>(_ body: () throws -> T) rethrows -> T {
+        lock.lock(); defer { lock.unlock() }; return try body()
+    }
+
+    init(dependencies: CoordinatorDependencies, config: CoordinatorConfig = CoordinatorConfig()) {
+        self.deps = dependencies
+        self.config = config
+    }
+
+    var status: CoordinatorStatus { lock.lock(); defer { lock.unlock() }; return _status }
+    var trace: [CoordinatorTraceEntry] { lock.lock(); defer { lock.unlock() }; return _trace }
+    var isBusy: Bool { lock.lock(); defer { lock.unlock() }; return active != nil }
+    var hasPending: Bool { lock.lock(); defer { lock.unlock() }; return pending != nil }
+
+    // MARK: - ToolExecuting surface
+
+    func execute(_ call: ToolCall) async throws {
+        // Local STOP must reach the brake before tracing or any lifecycle lock.
+        if case .stop = call { stopAll(); return }
+        record("request", call.toolName)
+        switch call {
+        case .stop:
+            stopAll()
+        case .say(let text):
+            deps.speaker.say(text)
+        case .markWaypoint(let name):
+            markWaypoint(name)
+        case .explore(let minutes):
+            try await submit(makeRequest(.explore, "explore", { [deps] in try await deps.explorer.explore(maxMinutes: minutes) },
+                                         { [deps] in deps.explorer.cancel() }))
+        case .findObject(let description):
+            try await submit(makeRequest(.find, "find: \(description)", { [deps] in try await deps.finder.find(description: description) },
+                                         { [deps] in deps.finder.cancel() }))
+        case .comeToMe:
+            try await submit(makeRequest(.comeToMe, "come to me", { [deps] in try await deps.comer.comeToMe() },
+                                         { [deps] in deps.comer.cancel() }))
+        case .goToWaypoint(let name):
+            guard let wp = deps.waypoints.lookup(name) else {
+                record("rejected", "unknown waypoint \(name)")
+                deps.speaker.say("I don't know a place called \(name).")
+                return
+            }
+            try await submit(makeRequest(.goToWaypoint, "go to: \(wp.name)", { [deps] in try await deps.navigator.goTo(wp) },
+                                         { [deps] in deps.navigator.cancel() }))
+        case .checkRoute, .startPatrol, .whatChanged:
+            record("unsupported", call.toolName)
+            deps.speaker.say("I can't do that yet.")
+        }
+    }
+
+    /// Stop always wins. Synchronous. Safe with nothing running.
+    func stopAll() {
+        deps.drive.stop()
+        synchronized {
+            let victim = active
+            let hadPending = pending != nil
+            pending = nil
+            cancel(victim)
+            record("stop", "cancelled \(victim?.label ?? "nothing")\(hadPending ? ", dropped pending" : "")")
+            publish(.idle)
+        }
+    }
+
+    /// Cancellation revokes the worker, but the slot stays occupied until it actually returns.
+    /// Adapters must check task cancellation before side effects and after every suspension.
+    private func cancel(_ req: Request?) {
+        guard let req, !req.cancelled else { return }
+        req.cancelled = true
+        req.monitor?.cancel()
+        req.worker?.cancel()
+        if req.started { req.cancel() }
+    }
+
+    // MARK: - Internals
+
+    private func makeRequest(_ kind: CoordinatorTaskKind, _ label: String,
+                             _ run: @escaping () async throws -> CoordinatorTaskResult,
+                             _ cancel: @escaping () -> Void) -> Request {
+        Request(kind: kind, label: label, run: run, cancel: cancel)
+    }
+
+    private func state(for kind: CoordinatorTaskKind) -> CoordinatorState {
+        switch kind {
+        case .explore: return .exploring
+        case .find, .goToWaypoint: return .finding
+        case .comeToMe: return .comingToUser
+        }
+    }
+
+    private func submit(_ req: Request) async throws {
+        try await withTaskCancellationHandler {
+            let worker: Task<Void, Error>? = try synchronized {
+                try Task.checkCancellation()
+                if active == nil {
+                    return start(req)
+                } else if active?.cancelled == true {
+                    record("refused", "\(req.label): previous task still stopping")
+                    deps.speaker.say("I'm still stopping. Please try again once I've stopped.")
+                } else if pending == nil {
+                    pending = req
+                    let current = active?.label ?? "a task"
+                    record("queued", "\(req.label) behind \(current)")
+                    deps.speaker.say("I'm busy with \(current). I'll do that next.")
+                } else {
+                    record("refused", "\(req.label): pending slot full")
+                    deps.speaker.say("I'm busy and already have something waiting. Say stop first.")
+                }
+                return nil
+            }
+            guard let worker else { return }
+            try await worker.value
+        } onCancel: {
+            self.synchronized {
+                guard self.active === req else { return }
+                self.deps.drive.stop()
+                self.pending = nil
+                self.cancel(req)
+                self.publish(.idle)
+            }
+        }
+    }
+
+    /// Reserve and create the owned task in the same transition. Called with the lock held.
+    private func start(_ req: Request) -> Task<Void, Error> {
+        active = req
+        let worker = Task { try await self.runActive(req) }
+        req.worker = worker
+        return worker
+    }
+
+    private func markWaypoint(_ name: String) {
+        synchronized { markWaypointLocked(name) }
+    }
+
+    private func markWaypointLocked(_ name: String) {
+        let busy = active
+        if let busy {
+            record("refused", "mark \(name): busy with \(busy.label)")
+            deps.speaker.say("I'm moving right now. Stop me first, then I can save this spot.")
+            return
+        }
+        guard deps.pose.tracking() == .normal else {
+            record("refused", "mark \(name): tracking not normal")
+            deps.speaker.say("I can't save a spot until I know where I am. I need a rescan.")
+            return
+        }
+        do {
+            let wp = try deps.waypoints.markHere(name: name)
+            record("marked", wp.name)
+            deps.speaker.say("Saved this spot as \(wp.name).")
+        } catch {
+            record("error", "mark \(name): \(error)")
+            deps.speaker.say("I couldn't save that spot.")
+        }
+    }
+
+    private func runActive(_ req: Request) async throws {
+        let canRun = synchronized { () -> Bool in
+            guard active === req else { return false }
+            guard !req.cancelled, !Task.isCancelled else { active = nil; return false }
+            guard deps.pose.tracking() == .normal else {
+                req.cancelled = true
+                pending = nil
+                publish(CoordinatorStatus(state: .blocked, task: CoordinatorConfig.rescanReason))
+                deps.speaker.say("I can't start, I need a rescan.")
+                active = nil
+                return false
+            }
+            publish(CoordinatorStatus(state: state(for: req.kind), task: req.label))
+            // A re-entrant status callback can STOP before the runner has even been called.
+            guard !req.cancelled, !Task.isCancelled else { active = nil; return false }
+            record("start", req.label)
+            req.started = true
+            req.monitor = Task { [weak self] in await self?.watchTracking(req) }
+            return true
+        }
+        guard canRun else { return }
+        let outcome: Result<CoordinatorTaskResult, Error>
+        do {
+            try Task.checkCancellation()
+            outcome = .success(try await req.run())
+        } catch { outcome = .failure(error) }
+
+        let error: Error? = synchronized {
+            req.monitor?.cancel()
+            guard active === req else { return nil }
+            if req.cancelled {
+                active = nil
+                record("late-return", req.label)
+                return nil
+            }
+            // No successor can start while the old task or its final STOP is unwinding.
+            deps.drive.stop()
+            var thrown: Error?
+            switch outcome {
+            case .success(.completed(let summary)):
+                record("done", "\(req.label)\(summary.map { ": \($0)" } ?? "")")
+                publish(.idle)
+            case .success(.cancelled):
+                pending = nil
+                record("cancelled", req.label)
+                publish(.idle)
+            case .success(.blocked(let reason)):
+                pending = nil
+                record("blocked", "\(req.label): \(reason)")
+                publish(CoordinatorStatus(state: .blocked, task: reason))
+                deps.speaker.say("I'm stuck: \(reason).")
+            case .failure(let error):
+                pending = nil
+                record("error", "\(req.label): \(error)")
+                publish(CoordinatorStatus(state: .error, task: "\(req.label) failed"))
+                deps.speaker.say("Something went wrong with \(req.label).")
+                thrown = error
+            }
+            active = nil
+            // STOP from a completion callback clears pending before this reservation.
+            if let next = pending, !req.cancelled {
+                pending = nil
+                let worker = start(next)
+                Task { _ = try? await worker.value } // queued errors are published by runActive
+            }
+            return thrown
+        }
+        if let error { throw error }
+    }
+
+    private func watchTracking(_ req: Request) async {
+        var lostSince: TimeInterval?
+        while !Task.isCancelled {
+            do { try await deps.clock.sleep(seconds: config.trackingPollS) } catch { return }
+            if Task.isCancelled { return }
+            if deps.pose.tracking() == .normal { lostSince = nil; continue }
+            let now = deps.clock.now()
+            if lostSince == nil { lostSince = now }
+            if now - (lostSince ?? now) > config.trackingLossLimitS {
+                trackingLost(req)
+                return
+            }
+        }
+    }
+
+    private func trackingLost(_ req: Request) {
+        synchronized {
+            // A cancelled old monitor must never brake or overwrite a successor's status.
+            guard active === req, !req.cancelled else { return }
+            deps.drive.stop()
+            pending = nil
+            cancel(req)
+            record("tracking-lost", "cancelled \(req.label)")
+            publish(CoordinatorStatus(state: .blocked, task: CoordinatorConfig.rescanReason))
+            deps.speaker.say("I lost track of where I am. I need a rescan.")
+        }
+    }
+
+    /// Called only within a lifecycle transition; callback and stored status share the same order.
+    private func publish(_ s: CoordinatorStatus) {
+        let changed = _status != s
+        _status = s
+        if changed { _onChange(s) }
+    }
+
+    private func record(_ event: String, _ detail: String) {
+        let t = deps.clock.now()
+        lock.lock(); _trace.append(CoordinatorTraceEntry(t: t, event: event, detail: detail)); lock.unlock()
+    }
+}
