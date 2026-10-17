@@ -61,5 +61,9 @@ let package = Package(
         .testTarget(name: "ComeToMeTests", dependencies: ["ComeToMeCore", "ControllerCore", "PoseCore"], path: "Tests/ComeToMeTests"),
         .testTarget(name: "MLEncodersTests", dependencies: ["MLEncoders", "Retrieval", "FindExecutor", "PerceptionCore", "Memory"], path: "Tests/MLEncodersTests", exclude: ["Fixtures"]),
             .testTarget(name: "ExploreTests", dependencies: ["ExploreCore", "OccupancyGridCore", "PoseCore"], path: "Tests/ExploreTests"),
+        .target(name: "EvalCore", dependencies: ["Memory", "Retrieval", "FindExecutor"], path: "Sources/EvalMode",
+                sources: ["EvalGroundTruth.swift", "EvalQueries.swift", "EvalRawRun.swift", "EvalScoring.swift",
+                          "EvalRetrievalRunner.swift", "EvalFindTrialLogger.swift", "EvalViewModel.swift"]),
+        .testTarget(name: "EvalModeTests", dependencies: ["EvalCore", "Memory", "Retrieval", "FindExecutor"], path: "Tests/EvalModeTests"),
     ]
 )

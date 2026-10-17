@@ -71,6 +71,7 @@ targets:
       - path: Sources/Planner
       - path: Sources/Retrieval
       - path: Sources/FindExecutor
+      - path: Sources/EvalMode
       - path: Sources/MLEncoders
         excludes: ["README.md"]
       - path: Sources/Sync
