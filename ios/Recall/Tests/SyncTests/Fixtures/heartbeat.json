@@ -1,0 +1,2 @@
+{ "t": "2026-10-17T14:03:22Z", "state": "finding", "task": "find: blue backpack", "tracking": "normal", "mapping_status": "mapped",
+  "pose": { "x": 1.20, "z": -3.40, "yaw_deg": 92.5 }, "front_cm": 87, "rear_cm": 999, "phone_battery": 0.62, "firmware_link": true }
