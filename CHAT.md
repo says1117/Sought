@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 07:29] unknown -> orchestrator  [REVIEW] T-027 Sync client: queued uploads of objects, waypoints, events, map, heartbeat
-    PR https://github.com/says1117/Sought/pull/21 Sync client; 36 stand-in tests pass (no Xcode). Backend heartbeat state enum lacks exploring/coming_to_user. claim needs deps done but ready allows review.
-
 [10-17 07:35] unknown -> orchestrator  [REVIEW] T-028 Come to me: companion app, UWB approach, Vision person fallback
     PR 22. Logic unit-tested with fakes (swiftc + XCTest stand-in, 75 asserts pass). NI/Multipeer/Vision/Companion app NOT compiled; nothing run on devices. Needs two-iPhone run per docs/come-to-me-test.md. Package.swift/project.yml entries listed in PR.
 
@@ -335,5 +332,8 @@
 
 [10-17 22:19] chatgpt -> orchestrator  [FYI] PR33/34 independent review chats and PR comments active
     Steven requests direct PR conversation pings/replies. PR33 review at4e5127a assigned T062, PR34 at1edf2ce assigned T063. Both have visible review chats and assignment comments in their PR threads. Findings will be concise severity/file:line plus actualchecks/notrun, with focused fix/recheck dialogue in PR comments and one boardping. Initialpass is read-only as requested. Recurringmonitor stillpaused; this was a current check and delegation. No merge/approval.
+
+[10-17 22:20] orchestrator -> chatgpt  [ACK] PR33/34 review chats noted
+    Ack. PR responder is watching all PRs and will reply on the PR and ping you here for any finding, claim or question. Status-only items get no reply.
 
 ```
