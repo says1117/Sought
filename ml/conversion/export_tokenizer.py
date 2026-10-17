@@ -6,11 +6,12 @@ so Swift unit tests can check the port). Also checks a plain-Python reimplementa
 algorithm Swift must follow against open_clip's tokenizer, so the Swift port has a verified spec.
 """
 import gzip, json, os, re
+import regex as unicode_re
 import open_clip
 from open_clip import tokenizer as T
 
 PHRASES = ["a cat", "a photo of a cat", "the blue backpack by the door", "A Red   Mug!", "keys",
-           "it's a café table", "TV remote", "50 cm chair", "", "a " + "very long phrase " * 30]
+           "it's a café table", "TV remote", "50 cm chair", "ⅫⅫ ①½", "", "a " + "very long phrase " * 30]
 
 
 def bytes_to_unicode():
@@ -34,7 +35,10 @@ def build():
 
 MERGES, ENC, B2U = build()
 RANK = {m: i for i, m in enumerate(MERGES)}
-PAT = re.compile(r"<start_of_text>|<end_of_text>|'s|'t|'re|'ve|'m|'ll|'d|[^\W\d_]+|\d|(?:[^\s\w]|_)+", re.IGNORECASE)  # = open_clip's \p{L}+|\p{N}|[^\s\p{L}\p{N}]+ (single digits!)
+PAT = unicode_re.compile(
+    r"<start_of_text>|<end_of_text>|'s|'t|'re|'ve|'m|'ll|'d|\p{L}+|\p{N}|[^\s\p{L}\p{N}]+",
+    unicode_re.IGNORECASE,
+)
 
 
 def bpe(token):
@@ -57,7 +61,7 @@ def bpe(token):
 def encode(text, ctx=77):
     text = re.sub(r"\s+", " ", text).strip().lower()   # whitespace_clean + lower (ftfy/html.unescape skipped)
     ids = []
-    for tok in re.findall(PAT, text):
+    for tok in unicode_re.findall(PAT, text):
         tok = "".join(B2U[b] for b in tok.encode("utf-8"))
         ids += [ENC[p] for p in bpe(tok)]
     ids = [49406] + ids[: ctx - 2] + [49407]
