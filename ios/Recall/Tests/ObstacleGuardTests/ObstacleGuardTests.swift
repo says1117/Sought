@@ -1,4 +1,7 @@
 import XCTest
+#if canImport(RecallShared)
+import RecallShared
+#endif
 #if canImport(ObstacleGuardCore)
 @testable import ObstacleGuardCore
 #endif

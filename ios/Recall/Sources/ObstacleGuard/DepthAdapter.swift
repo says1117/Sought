@@ -1,5 +1,8 @@
 #if canImport(ARKit)
 import ARKit
+#if canImport(RecallShared)
+import RecallShared
+#endif
 
 // Thin ARKit adapter. NOT compiled or run in the authoring environment (no Xcode / iOS SDK).
 // Converts ARFrame.sceneDepth into the plain arrays the pure core in CorridorSampler.swift expects.

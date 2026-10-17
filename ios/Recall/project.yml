@@ -9,6 +9,9 @@ settings:
     SWIFT_VERSION: "5.0"
     # Set your own team in Xcode (Signing & Capabilities). Not committed.
     CODE_SIGN_STYLE: Automatic
+configFiles:
+  Debug: Config/Recall.xcconfig
+  Release: Config/Recall.xcconfig
 targets:
   Recall:
     type: application
@@ -26,6 +29,13 @@ targets:
         NSCameraUsageDescription: Sees the room to find objects
         NSMicrophoneUsageDescription: Listens for voice commands
         NSSpeechRecognitionUsageDescription: Understands voice commands
+        NSNearbyInteractionUsageDescription: Measures the distance to your phone so the robot can come to you
+        NSLocalNetworkUsageDescription: Talks to the Recall companion app on your iPhone
+        NSBonjourServices: ["_recall-ni._tcp", "_recall-ni._udp"]
+        GEMINI_API_KEY: $(GEMINI_API_KEY)
+        GEMINI_MODEL: $(GEMINI_MODEL)
+        BACKEND_BASE_URL: $(BACKEND_BASE_URL)
+        RECALL_TOKEN: $(RECALL_TOKEN)
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.recall.app
@@ -45,6 +55,33 @@ targets:
       - path: Sources/SelfTest/SelfTestMetrics.swift
       - path: Sources/SelfTest/SelfTestSteps.swift
       - path: Sources/SelfTest/SelfTestEngine.swift
+      - path: Sources/Shared
+      - path: Sources/Memory
+      - path: Sources/OccupancyGrid
+        excludes: ["README.md"]
+      - path: Sources/Planner
+      - path: Sources/Retrieval
+      - path: Sources/FindExecutor
+      - path: Sources/Sync
+        excludes: ["README.md"]
+      - path: Sources/ComeToMe/CompanionMessages.swift
+      - path: Sources/ComeToMe/ApproachPlanner.swift
+      - path: Sources/ComeToMe/ComeToMeRunner.swift
+      - path: Sources/ComeToMe/RangeSample.swift
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
+  Companion:
+    type: application
+    platform: iOS
+    sources:
+      - path: ../Companion/Sources
+      - path: Sources/ComeToMe/CompanionMessages.swift
+      - path: Sources/ComeToMe/CompanionLink.swift
+      - path: Sources/ComeToMe/NIRanging.swift
+      - path: Sources/ComeToMe/RangeSample.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.recall.companion
+        SWIFT_VERSION: "5.0"
+        INFOPLIST_FILE: ../Companion/Resources/Info.plist

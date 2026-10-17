@@ -1,0 +1,1 @@
+{ "id": "rte_bathroom01", "name": "bathroom route", "waypoint_ids": ["wpt_home", "wpt_hall", "wpt_bath"], "kind": "patrol" }

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key><string>en</string>
+	<key>CFBundleDisplayName</key><string>Recall Companion</string>
+	<key>CFBundleExecutable</key><string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key><string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleName</key><string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key><string>APPL</string>
+	<key>CFBundleShortVersionString</key><string>1.0</string>
+	<key>CFBundleVersion</key><string>1</string>
+	<key>LSRequiresIPhoneOS</key><true/>
+	<key>UILaunchScreen</key><dict/>
+	<key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationPortrait</string></array>
+	<key>NSNearbyInteractionUsageDescription</key>
+	<string>Measures the distance and direction to the Recall robot so it can drive to you.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Finds and talks to the Recall robot on your local network and over Bluetooth.</string>
+	<key>NSBonjourServices</key>
+	<array><string>_recall-ni._tcp</string><string>_recall-ni._udp</string></array>
+</dict>
+</plist>
