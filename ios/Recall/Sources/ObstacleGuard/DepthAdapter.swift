@@ -30,7 +30,9 @@ public enum DepthAdapter {
         var confRow = 0
         if let cm = depth.confidenceMap {
             CVPixelBufferLockBaseAddress(cm, .readOnly)
-            conf = CVPixelBufferGetBaseAddress(cm)?.assumingMemoryBound(to: UInt8.self)
+            if let raw = CVPixelBufferGetBaseAddress(cm) {
+                conf = UnsafePointer(raw.assumingMemoryBound(to: UInt8.self))
+            }
             confRow = CVPixelBufferGetBytesPerRow(cm)
         }
         defer { if let cm = depth.confidenceMap { CVPixelBufferUnlockBaseAddress(cm, .readOnly) } }
