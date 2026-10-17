@@ -81,6 +81,19 @@ struct RobotStatus: Equatable {
     var rearDistanceCm: Int? { rearCm == Self.noEcho ? nil : rearCm }
 }
 
+/// Fail-closed check for speech input: telemetry must be connected, recent, and show both wheels stopped.
+enum StationaryStatus {
+    private static let telemetryInterval: TimeInterval = 1.0 / 5.0 // BLE contract status rate
+    static let freshnessWindow = telemetryInterval * 2 // allow one delayed sample, then fail closed
+
+    static func isStationary(status: RobotStatus?, connected: Bool,
+                             receivedAt: TimeInterval?, now: TimeInterval) -> Bool {
+        guard connected, let status, let receivedAt, receivedAt <= now,
+              now - receivedAt <= freshnessWindow else { return false }
+        return status.left == 0 && status.right == 0
+    }
+}
+
 /// TX notifications can split a line across packets. Feed chunks, get complete lines back.
 struct LineBuffer {
     private var pending = ""
@@ -110,18 +123,18 @@ enum PeripheralMatch {
 }
 
 /// Which pad button is held. Decision logic for the hold-to-drive pad, kept pure so it is testable.
-enum DriveIntent: Equatable {
+public enum DriveIntent: Equatable {
     case forward, back, left, right
 }
 
-enum DriveAction: Equatable {
+public enum DriveAction: Equatable {
     case stop
     case drive(left: Int, right: Int)
 }
 
-enum DrivePad {
+public enum DrivePad {
     /// No held button (never pressed, released, or gesture cancelled) or zero speed means STOP.
-    static func action(held: DriveIntent?, speed: Int, isEnabled: Bool = true) -> DriveAction {
+    public static func action(held: DriveIntent?, speed: Int, isEnabled: Bool = true) -> DriveAction {
         let s = abs(DriveProtocol.clamp(speed))
         guard isEnabled, let held, s > 0 else { return .stop }
         switch held {

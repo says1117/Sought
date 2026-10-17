@@ -64,10 +64,22 @@ targets:
       - path: Sources/FindExecutor
       - path: Sources/Sync
         excludes: ["README.md"]
+      - path: Sources/Perception
+        excludes: ["PerceptionAdapters.swift", "README.md"]
+      - path: Sources/Explore
+        excludes: ["README.md"]
+      - path: Sources/Speech/SpeechTypes.swift
+      - path: Sources/Speech/SpeechFakes.swift
+      - path: Sources/UI/FindBarViewModel.swift
+      - path: Sources/UI/ToolExecuting.swift
       - path: Sources/ComeToMe/CompanionMessages.swift
       - path: Sources/ComeToMe/ApproachPlanner.swift
       - path: Sources/ComeToMe/ComeToMeRunner.swift
       - path: Sources/ComeToMe/RangeSample.swift
+      - path: Sources/Teach/WaypointStore.swift
+      - path: Sources/Teach/WorldMapStore.swift
+      - path: Sources/Teach/RelocalizationMonitor.swift
+      - path: Sources/Teach/TeachViewModel.swift
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
