@@ -110,18 +110,18 @@ enum PeripheralMatch {
 }
 
 /// Which pad button is held. Decision logic for the hold-to-drive pad, kept pure so it is testable.
-enum DriveIntent: Equatable {
+public enum DriveIntent: Equatable {
     case forward, back, left, right
 }
 
-enum DriveAction: Equatable {
+public enum DriveAction: Equatable {
     case stop
     case drive(left: Int, right: Int)
 }
 
-enum DrivePad {
+public enum DrivePad {
     /// No held button (never pressed, released, or gesture cancelled) or zero speed means STOP.
-    static func action(held: DriveIntent?, speed: Int, isEnabled: Bool = true) -> DriveAction {
+    public static func action(held: DriveIntent?, speed: Int, isEnabled: Bool = true) -> DriveAction {
         let s = abs(DriveProtocol.clamp(speed))
         guard isEnabled, let held, s > 0 else { return .stop }
         switch held {
