@@ -70,3 +70,41 @@ struct LineBuffer {
         return lines
     }
 }
+
+/// Only attach to our rover: it must advertise the Nordic UART service AND be named `Navigator`
+/// (docs/03_CONTRACTS.md section 1), so another team's UART peripheral is never adopted.
+enum PeripheralMatch {
+    static let name = "Navigator"
+    static let serviceUUID = "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
+
+    /// `advertisedName` is the advertisement local name, `cachedName` is CBPeripheral.name; either may match.
+    static func isNavigator(advertisedName: String?, cachedName: String?, advertisedServiceUUIDs: [String]) -> Bool {
+        let nameOK = advertisedName == name || cachedName == name
+        let serviceOK = advertisedServiceUUIDs.contains { $0.uppercased() == serviceUUID }
+        return nameOK && serviceOK
+    }
+}
+
+/// Which pad button is held. Decision logic for the hold-to-drive pad, kept pure so it is testable.
+enum DriveIntent: Equatable {
+    case forward, back, left, right
+}
+
+enum DriveAction: Equatable {
+    case stop
+    case drive(left: Int, right: Int)
+}
+
+enum DrivePad {
+    /// No held button (never pressed, released, or gesture cancelled) or zero speed means STOP.
+    static func action(held: DriveIntent?, speed: Int) -> DriveAction {
+        let s = DriveProtocol.clamp(abs(speed))
+        guard let held, s > 0 else { return .stop }
+        switch held {
+        case .forward: return .drive(left: s, right: s)
+        case .back:    return .drive(left: -s, right: -s)
+        case .left:    return .drive(left: -s, right: s)
+        case .right:   return .drive(left: s, right: -s)
+        }
+    }
+}

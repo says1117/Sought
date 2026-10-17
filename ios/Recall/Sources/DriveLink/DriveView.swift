@@ -1,9 +1,12 @@
 import SwiftUI
 
-/// Hold-to-drive pad. Drives while a button is held, stops on release.
+/// Hold-to-drive pad. Drives while a button is held; release or a cancelled touch stops.
 struct DriveView: View {
     @ObservedObject var link: DriveLink
     @State private var speed = 150.0
+    @Environment(\.scenePhase) private var scenePhase
+    /// Resets to nil on release AND on cancellation (call, system gesture), unlike DragGesture.onEnded.
+    @GestureState private var held: DriveIntent?
 
     var body: some View {
         VStack(spacing: 16) {
@@ -18,25 +21,35 @@ struct DriveView: View {
             Slider(value: $speed, in: 60...200, step: 10) { Text("Speed") }
             Text("Speed \(Int(speed))").font(.caption)
 
-            let s = Int(speed)
-            HoldButton(title: "Forward", onPress: { link.drive(left: s, right: s) }, onRelease: link.stop)
+            HoldButton(title: "Forward", intent: .forward, held: $held)
             HStack(spacing: 20) {
-                HoldButton(title: "Left", onPress: { link.drive(left: -s, right: s) }, onRelease: link.stop)
-                HoldButton(title: "Right", onPress: { link.drive(left: s, right: -s) }, onRelease: link.stop)
+                HoldButton(title: "Left", intent: .left, held: $held)
+                HoldButton(title: "Right", intent: .right, held: $held)
             }
-            HoldButton(title: "Back", onPress: { link.drive(left: -s, right: -s) }, onRelease: link.stop)
+            HoldButton(title: "Back", intent: .back, held: $held)
         }
         .padding()
+        .onChange(of: held) { _, _ in apply() }
+        .onChange(of: speed) { _, _ in apply() }
+        .onChange(of: scenePhase) { _, phase in if phase != .active { link.stop() } }
+        .onDisappear { link.stop() }
+    }
+
+    private func apply() {
+        switch DrivePad.action(held: held, speed: Int(speed)) {
+        case .stop: link.stop()
+        case .drive(let l, let r): link.drive(left: l, right: r)
+        }
     }
 }
 
 struct HoldButton: View {
     let title: String
-    let onPress: () -> Void
-    let onRelease: () -> Void
-    @State private var down = false
+    let intent: DriveIntent
+    let held: GestureState<DriveIntent?>
 
     var body: some View {
+        let down = held.wrappedValue == intent
         Text(title)
             .frame(width: 120, height: 60)
             .background(down ? Color.blue : Color.gray.opacity(0.3))
@@ -44,7 +57,6 @@ struct HoldButton: View {
             .cornerRadius(12)
             .accessibilityLabel("Drive \(title)")
             .gesture(DragGesture(minimumDistance: 0)
-                .onChanged { _ in if !down { down = true; onPress() } }
-                .onEnded { _ in down = false; onRelease() })
+                .updating(held) { _, state, _ in state = intent })
     }
 }
