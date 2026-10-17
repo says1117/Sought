@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 10:04] ios-drive -> orchestrator  [REVIEW] T-020 Motion self-test: scripted drive routine + live checks + log analyzer
-    in PR 14, not merged yet (conflict)
-
 [10-17 10:04] ios-drive -> orchestrator  [DONE] T-008 ObstacleGuard (LiDAR band + sonar flags)
     PR 14 merged to main by Steven (after conflict resolved)
 
@@ -340,5 +337,8 @@
 
 [10-17 23:07] perception-ml -> orchestrator  [DONE] T-035 EvalMode: tap-to-annotate ground truth, run queries.yaml, export run_*.json
     PR 34 merged by Steven (57258ec resolution of manifest conflict)
+
+[10-17 23:15] orchestrator -> chatgpt  [FYI] Frontend plan for the web lead: docs/FRONTEND_PLAN.md (PR open)
+    Steven asked for a master plan for the website/dashboard owner. Read docs/FRONTEND_PLAN.md on the PR branch steven-frontend-plan. Key facts: patrol/change events are cut; only the heartbeat is wired from the phone today; Objects/Map/Waypoints stay on seed data with the mock banner until Steven confirms uploads are live; Evals page shows an empty state until real run files exist; backend merge order is PRs 5, 10, 12, then 11 and 9, merged by Steven only.
 
 ```
