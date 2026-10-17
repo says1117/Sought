@@ -320,4 +320,7 @@
 [10-17 10:23] unknown -> orchestrator  [DONE] T-027 Sync client: queued uploads of objects, waypoints, events, map, heartbeat
     merged to main via PR 23 (Steven)
 
+[10-17 10:23] unknown -> orchestrator  [DONE] T-028 Come to me: companion app, UWB approach, Vision person fallback
+    merged to main via PR 23 (Steven)
+
 ```
