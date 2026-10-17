@@ -9,7 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.staticfiles import StaticFiles
 
-from backend.db import connect
+from backend.db import Store, connect
+from backend.routes.api import router
 from backend.models import HealthResponse
 
 
@@ -29,6 +30,8 @@ def create_app() -> FastAPI:
     async def lifespan(application: FastAPI):
         media_dir.mkdir(parents=True, exist_ok=True)
         application.state.db = connect(database_path)
+        application.state.store = Store(application.state.db)
+        application.state.media_dir = media_dir
         try:
             yield
         finally:
@@ -59,6 +62,8 @@ def create_app() -> FastAPI:
     @application.get("/api/health", response_model=HealthResponse)
     def health() -> HealthResponse:
         return HealthResponse()
+
+    application.include_router(router)
 
     # StaticFiles rejects traversal; missing files return 404 without API auth.
     application.mount("/media", StaticFiles(directory=media_dir, check_dir=False), name="media")

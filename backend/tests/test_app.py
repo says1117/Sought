@@ -38,7 +38,7 @@ def test_api_requires_valid_token(configured, path, authorization):
 
 def test_valid_token_passes_auth_and_health_post_is_protected(configured):
     with TestClient(create_app()) as client:
-        assert client.get("/api/objects", headers={"Authorization": "Bearer test-only-token"}).status_code == 404
+        assert client.get("/api/objects", headers={"Authorization": "Bearer test-only-token"}).status_code == 200
         assert client.post("/api/health").status_code == 401
 
 
