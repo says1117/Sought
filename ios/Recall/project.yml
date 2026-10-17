@@ -45,6 +45,7 @@ targets:
       - path: Sources/SelfTest/SelfTestMetrics.swift
       - path: Sources/SelfTest/SelfTestSteps.swift
       - path: Sources/SelfTest/SelfTestEngine.swift
+      - path: Sources/Memory
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES

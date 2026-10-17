@@ -3,9 +3,12 @@ import PackageDescription
 
 // Lets the pure DriveLink, Pose and Controller logic be unit tested without Xcode: `swift test` in ios/Recall.
 let package = Package(
-    name: "RecallCore",
+    name: "Recall",
     platforms: [.iOS(.v17), .macOS(.v13)],
+    products: [.library(name: "Memory", targets: ["Memory"])],
     targets: [
+        .target(name: "Memory", path: "Sources/Memory"),
+        .testTarget(name: "MemoryTests", dependencies: ["Memory"], path: "Tests/MemoryTests"),
         .target(name: "DriveLinkCore", path: "Sources/DriveLink",
                 sources: ["DriveLinkProtocol.swift"]),
         .target(name: "PoseCore", path: "Sources/Pose", sources: ["PoseMath.swift"]),
