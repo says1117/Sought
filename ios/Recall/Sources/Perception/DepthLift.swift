@@ -18,6 +18,7 @@ public enum DepthLift {
     /// Median valid depth over the central 30% (by area) of `box`. nil if no valid sample or the median is > 5 m.
     public static func medianDepth(_ depth: DepthMap, box: NormBox) -> Float? {
         let c = box.clamped().central(areaFraction: centralFraction)
+        guard c.area > 0 else { return nil }
         let u0 = max(0, Int((c.x * Float(depth.width)).rounded(.down)))
         let v0 = max(0, Int((c.y * Float(depth.height)).rounded(.down)))
         let u1 = min(depth.width, max(u0 + 1, Int(((c.x + c.w) * Float(depth.width)).rounded(.up))))

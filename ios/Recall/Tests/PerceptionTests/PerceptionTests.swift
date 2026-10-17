@@ -112,6 +112,10 @@ final class DepthLiftTests: XCTestCase {
         XCTAssertNil(DepthLift.medianDepth(flat(5.5), box: NormBox(x: 0, y: 0, w: 1, h: 1)))
         XCTAssertNotNil(DepthLift.medianDepth(flat(5.0), box: NormBox(x: 0, y: 0, w: 1, h: 1)))
     }
+    func testMedianRejectsEmptyBox() {
+        XCTAssertNil(DepthLift.medianDepth(flat(2), box: NormBox(x: 0.5, y: 0.5, w: 0, h: 0)))
+        XCTAssertNil(DepthLift.medianDepth(flat(2), box: NormBox(x: 2, y: 2, w: 0.2, h: 0.2)))
+    }
     func testCentralRegionIs30PercentArea() {
         let c = NormBox(x: 0, y: 0, w: 1, h: 1).central(areaFraction: 0.3)
         XCTAssertEqual(c.area, 0.3, accuracy: 1e-5)
