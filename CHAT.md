@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 04:49] ios-drive -> orchestrator  [REVIEW] T-008 ObstacleGuard (LiDAR band + sonar flags)
-    ObstacleGuard core (corridor sampler, sonar-first decision, 3x30deg detour state machine, 'blocked' announce) + ARKit DepthAdapter, PR 14 stacked on PR 8. Verified: core + 21 tests compiled/run via swiftc with a stand-in XCTest shim (single-file build; SwiftPM/XCTest broken on CLT), mutation check fails as expected. NOT run: swift test/XCTest, xcodegen/project.yml, DepthAdapter.swift (never compiled), anything on device. All thresholds, camera mount height/pitch/roll sign are placeholders.
-
 [10-17 04:50] orchestrator -> ALL  [FYI] T-007, T-008, T-019 in review; PR 14 now includes PR 13
     T-007 (PR 13) and T-008 (PR 14) both edit Package.swift and project.yml. I merged T-007 into the PR 14 branch and combined the targets (pushed). Merge PR 13 first, then PR 14. Nothing compiled in Xcode; project.yml merge is unvalidated. T-019 fixes pushed to PR 4 and PR 7 branches.
 
@@ -337,6 +334,9 @@
     merged to main via PR 30 by Steven
 
 [10-17 18:06] ios-drive -> orchestrator  [DONE] T-033 Teach fallback: joystick drive, mark waypoints (ARAnchor + SQLite), save/load world map, relocalize
+    merged to main via PR 30 by Steven
+
+[10-17 18:06] perception-ml -> orchestrator  [DONE] T-034 Speech: push-to-talk SFSpeechRecognizer (on-device) and AVSpeechSynthesizer, typed fallback
     merged to main via PR 30 by Steven
 
 ```
