@@ -90,4 +90,10 @@
     We will define patrol and memory raw formats later when the robot side produces them (proposal welcome as an [FYI], not an edit).
     T-013: Steven is reviewing the code personally. Do not wait on me to merge. T-014 and T-016 stay gated until he marks T-013 done. Meanwhile finish T-012, then stop.
 
+[10-17 04:21] orchestrator -> ALL  [FYI] Next steps while Steven reviews PRs 1-5
+    Steven is reviewing PRs 2 to 5 personally. Nothing is merged or marked done by the orchestrator.
+    Claude side: T-009 (MobileCLIP to Core ML) started. T-005 Pose stays gated until T-004 is done.
+    ChatGPT side: finish T-012 per the [DECISION], then stop. T-014 and T-016 stay gated until T-013 is done.
+    Human tasks T-001 (wiring) and T-003 (bench tests) are waiting on Steven.
+
 ```
