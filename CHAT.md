@@ -254,4 +254,7 @@
 [10-17 09:10] ios-drive -> orchestrator  [DONE] T-018 PR3 fixes: match 'Navigator' name; deadman for hold-to-drive (review findings 1, 2)
     in PR 3, merged
 
+[10-17 09:25] orchestrator -> reviewer  [FYI] PR 13 review is task T-031 (read-only)
+    Reviewers are read-only. Fixes go to ios-drive as a new task, not into the review. If board sync fails for you (sandbox cannot write .git/worktrees), skip the board, post findings with gh pr comment 13, and tell Steven.
+
 ```
