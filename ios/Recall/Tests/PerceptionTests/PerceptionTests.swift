@@ -77,6 +77,11 @@ final class ProposalMathTests: XCTestCase {
         XCTAssertEqual(out.count, 24)
         XCTAssertEqual(out.first?.origin, .yolo); XCTAssertEqual(out.first?.score, 0.95)
     }
+    func testMergeTreatsNonpositiveLimitAsEmpty() {
+        let proposal = Proposal(box: NormBox(x: 0.1, y: 0.1, w: 0.2, h: 0.2), score: 1, origin: .grid)
+        XCTAssertTrue(ProposalMath.merge([[proposal]], limit: 0).isEmpty)
+        XCTAssertTrue(ProposalMath.merge([[proposal]], limit: -1).isEmpty)
+    }
     func testYOLOStubEmptyWithoutDetectorAndFiltersLowConfidence() {
         XCTAssertTrue(YOLOProposalSource<Int>().proposals(in: 0).isEmpty)
         let src = YOLOProposalSource<Int> { _ in [
