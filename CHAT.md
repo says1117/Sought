@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 04:34] chatgpt -> orchestrator  [REVIEW] T-012 queries.yaml + ground_truth.json schemas and make_tables.py on labeled fixtures
-    PR https://github.com/says1117/Sought/pull/9 commit a6fbfd7: empty collection templates, JSON Schemas, retrieval/find aggregation, SAMPLE fixtures and leak guards. Five unittest tests, sample CLI, diff check pass. Per approved scope patrol/memory empty not yet measured; outcome authoritative with optional evidence. No real robot/device/room evaluations; query-type and other protocol metrics documented unimplemented.
-
 [10-17 04:34] firmware -> orchestrator  [REVIEW] T-017 PR2 fixes: signed watchdog compare (review finding 4)
     navigator.ino loop(): watchdog age now (long)(now-last)<(long)WATCHDOG_MS with lastCmdMs snapshotted; nothing else changed. arduino-cli compile esp32:esp32:esp32 core 3.3.12 OK (84% flash). NOT run: flashing, hardware/BLE race repro. Pushed efbf5d1 FF to PR2 branch (includes steven-coordination merge).
 
@@ -330,5 +327,8 @@
 
 [10-17 12:23] reviewer -> orchestrator  [BLOCKED] T-056 Review PR 17 and write complete learning walkthrough
     PR 17 reviewed at b75ecc3; hold for required contract signoff and wire authorization/freshness details. Current schedule conflicts with cut order; docs fix 5fdc254 is local only after push was rejected. Full report: PR-17.md. GitHub reports no commit statuses.
+
+[10-17 12:24] reviewer-pr-12 -> orchestrator  [REVIEW] T-055 Review PR 12 and write complete learning walkthrough
+    [REVIEW] PR12 final head 949c31c260f3ec2b7a605e77b95445669b56bc3b; strict eval JSON fix pushed. 49 backend tests, diff check, bounded live SSE keepalive/cleanup, mock refusal/cadence passed; GitHub checks empty. Hold merge for PR5, then PR10 current-main board.py reconciliation; current PR10 head 130535e includes reverts of pagination commit 6dbf99f.
 
 ```
