@@ -11,7 +11,12 @@ import Foundation
 /// - A second task request while one runs is held as the single pending request. If that slot is also full,
 ///   or the request is mark_waypoint, it is refused with a spoken reason. Never throws for that.
 /// - `stopAll()` is synchronous: drive STOP first, cancel the owned task and adapter, clear pending,
-///   state idle. Movement ownership stays busy until the cancelled runner returns.
+///   state idle. The slot stays busy until the cancelled runner returns or the drain timeout releases it.
+/// - Each running request holds a `DriveLease` token. Cancelling revokes it, so a runner that ignores
+///   cancellation (even after the drain timeout hands the slot to a successor) cannot drive: its commands
+///   are dropped at the drive boundary. STOP is never filtered.
+/// - A manual tool (Manual drive, Teach, Self-test) takes the lease exclusively via `beginManualControl`;
+///   new motion is refused until `endManualControl`.
 /// - Tracking not normal for more than 1 s cancels the motion task and reports "need a rescan" (blocked).
 /// - Reported failures become `blocked`; a thrown error becomes `error` and is rethrown to the caller.
 final class RobotCoordinator {
@@ -25,6 +30,7 @@ final class RobotCoordinator {
         var worker: Task<Void, Error>?
         var cancelled = false
         var started = false
+        var token: UInt64?
         var drainWatch: Task<Void, Never>?
         var result: Result<Void, Error>?
         var waiters: [CheckedContinuation<Void, Error>] = []
@@ -107,6 +113,8 @@ final class RobotCoordinator {
 
     /// Stop always wins. Synchronous. Safe with nothing running.
     func stopAll() {
+        // Revoke first so no drive command can follow the brake and leave the heartbeat resending it.
+        deps.lease.revoke()
         deps.drive.stop()
         synchronized {
             let victim = active
@@ -123,6 +131,7 @@ final class RobotCoordinator {
     private func cancel(_ req: Request?) {
         guard let req, !req.cancelled else { return }
         req.cancelled = true
+        deps.lease.revoke()
         req.monitor?.cancel()
         req.worker?.cancel()
         if req.started {
@@ -136,7 +145,8 @@ final class RobotCoordinator {
     }
 
     /// A cancelled runner that never returns must not wedge the coordinator. The drive STOP was already
-    /// sent when the task was cancelled; this releases the slot so new requests are accepted again.
+    /// sent and its lease token revoked when the task was cancelled, so the stale runner can no longer drive;
+    /// this releases the slot so new requests are accepted again.
     private func forceComplete(_ req: Request) {
         synchronized {
             guard active === req, req.cancelled else { return }
@@ -148,6 +158,20 @@ final class RobotCoordinator {
             deps.speaker.say("I stopped, but the last task did not finish cleanly. I'm ready for a new request.")
             finishRequest(req, .success(()))
         }
+    }
+
+    /// A manual tool (Manual drive, Teach, Self-test) is opening: cancel motion, brake, revoke the lease, and
+    /// refuse new motion until `endManualControl` for the same tool. Idempotent per tool.
+    func beginManualControl(_ tool: String) {
+        deps.lease.holdManual(tool)   // revokes the current token before the brake below
+        stopAll()
+        synchronized { record("manual-begin", tool) }
+    }
+
+    func endManualControl(_ tool: String) {
+        deps.drive.stop()
+        deps.lease.releaseManual(tool)
+        synchronized { record("manual-end", tool) }
     }
 
     private func refuseDisabled(_ what: String, _ spoken: String) {
@@ -195,7 +219,10 @@ final class RobotCoordinator {
         try await withTaskCancellationHandler {
             let worker: Task<Void, Error>? = try synchronized {
                 try Task.checkCancellation()
-                if active == nil {
+                if deps.lease.manualHeld {
+                    record("refused", "\(req.label): manual control is open")
+                    deps.speaker.say("A manual control screen is open. Close it first, then ask me again.")
+                } else if active == nil {
                     return start(req)
                 } else if active?.cancelled == true {
                     record("refused", "\(req.label): previous task still stopping")
@@ -222,6 +249,7 @@ final class RobotCoordinator {
                     return
                 }
                 guard self.active === req else { return }
+                self.deps.lease.revoke()
                 self.deps.drive.stop()
                 self.pending = nil
                 self.cancel(req)
@@ -259,8 +287,13 @@ final class RobotCoordinator {
         }
         do {
             let wp = try deps.waypoints.markHere(name: name)
-            record("marked", wp.name)
-            deps.speaker.say("Saved this spot as \(wp.name).")
+            if deps.waypoints.isPersistent {
+                record("marked", wp.name)
+                deps.speaker.say("Saved this spot as \(wp.name).")
+            } else {
+                record("marked-temporary", wp.name)
+                deps.speaker.say("Saved this spot as \(wp.name), but only until the app closes. Storage is not working, so it will not be remembered.")
+            }
         } catch {
             record("error", "mark \(name): \(error)")
             deps.speaker.say("I couldn't save that spot.")
@@ -279,6 +312,14 @@ final class RobotCoordinator {
                 active = nil
                 return false
             }
+            guard let token = deps.lease.grant() else {
+                pending = nil
+                record("refused", "\(req.label): manual control is open")
+                deps.speaker.say("A manual control screen is open. Close it first, then ask me again.")
+                active = nil
+                return false
+            }
+            req.token = token
             publish(CoordinatorStatus(state: state(for: req.kind), task: req.label))
             // A re-entrant status callback can STOP before the runner has even been called.
             guard !req.cancelled, !Task.isCancelled else { active = nil; return false }
@@ -291,11 +332,12 @@ final class RobotCoordinator {
         let outcome: Result<CoordinatorTaskResult, Error>
         do {
             try Task.checkCancellation()
-            outcome = .success(try await req.run())
+            outcome = .success(try await DriveLease.$token.withValue(req.token) { try await req.run() })
         } catch { outcome = .failure(error) }
 
         let error: Error? = synchronized {
             req.monitor?.cancel()
+            deps.lease.revoke(req.token)   // child work still unwinding cannot drive; a successor's token is untouched
             guard active === req else { return nil }
             if req.cancelled {
                 active = nil
@@ -360,6 +402,7 @@ final class RobotCoordinator {
         synchronized {
             // A cancelled old monitor must never brake or overwrite a successor's status.
             guard active === req, !req.cancelled else { return }
+            deps.lease.revoke()
             deps.drive.stop()
             pending = nil
             cancel(req)

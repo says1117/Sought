@@ -39,9 +39,9 @@ struct RecallApp: App {
                     .toolbar {
                         ToolbarItem(placement: .topBarTrailing) {
                             Menu {
-                                Button("Manual drive") { showDrive = true }
-                                Button("Teach (waypoints, map)") { showTeach = true }
-                                Button("Self-test") { showSelfTest = true }
+                                Button("Manual drive") { runtime.beginManualControl("drive"); showDrive = true }
+                                Button("Teach (waypoints, map)") { runtime.beginManualControl("teach"); showTeach = true }
+                                Button("Self-test") { runtime.beginManualControl("selftest"); showSelfTest = true }
                             } label: {
                                 HStack(spacing: 6) {
                                     Image(systemName: "wrench.and.screwdriver")
@@ -55,15 +55,15 @@ struct RecallApp: App {
                     }
                     .navigationBarTitleDisplayMode(.inline)
             }
-            .sheet(isPresented: $showDrive) {
+            .sheet(isPresented: $showDrive, onDismiss: { runtime.endManualControl("drive") }) {
                 NavigationStack {
                     DriveView(link: link)
                         .overlay(alignment: .topTrailing) { PoseOverlay(tracker: pose).padding(8) }
                         .toolbar { ToolbarItem(placement: .topBarLeading) { Button("Done") { link.stop(); showDrive = false } } }
                 }
             }
-            .sheet(isPresented: $showTeach) { TeachContainer(link: link, tracker: pose) }
-            .sheet(isPresented: $showSelfTest) { SelfTestContainer(link: link, tracker: pose) }
+            .sheet(isPresented: $showTeach, onDismiss: { runtime.endManualControl("teach") }) { TeachContainer(link: link, tracker: pose) }
+            .sheet(isPresented: $showSelfTest, onDismiss: { runtime.endManualControl("selftest") }) { SelfTestContainer(link: link, tracker: pose) }
             .onAppear {
                 UIApplication.shared.isIdleTimerDisabled = true
                 startPoseSession()

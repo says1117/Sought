@@ -51,7 +51,10 @@ final class StoreWaypointsAdapter: CoordinatorWaypoints {
     enum MarkError: Error { case noPose }
     private let store: WaypointStore
     private let poses: PoseSource
-    init(store: WaypointStore, poses: PoseSource) { self.store = store; self.poses = poses }
+    let isPersistent: Bool
+    init(store: WaypointStore, poses: PoseSource, isPersistent: Bool = true) {
+        self.store = store; self.poses = poses; self.isPersistent = isPersistent
+    }
 
     func lookup(_ name: String) -> CoordinatorWaypoint? {
         guard let w = try? store.waypoint(named: name) else { return nil }
@@ -202,9 +205,14 @@ struct CoordinatorWiring {
     var controllerClock: () -> Double = { ProcessInfo.processInfo.systemUptime }
     var controllerSleep: (Double) async -> Void = { try? await Task.sleep(nanoseconds: UInt64($0 * 1_000_000_000)) }
     var config = CoordinatorConfig()
+    /// False when the waypoint store fell back to memory; marks are then confirmed as temporary.
+    var waypointsPersistent = true
 
+    /// `drive` must be a serialized sink (see `SerialDriveSink`) and `poses` a snapshot reader
+    /// (see `PoseSnapshotBox`): the coordinator and Controller run off the main thread.
     func makeCoordinator() -> RobotCoordinator {
-        let controller = Controller(poses: poses, sink: drive, guardState: guardState,
+        let lease = DriveLease()
+        let controller = Controller(poses: poses, sink: LeasedDriveSink(base: drive, lease: lease), guardState: guardState,
                                     clock: controllerClock, sleep: controllerSleep)
         let driver = ControllerApproachDriver(controller: controller, poses: poses)
         let finder = FindRunnerAdapter(tracks: trackStore, encoders: encoders, driver: driver, speaker: speaker,
@@ -215,9 +223,9 @@ struct CoordinatorWiring {
             dependencies: CoordinatorDependencies(
                 explorer: UnwiredExplorer(), finder: finder, comer: UnwiredComeToMe(),
                 navigator: ControllerNavigator(controller: controller),
-                waypoints: StoreWaypointsAdapter(store: waypointStore, poses: poses),
+                waypoints: StoreWaypointsAdapter(store: waypointStore, poses: poses, isPersistent: waypointsPersistent),
                 drive: DriveStopAdapter(sink: drive), speaker: speaker, clock: clock,
-                pose: ControllerPoseAdapter(source: poses)),
+                pose: ControllerPoseAdapter(source: poses), lease: lease),
             config: cfg)
     }
 }

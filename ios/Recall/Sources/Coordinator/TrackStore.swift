@@ -11,13 +11,68 @@ protocol TrackProviding: AnyObject {
 
 enum TrackStoreError: Error, Equatable { case sqlite(String) }
 
+/// float16 BLOB codec for stored embeddings (little endian, 2 bytes per component).
+enum EmbeddingCodec {
+    static func encode(_ v: [Float]) -> Data {
+        var d = Data(capacity: v.count * 2)
+        for f in v { let h = halfBits(f); d.append(UInt8(h & 0xFF)); d.append(UInt8(h >> 8)) }
+        return d
+    }
+
+    /// nil unless the blob is exactly `dim * 2` bytes and `dim` is positive.
+    static func decode(_ blob: Data, dim: Int) -> [Float]? {
+        guard dim > 0, blob.count == dim * 2 else { return nil }
+        let b = [UInt8](blob)
+        return (0..<dim).map { halfFloat(UInt16(b[2 * $0]) | UInt16(b[2 * $0 + 1]) << 8) }
+    }
+
+    static func halfBits(_ f: Float) -> UInt16 {
+        let x = f.bitPattern
+        let sign = UInt16((x >> 16) & 0x8000)
+        let exp = Int((x >> 23) & 0xFF)
+        var man = x & 0x7FFFFF
+        if exp == 0xFF { return sign | 0x7C00 | (man != 0 ? 0x200 : 0) }
+        let e = exp - 127 + 15
+        if e >= 0x1F { return sign | 0x7C00 }
+        if e <= 0 {
+            if e < -10 { return sign }
+            man |= 0x800000
+            let shift = UInt32(14 - e)
+            var h = man >> shift
+            let rem = man & ((1 << shift) - 1), half = UInt32(1) << (shift - 1)
+            if rem > half || (rem == half && (h & 1) == 1) { h += 1 }
+            return sign | UInt16(h)
+        }
+        var h = UInt32(e) << 10 | (man >> 13)
+        let rem = man & 0x1FFF
+        if rem > 0x1000 || (rem == 0x1000 && (h & 1) == 1) { h += 1 }
+        return sign | UInt16(h)
+    }
+
+    static func halfFloat(_ h: UInt16) -> Float {
+        let sign = UInt32(h & 0x8000) << 16
+        let exp = UInt32((h >> 10) & 0x1F), man = UInt32(h & 0x3FF)
+        if exp == 0 {
+            if man == 0 { return Float(bitPattern: sign) }
+            let v = Float(man) / 16_777_216            // man * 2^-24
+            return sign != 0 ? -v : v
+        }
+        if exp == 0x1F { return Float(bitPattern: sign | 0x7F80_0000 | (man << 13)) }
+        return Float(bitPattern: sign | ((exp + 112) << 23) | (man << 13))
+    }
+}
+
 /// SQLite persistence for object tracks, using the contract's `tracks` table (docs/03_CONTRACTS.md section 3).
-/// Embeddings stay on the phone. They are stored as float32 BLOBs here (the contract text says float16; nothing
-/// outside this file reads them, and float32 avoids a Float16 dependency on Intel simulators).
+/// Embeddings stay on the phone and are stored as little-endian float16 BLOBs (contract section 3), converted
+/// with bit operations so no `Float16` type is needed on Intel simulators. A row whose BLOB length is not
+/// `2 * embedding_dim` is skipped with a logged error rather than decoded into a wrong-sized vector.
 /// Pass ":memory:" for tests. Can share the Teach database file (separate connection, busy timeout set).
 final class TrackStore: TrackProviding {
     private var db: OpaquePointer?
     private let lock = NSLock()
+    /// Rows skipped because their embedding BLOB did not match `embedding_dim`.
+    private(set) var invalidRowCount = 0
+    var onInvalidRow: (String) -> Void = { NSLog("TrackStore: %@", $0) }
     private static let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
     init(path: String) throws {
@@ -42,16 +97,22 @@ final class TrackStore: TrackProviding {
         lock.lock(); defer { lock.unlock() }
         var out: [Track] = []
         var stmt: OpaquePointer?
-        let sql = "SELECT id,x,y,z,embedding,sightings,persistence,last_seen FROM tracks WHERE active = 1"
+        let sql = "SELECT id,x,y,z,embedding,sightings,persistence,last_seen,embedding_dim FROM tracks WHERE active = 1"
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { throw TrackStoreError.sqlite(msg()) }
         defer { sqlite3_finalize(stmt) }
         while sqlite3_step(stmt) == SQLITE_ROW {
             guard let idc = sqlite3_column_text(stmt, 0) else { continue }
+            let id = String(cString: idc)
             let n = Int(sqlite3_column_bytes(stmt, 4))
-            var emb = [Float](repeating: 0, count: n / MemoryLayout<Float>.size)
-            if n > 0, let raw = sqlite3_column_blob(stmt, 4) { memcpy(&emb, raw, emb.count * MemoryLayout<Float>.size) }
+            let dim = Int(sqlite3_column_int(stmt, 8))
+            let blob = (n > 0 ? sqlite3_column_blob(stmt, 4).map { Data(bytes: $0, count: n) } : nil) ?? Data()
+            guard let emb = EmbeddingCodec.decode(blob, dim: dim) else {
+                invalidRowCount += 1
+                onInvalidRow("skipping \(id): embedding BLOB is \(n) bytes but embedding_dim is \(dim) (float16 needs \(dim * 2))")
+                continue
+            }
             let seen = sqlite3_column_text(stmt, 7).flatMap { ISO8601DateFormatter().date(from: String(cString: $0)) }
-            out.append(Track(id: String(cString: idc),
+            out.append(Track(id: id,
                              position: SIMD3(Float(sqlite3_column_double(stmt, 1)), Float(sqlite3_column_double(stmt, 2)),
                                              Float(sqlite3_column_double(stmt, 3))),
                              embedding: emb, sightings: Int(sqlite3_column_int(stmt, 5)),
@@ -78,12 +139,49 @@ final class TrackStore: TrackProviding {
         sqlite3_bind_double(stmt, 3, Double(t.position.y))
         sqlite3_bind_double(stmt, 4, Double(t.position.z))
         sqlite3_bind_double(stmt, 5, Double(height))
-        t.embedding.withUnsafeBytes { sqlite3_bind_blob(stmt, 6, $0.baseAddress, Int32($0.count), Self.transient) }
+        let blob = EmbeddingCodec.encode(t.embedding)
+        _ = blob.withUnsafeBytes { sqlite3_bind_blob(stmt, 6, $0.baseAddress, Int32($0.count), Self.transient) }
         sqlite3_bind_int(stmt, 7, Int32(t.embedding.count))
         sqlite3_bind_text(stmt, 8, iso, -1, Self.transient)
         sqlite3_bind_int(stmt, 9, Int32(t.sightings))
         sqlite3_bind_double(stmt, 10, Double(t.persistence))
         guard sqlite3_step(stmt) == SQLITE_DONE else { throw TrackStoreError.sqlite(msg()) }
+    }
+
+    /// Persist a matched observation, honouring the Memory `UpdatePlan`. `last_seen`, `sightings` and
+    /// `persistence` are always written; position/height and the embedding only when the plan says so.
+    /// (The thumbnail is not stored in this table.) Falls back to a full insert if the row is missing.
+    func recordMatch(_ t: Track, plan: UpdatePlan, height: Float = 0, at date: Date = Date()) throws {
+        lock.lock(); defer { lock.unlock() }
+        var sets = ["last_seen=?", "sightings=?", "persistence=?"]
+        if plan.rewritePosition { sets += ["x=?", "y=?", "z=?", "height_above_floor=?"] }
+        if plan.rewriteEmbedding { sets += ["embedding=?", "embedding_dim=?"] }
+        var stmt: OpaquePointer?
+        let sql = "UPDATE tracks SET \(sets.joined(separator: ",")) WHERE id=?"
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { throw TrackStoreError.sqlite(msg()) }
+        defer { sqlite3_finalize(stmt) }
+        var i: Int32 = 1
+        func next() -> Int32 { defer { i += 1 }; return i }
+        sqlite3_bind_text(stmt, next(), ISO8601DateFormatter().string(from: date), -1, Self.transient)
+        sqlite3_bind_int(stmt, next(), Int32(t.sightings))
+        sqlite3_bind_double(stmt, next(), Double(t.persistence))
+        if plan.rewritePosition {
+            sqlite3_bind_double(stmt, next(), Double(t.position.x))
+            sqlite3_bind_double(stmt, next(), Double(t.position.y))
+            sqlite3_bind_double(stmt, next(), Double(t.position.z))
+            sqlite3_bind_double(stmt, next(), Double(height))
+        }
+        if plan.rewriteEmbedding {
+            let blob = EmbeddingCodec.encode(t.embedding)
+            _ = blob.withUnsafeBytes { sqlite3_bind_blob(stmt, next(), $0.baseAddress, Int32($0.count), Self.transient) }
+            sqlite3_bind_int(stmt, next(), Int32(t.embedding.count))
+        }
+        sqlite3_bind_text(stmt, next(), t.id, -1, Self.transient)
+        guard sqlite3_step(stmt) == SQLITE_DONE else { throw TrackStoreError.sqlite(msg()) }
+        if sqlite3_changes(db) == 0 {
+            lock.unlock(); defer { lock.lock() }
+            try upsert(t, height: height, at: date)
+        }
     }
 
     private func msg() -> String { db.map { String(cString: sqlite3_errmsg($0)) } ?? "no db" }

@@ -29,9 +29,9 @@ final class MemoryIngestor {
             switch assoc.result {
             case .matched(let id, let sim, let dist):
                 guard let i = tracks.firstIndex(where: { $0.id == id }) else { continue }
-                let (updated, _) = applyMatch(track: tracks[i], observation: o.observation, cosine: sim, distance: dist)
+                let (updated, plan) = applyMatch(track: tracks[i], observation: o.observation, cosine: sim, distance: dist)
                 tracks[i] = updated
-                try store.upsert(updated, height: o.heightAboveFloor, at: now())
+                try store.recordMatch(updated, plan: plan, height: o.heightAboveFloor, at: now())
                 summary.matched += 1
             case .newTrack:
                 let t = newTrack(id: newId(), from: o.observation)

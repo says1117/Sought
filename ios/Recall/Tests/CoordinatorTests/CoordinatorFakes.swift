@@ -83,6 +83,7 @@ final class CoordTestWaypoints: CoordinatorWaypoints {
     var known: [String: CoordinatorWaypoint] = ["kitchen": CoordinatorWaypoint(name: "kitchen", x: 1, z: 2)]
     var marked: [String] = []
     var markError: Error?
+    var isPersistent = true
     func lookup(_ name: String) -> CoordinatorWaypoint? { known[name.lowercased()] }
     func markHere(name: String) throws -> CoordinatorWaypoint {
         if let markError { throw markError }

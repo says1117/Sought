@@ -1,16 +1,21 @@
 import SwiftUI
 import ARKit
 import CoreImage
+import Combine
 
 /// Builds and owns the real robot stack: DriveLink, PoseTracker, stores, the coordinator, the heartbeat, and the
 /// perception loop. Everything with logic lives in Sources/Coordinator and is unit tested; this file is wiring.
 ///
-/// Threading: the coordinator and Controller run off the main thread. They only read `SensorCache`, which the main
-/// thread refreshes at 10 Hz under a lock, so they never touch @Published ARKit or BLE state directly.
+/// Threading: the coordinator and Controller run off the main thread. They never touch the mutable PoseTracker or
+/// DriveLink. Obstacle data comes from `SensorCache`, pose/tracking from `PoseSnapshotBox` (both updated on the
+/// main thread under a lock), and every drive write goes through `SerialDriveSink`, which runs it on the main queue.
+/// Manual tools take the drive lease exclusively through `beginManualControl` / `endManualControl`.
 @MainActor
 final class AppRuntime: ObservableObject {
     @Published private(set) var coordinatorStatus = CoordinatorStatus.idle
     @Published private(set) var perceptionNote = "Perception idle"
+    /// Non-nil when waypoints or remembered objects could only be kept in memory this run.
+    @Published private(set) var storageWarning: String?
 
     let link: DriveLink
     let pose: PoseTracker
@@ -21,6 +26,9 @@ final class AppRuntime: ObservableObject {
 
     private let waypointStore: WaypointStore
     private let cache = SensorCache()
+    private let poseBox = PoseSnapshotBox()
+    private var poseSubscription: AnyCancellable?
+    private var storageWarningSpoken = false
     private let heartbeatSource = CoordinatorHeartbeatSource()
     private var heartbeat: HeartbeatPublisher?
     private var sensorTimer: Timer?
@@ -38,22 +46,36 @@ final class AppRuntime: ObservableObject {
         let dbPath = dir.appendingPathComponent("recall.sqlite").path
         let waypoints: WaypointStore
         let tracks: TrackStore
-        do { waypoints = try WaypointStore(path: dbPath) } catch { waypoints = try! WaypointStore(path: ":memory:") }
-        do { tracks = try TrackStore(path: dbPath) } catch { tracks = try! TrackStore(path: ":memory:") }
+        var lost: [String] = []
+        do { waypoints = try WaypointStore(path: dbPath) } catch {
+            waypoints = try! WaypointStore(path: ":memory:"); lost.append("saved places")
+        }
+        do { tracks = try TrackStore(path: dbPath) } catch {
+            tracks = try! TrackStore(path: ":memory:"); lost.append("remembered objects")
+        }
+        let waypointsPersistent = !lost.contains("saved places")
+        let warning: String? = lost.isEmpty ? nil : "Storage unavailable. New \(lost.joined(separator: " and ")) are temporary and will be lost when the app closes."
 
         self.waypointStore = waypoints
         let cache = self.cache
         let wiring = CoordinatorWiring(
-            poses: pose, drive: link, guardState: { cache.guardState() }, waypointStore: waypoints, trackStore: tracks,
-            encoders: encoders, speaker: SpeakerAdapter(speaker: speaker), features: features)
+            poses: poseBox, drive: SerialDriveSink(target: link, queue: .main, isOnQueue: { Thread.isMainThread }),
+            guardState: { cache.guardState() }, waypointStore: waypoints, trackStore: tracks,
+            encoders: encoders, speaker: SpeakerAdapter(speaker: speaker), features: features,
+            waypointsPersistent: waypointsPersistent)
         let coordinator = wiring.makeCoordinator()
         self.coordinator = coordinator
+        self.storageWarning = warning
 
         if let embed = cropEmbedder, encoderSet.isAvailable {
             perception = PerceptionLoop(session: pose.session, ingestor: MemoryIngestor(store: tracks), embed: embed,
                                         floorY: { [weak pose] in pose?.floorY })
         }
         perceptionNote = perception == nil ? "Memory is not filling: image models not installed" : "Memory fills while parked"
+
+        let box = poseBox
+        poseSubscription = Publishers.CombineLatest(pose.$pose, pose.$tracking)
+            .sink { box.update(pose: $0, tracking: $1) }
 
         let hb = heartbeatSource
         coordinator.onChange = { [weak self] status in
@@ -70,6 +92,7 @@ final class AppRuntime: ObservableObject {
         var s = "Robot: \(coordinatorStatus.state.heartbeatValue)"
         if let task = coordinatorStatus.task { s += " · \(task)" }
         if !encoderSet.isAvailable { s += "\nFinding objects is off: image models not installed" }
+        if let storageWarning { s += "\n" + storageWarning }
         return s
     }
 
@@ -80,6 +103,10 @@ final class AppRuntime: ObservableObject {
 
     func start() {
         refreshSensors()
+        if let storageWarning, !storageWarningSpoken {
+            storageWarningSpoken = true
+            speaker.speak(storageWarning)
+        }
         sensorTimer?.invalidate()
         let t = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.tick() }
@@ -93,6 +120,18 @@ final class AppRuntime: ObservableObject {
     func stopEverything() {
         coordinator.stopAll()
         link.stop()
+    }
+
+    /// Opening Manual drive, Teach or Self-test: stop and revoke the coordinator's drive access first, and keep it
+    /// refused until the tool closes. Call `endManualControl` with the same name when it closes.
+    func beginManualControl(_ tool: String) {
+        coordinator.beginManualControl(tool)
+        link.stop()
+    }
+
+    func endManualControl(_ tool: String) {
+        link.stop()
+        coordinator.endManualControl(tool)
     }
 
     func pause() {

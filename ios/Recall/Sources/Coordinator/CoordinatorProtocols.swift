@@ -66,6 +66,12 @@ protocol CoordinatorWaypoints: AnyObject {
     func lookup(_ name: String) -> CoordinatorWaypoint?
     /// Save the robot's current pose under `name`. Throws if there is no pose or the save fails.
     func markHere(name: String) throws -> CoordinatorWaypoint
+    /// False when saves only live in memory (persistent storage failed to open). Spoken confirmations say so.
+    var isPersistent: Bool { get }
+}
+
+extension CoordinatorWaypoints {
+    var isPersistent: Bool { true }
 }
 
 /// Synchronous drive brake. Must be safe to call from any thread, at any time, many times.
@@ -98,6 +104,8 @@ struct CoordinatorDependencies {
     var speaker: CoordinatorSpeaking
     var clock: CoordinatorClock
     var pose: CoordinatorPoseSource
+    /// Shared with the drive sink the runners use; the coordinator grants, revokes and holds it.
+    var lease = DriveLease()
 }
 
 /// T-039 SEAM: the app shell implements this to build the real adapters (ARKit pose, DriveLink, Memory,
