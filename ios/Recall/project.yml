@@ -68,6 +68,10 @@ targets:
         excludes: ["PerceptionAdapters.swift", "README.md"]
       - path: Sources/Explore
         excludes: ["README.md"]
+      - path: Sources/Speech/SpeechTypes.swift
+      - path: Sources/Speech/SpeechFakes.swift
+      - path: Sources/UI/FindBarViewModel.swift
+      - path: Sources/UI/ToolExecuting.swift
       - path: Sources/ComeToMe/CompanionMessages.swift
       - path: Sources/ComeToMe/ApproachPlanner.swift
       - path: Sources/ComeToMe/ComeToMeRunner.swift
