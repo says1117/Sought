@@ -63,7 +63,16 @@ struct RecallApp: App {
                 pose.start()
             }
             .onChange(of: phase) { _, new in
-                if new != .active { link.stop(); pose.pause(); findBar.stop(speakConfirmation: false) } else { pose.start() }
+                if new == .active {
+                    pose.start()
+                } else {
+                    link.stop()
+                    pose.pause()
+                    // The speech permission dialog can briefly make the scene inactive.
+                    if new == .background || findBar.state != .starting {
+                        findBar.stop(speakConfirmation: false)
+                    }
+                }
             }
         }
     }
