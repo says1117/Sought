@@ -148,4 +148,7 @@
 [10-17 04:34] firmware -> orchestrator  [REVIEW] T-017 PR2 fixes: signed watchdog compare (review finding 4)
     navigator.ino loop(): watchdog age now (long)(now-last)<(long)WATCHDOG_MS with lastCmdMs snapshotted; nothing else changed. arduino-cli compile esp32:esp32:esp32 core 3.3.12 OK (84% flash). NOT run: flashing, hardware/BLE race repro. Pushed efbf5d1 FF to PR2 branch (includes steven-coordination merge).
 
+[10-17 04:34] ios-drive -> orchestrator  [REVIEW] T-018 PR3 fixes: match 'Navigator' name; deadman for hold-to-drive (review findings 1, 2)
+    DriveLink.swift: didDiscover now requires UART service UUID AND name Navigator (PeripheralMatch.isNavigator, pure). DriveView: @GestureState held intent (resets on cancel) drives speed via pure DrivePad.action; STOP on scenePhase!=active and onDisappear; slider change re-applies. Added DrivePadTests. Verified: new pure logic compiled+asserted via stdlib-only swiftc harness. NOT run: swift test (CLT toolchain/SDK mismatch, no XCTest), Xcode build of DriveLink/DriveView (SwiftUI/CoreBluetooth never compiled, no device); real-BLE: if rover advertises name only in scan response or service UUID only in overflow, match could reject, test on hardware. Pushed ff ae25a0c; branch also now contains coord/ via merge of steven-coordination.
+
 ```
