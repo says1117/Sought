@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 03:32] ios-drive -> orchestrator  [REVIEW] T-004 Xcode project, DriveLink hold-to-drive, 10 Hz heartbeat
-    Branch claude/steven-t-004-f7c5c9 pushed. Added ios/Recall/Sources/DriveLink (protocol helpers, CoreBluetooth client w/ 10Hz heartbeat+STOP, HoldButton UI), App/RecallApp.swift, project.yml (XcodeGen), Package.swift, unit tests. Verified: logic compiled+ran with swiftc harness, all pass. NOT built: no Xcode/XcodeGen here (CLT only, SDK mismatch breaks Foundation/swift test), so DriveLink.swift/DriveView.swift/XCTest file are uncompiled. Human: install Xcode+xcodegen, 'cd ios/Recall && xcodegen generate', set team, run Cmd+U, device check per Sources/DriveLink/README.md.
-
 [10-17 03:32] perception-ml -> orchestrator  [REVIEW] T-010 Memory SQLite schema + track association with tests
     Branch claude/steven-t-010-33e4bf: ios/Recall/Package.swift (SwiftPM target Memory) + Sources/Memory (Schema, Thresholds, Association, MemoryUpdate) + Tests/MemoryTests. Verified: SQL schema executes in sqlite (python); logic tests (29 checks) pass via a standalone swiftc harness with an XCTest shim. NOT run: real 'swift test' (Mac CLT toolchain is broken: no XCTest, SDK/compiler mismatch, no Xcode installed), so SchemaTests (SQLite3) is unrun. Human: run 'swift test' in ios/Recall with full Xcode. All thresholds marked TO BE CALIBRATED; movedDistance 0.15, persistenceThreshold 0.5, alpha 0.3 are my guesses. Note: coord/ is not on main/this branch (only on steven-coordination).
 
@@ -381,5 +378,8 @@
 
 [10-17 11:48] chatgpt -> orchestrator  [DECISION] Steven authorizes overnight reviews and conditional merge handoffs
     Steven is going to sleep and explicitly authorized separate visible PR review chats, necessary fixes and full file/code-block walkthroughs. I will review current open PRs and newly opened ones, save detailed reports, and post per-PR exact-head merge clearances only after review, checks and walkthrough completion. This is not blanket merge approval; do not treat pending reviews as cleared. Claude may merge specifically cleared heads in dependency order; no device/hardware operation is authorized. Chats will disclose unrun checks and block clearance on unresolved material issues. Existing user file tools/bench_ble.py is untouched.
+
+[10-17 11:55] reviewer -> orchestrator  [REVIEW] T-047 Review PR 5 and write complete learning walkthrough
+    Reviewed PR #5 head 4f5371cca520720d1b8b20a62b5954960b538ecb against current main; effective diff is 12 backend files, no material findings. 25 pytest passed; live Uvicorn health and diff check passed. PR description updated. Walkthrough: overnight-reviews/PR-5.md. Docker/deploy, phone integration, and hardware unrun; PR #10/#11 depend on this branch.
 
 ```
