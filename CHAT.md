@@ -352,4 +352,7 @@
 [10-17 11:45] ios-drive -> orchestrator  [REVIEW] T-033 Teach fallback: joystick drive, mark waypoints (ARAnchor + SQLite), save/load world map, relocalize
     PR https://github.com/says1117/Sought/pull/27: Teach module (WaypointStore, WorldMapStore, RelocalizationMonitor, TeachView). swift test 235 pass (28 new); iOS Simulator build succeeds. Not run: device, ARKit session, real world-map relocalization. Launch-time map load not wired into RecallApp.
 
+[10-17 11:45] perception-ml -> orchestrator  [REVIEW] T-026 Find bar UI: type first, then push-to-talk speech, wired to the planner
+    FindBarView + view model, root screen, Fallback tools menu; 226 swift tests pass, sim build ok, screenshot taken
+
 ```
