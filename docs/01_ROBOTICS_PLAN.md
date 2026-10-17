@@ -165,17 +165,20 @@ stop and announce if tracking != normal for > 1 s
 ### 3.5 Explore (autonomous, plan v2)
 
 - **Grid:** 5 cm cells around `floor_y`, built from LiDAR depth each keyframe: free (floor hit), occupied low (3 to 40 cm), occupied high (above 40 cm), unknown. The same grid feeds floor hazards (section 5.2) and the map snapshot in the contract.
-- **Frontiers:** free cells next to unknown cells, clustered; skip clusters under 0.3 m. Pick the goal by `distance + visited_penalty - size_bonus`, at least 0.5 m from the last goal.
+- **Frontiers:** free cells next to unknown cells, clustered; skip clusters under 0.3 m. Pick the goal by `distance + visited_penalty - size_bonus`, at least 0.5 m from the last goal. Rank only reachable goals: inflate occupied cells by the rover footprint plus margin, and verify every drive segment stays in connected known-free space. Unknown space and diagonal corner cutting are not traversable shortcuts. If no safe segment is available, stop and select another frontier or report blocked.
 - **Loop:** pick a frontier, drive with `Controller.goTo` (straight segments, ObstacleGuard detours), stop, rotate 360 degrees in 4 steps to scan (keyframes, proposals, embeddings, memory), repeat. End when no frontier is reachable, after 5 min, or on tracking loss (stop and report).
 - **Waypoints:** auto-create an anchor at the start (`home`) and at each scan stop; the user can name one by voice ("this is the kitchen").
 - **Fallback:** the Teach screen (joystick) stays one tap away.
+- **Rollout:** the `explore` tool emits heartbeat state `exploring`; an active `come_to_me` approach emits `coming_to_user`. Update and test backend validation, stored-state handling and dashboard rendering before the phone emits either new value. Adding enum values to the document does not make older strict consumers accept them.
 
 ### 3.6 Come to me (plan v2)
 
 - **Companion app:** a small second target on the user's iPhone. It advertises over MultipeerConnectivity (service type `recall-ni`), exchanges `NIDiscoveryToken`s with the robot, and sends a `come_to_me` request.
-- **Approach:** the robot runs an `NISession` and reads distance and direction to the user. Turn toward the direction, drive with the Controller, stop at 1.0 m. If direction is missing, rotate in place sampling distance and drive along the decreasing gradient.
-- **Last meters:** Vision `VNDetectHumanRectanglesRequest` plus LiDAR depth confirms the person in view and centers the approach.
-- **Safety:** ObstacleGuard and the ESP32 stops apply; cap speed lower than normal; stop if the UWB session drops for more than 2 s.
+- **Capabilities and setup:** check `NISession.deviceCapabilities.supportsPreciseDistanceMeasurement`, `supportsDirectionMeasurement` and `supportsCameraAssistance` on the actual phone pair. A newer second phone alone does not prove the mounted robot phone supports the required features. Configure Nearby Interaction and local-network/Bonjour permissions on both targets. The initial demo requires both apps in the foreground; background ranging is outside this plan. See [Apple's capability guidance](https://developer.apple.com/videos/play/wwdc2022/10008/) and [Nearby Interaction overview](https://developer.apple.com/documentation/nearbyinteraction/).
+- **Pairing:** explicitly confirm the intended companion and use an encrypted session before accepting tokens or motion requests. Do not accept arbitrary peers just because they advertise `recall-ni`. Cancellation applies to the matching active command ID; terminal or duplicate requests must not restart motion.
+- **Approach:** the robot runs an `NISession` and reads fresh distance and direction to the paired companion. Transform direction from the phone/device frame into the rover heading frame using the calibrated mount. Turn toward it, drive with the Controller, and stop at the 1.0 m stand-off target. If direction is missing, hold translation. Rotation may help reacquire direction or a confirmed visual target, but range alone does not reveal a bearing: an ideal in-place rotation does not create the positional baseline needed to infer a distance gradient. If no trustworthy bearing is available, stop and report that limitation rather than choosing an arbitrary drive direction.
+- **Last meters:** Vision `VNDetectHumanRectanglesRequest` plus LiDAR depth can center a confirmed target. A generic person detection does not identify the companion owner. Use a single-person supervised demo or explicit target confirmation; stop on ambiguity or loss of the confirmed target. Define the measured stand-off consistently relative to the phone/rover, including the mount offset, before claiming arrival accuracy.
+- **Safety:** ObstacleGuard and the ESP32 stops apply; cap speed lower than normal. Hold motion immediately when the required target bearing/range or tracking becomes unusable. Fail and stop if usable UWB updates remain absent for more than 2 s, as specified by the companion-link contract. Heartbeat/status messages do not count as fresh ranging. Foreground loss, cancellation or session invalidation stops the active approach.
 
 ### 3.7 Phone power and heat
 
@@ -306,6 +309,8 @@ protocol Planner { func plan(_ utterance: String, context: PlannerContext) async
 | `come_to_me` | none | Drive to the companion iPhone |
 
 Guardrails: the model can only call these tools. Speeds, distances, and safety are constants in code. Any `go_to` target must resolve to a known waypoint or track. Timeout 3 s, then fall back to the keyword planner.
+
+STOP/HALT is a local priority override before any model request: brake and cancel active motion immediately, without waiting for a network response or the 3 s planner timeout. Discard late results from cancelled or superseded planner requests. Treat returned tool names and arguments as untrusted input: resolve targets, validate finite values, and clamp exploration duration to the fixed safe session cap before execution. The LLM never supplies raw motor commands or overrides obstacle/tracking rules.
 
 ### 6.3 Keyword grammar (offline fallback)
 

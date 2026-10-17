@@ -1,6 +1,6 @@
 # STATUS (update at the end of every work session)
 
-Last updated: 2026-10-16 evening, before the hackathon starts.
+Hardware/software checklist snapshot: 2026-10-16 evening, before the hackathon starts. Plan-v2 decisions and review clarifications below are dated 2026-10-17; the historical checklist is not a current implementation or validation report.
 
 ## Hardware
 
@@ -40,6 +40,8 @@ Power design: 4xAA (about 6 V) feeds only VM and GND of the TB6612. ESP32 runs f
 - [ ] Text encoder tokenizer route for MobileCLIP (see `01_ROBOTICS_PLAN.md`, section 4.4)
 
 ## Plan v2 decisions (2026-10-17)
+
+Checked items in this section record product decisions, not completed implementations or measured results. Nearby Interaction capability on both phones, mount-frame alignment, pairing, target identity, safe exploration reachability and local STOP priority still require implementation and device verification. Distance-only in-place rotation is not an approach-direction estimator. These review clarifications do not change the contract schema.
 
 - [x] Primary control is the LLM planner from a speak or type bar. Manual drive is fallback only.
 - [x] Autonomous Explore replaces Teach as the main way to build memory. Teach stays as a quick fallback.

@@ -92,7 +92,7 @@ Plan for at least one 4 to 5 hour sleep each, staggered, so someone is awake to 
 | Phone overheats or battery drains | Medium | Mid-demo failure | Cap ML to 2 Hz while moving, charge from a power bank, keep the screen awake, have a fan or pause plan |
 | Motor noise breaks speech recognition | High | Voice fails | Push-to-talk, robot stationary while listening, typed fallback |
 | Exploration gets stuck in clutter, loops, or loses tracking | High | Memory incomplete, demo stalls | Small demo room, frontier goals at least 0.5 m apart, a visited-cell penalty, a 5 min cap, stop and report on tracking loss. Teach drive is the fallback |
-| UWB direction is unavailable or noisy (needs line of sight, both apps in the foreground, camera assistance on newer phones) | Medium | Come to me fails | Use distance alone with a rotate-and-sample search, then Vision person detection and LiDAR depth for the last meters. Stop at 1 m |
+| UWB direction is unavailable or noisy (capabilities vary; initial demo keeps both apps in the foreground) | Medium | Come to me fails | Verify both devices' capabilities and mount-frame conversion. Hold translation without a trustworthy bearing; rotate only to reacquire direction or a confirmed visual target. Range-only rotation does not provide a bearing. Stop at the defined 1 m stand-off target and stop on ambiguity |
 | LLM latency or no network | Medium | Commands feel slow or fail | 3 s timeout, keyword grammar fallback, all safety in code and on the ESP32 |
 | Hardware mishap (short, dead ESP32, cable) | Medium | Lost hours | Spare ESP32 and known-good data cable on hand. Check polarity twice. Fuse or switch on the battery |
 | Scope creep | High | Nothing finished | Cut order below. Freeze at H24 |
