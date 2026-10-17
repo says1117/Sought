@@ -1,7 +1,7 @@
 // swift-tools-version:5.9
 import PackageDescription
 
-// Lets the pure DriveLink and Pose logic be unit tested without Xcode: `swift test` in ios/Recall.
+// Lets the pure DriveLink, Pose and Controller logic be unit tested without Xcode: `swift test` in ios/Recall.
 let package = Package(
     name: "RecallCore",
     platforms: [.iOS(.v17), .macOS(.v13)],
@@ -11,8 +11,11 @@ let package = Package(
         .target(name: "PoseCore", path: "Sources/Pose", sources: ["PoseMath.swift"]),
         .target(name: "ObstacleGuardCore", path: "Sources/ObstacleGuard",
                 sources: ["GuardConfig.swift", "CorridorSampler.swift", "ObstacleGuardLogic.swift"]),
+        .target(name: "ControllerCore", dependencies: ["PoseCore"], path: "Sources/Controller",
+                sources: ["ControllerMath.swift", "Controller.swift"]),
         .testTarget(name: "DriveLinkTests", dependencies: ["DriveLinkCore"], path: "Tests/DriveLinkTests"),
         .testTarget(name: "PoseTests", dependencies: ["PoseCore"], path: "Tests/PoseTests"),
         .testTarget(name: "ObstacleGuardTests", dependencies: ["ObstacleGuardCore"], path: "Tests/ObstacleGuardTests"),
+        .testTarget(name: "ControllerTests", dependencies: ["ControllerCore", "PoseCore"], path: "Tests/ControllerTests"),
     ]
 )

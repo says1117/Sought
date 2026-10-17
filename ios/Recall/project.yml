@@ -39,6 +39,8 @@ targets:
       - path: Sources/Pose/PoseMath.swift
       - path: Sources/ObstacleGuard
         excludes: ["DepthAdapter.swift", "README.md"]
+      - path: Sources/Controller/ControllerMath.swift
+      - path: Sources/Controller/Controller.swift
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
