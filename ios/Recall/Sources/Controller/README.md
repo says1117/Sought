@@ -10,3 +10,5 @@ is the single place to flip if a positive `angular` does not reduce the heading 
 it does not do the detour logic from the plan.
 
 Tests: `Tests/ControllerTests` use a simulated kinematic rover. They check the logic against that model, not the real robot.
+
+PR14's stack review also applies guard-stop to rotation, resets arrival confirmation across tracking dropouts, and rejects controller-adapter poses whose AR frame is absent or older than one second. A higher-level coordinator must supply obstacle decisions and serialize movement ownership; default-clear input does not connect the guard automatically. Detour requests do not authorize bypassing a stop to force rotation. These stack fixes are not automatically backported to the standalone PR13 branch.
