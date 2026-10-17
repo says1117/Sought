@@ -27,6 +27,8 @@ BOARD = shared_root() / ".board"
 TASKS, MSGS, ACKS = BOARD / "tasks", BOARD / "messages", BOARD / "acks"
 STATUSES = ("open", "claimed", "blocked", "review", "done")
 NOTIFY_ON = ("blocked", "review", "done")
+# A dependency in review already has code on a branch, so dependents may start "stacked" on it.
+UNBLOCKS = ("review", "done")
 
 
 # ---------- git plumbing ----------
@@ -119,7 +121,7 @@ def render():
     """Regenerate BOARD.md, the human-readable kanban view, from tasks and messages."""
     tasks = all_tasks()
     bodies = {m["id"]: b for _, m, b in tasks}
-    done = {m["id"] for _, m, _ in tasks if m["status"] == "done"}
+    done = {m["id"] for _, m, _ in tasks if m["status"] in UNBLOCKS}
     columns = {"todo": [], "waiting": [], "claimed": [], "review": [], "blocked": [], "done": []}
     for _, m, _ in tasks:
         if m["status"] == "open":
@@ -223,7 +225,7 @@ def deps_done(meta, done_ids):
 
 
 def ready_tasks(role=None):
-    done = {m["id"] for _, m, _ in all_tasks() if m["status"] == "done"}
+    done = {m["id"] for _, m, _ in all_tasks() if m["status"] in UNBLOCKS}
     out = []
     for path, meta, body in all_tasks():
         if meta["status"] != "open" or not deps_done(meta, done):
