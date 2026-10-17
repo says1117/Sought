@@ -416,4 +416,102 @@ final class MLEncodersTests: XCTestCase {
         try fm.removeItem(at: dir.appendingPathComponent("merges.txt"))
         XCTAssertThrowsError(try loc.locateAll()) { XCTAssertEqual(($0 as? ModelLocatorError)?.missing, [.merges]) }
     }
+
+    func testLocatorSearchesBundleRootSubfoldersAndCompilesPackageOnce() throws {
+        let fm = FileManager.default
+        let base = fm.temporaryDirectory.appendingPathComponent("ml32pkg-\(UUID().uuidString)")
+        defer { try? fm.removeItem(at: base) }
+        let support = base.appendingPathComponent("support")
+        try fm.createDirectory(at: support, withIntermediateDirectories: true)
+        // raw packages + tokenizer files in Application Support only
+        for n in ["MobileCLIP_S0_Text.mlpackage", "MobileCLIP_S0_Image.mlpackage"] {
+            try fm.createDirectory(at: support.appendingPathComponent(n), withIntermediateDirectories: true)
+        }
+        try Data().write(to: support.appendingPathComponent("vocab.json"))
+        try Data().write(to: support.appendingPathComponent("merges.txt"))
+        var compiles: [String] = []
+        let compiler: (URL) throws -> URL = { pkg in
+            compiles.append(pkg.lastPathComponent)
+            let out = base.appendingPathComponent("tmp-\(UUID().uuidString).mlmodelc")
+            try fm.createDirectory(at: out, withIntermediateDirectories: true)
+            return out
+        }
+        let loc = ModelLocator(bundles: [], applicationSupport: support, compiler: compiler)
+        let first = try loc.locateAll()
+        XCTAssertEqual(first.textModel.lastPathComponent, "MobileCLIP_S0_Text.mlmodelc")
+        XCTAssertTrue(first.textModel.path.contains("/Compiled/"))
+        XCTAssertEqual(Set(compiles), ["MobileCLIP_S0_Text.mlpackage", "MobileCLIP_S0_Image.mlpackage"])
+        _ = try loc.locateAll()
+        XCTAssertEqual(compiles.count, 2, "second lookup must reuse the cached compile")
+
+        // a failing compile is reported, and the asset is still listed as missing
+        try fm.removeItem(at: support.appendingPathComponent("Compiled"))
+        struct Boom: Error {}
+        let bad = ModelLocator(bundles: [], applicationSupport: support, compiler: { _ in throw Boom() })
+        XCTAssertThrowsError(try bad.locateAll()) { e in
+            let err = e as? ModelLocatorError
+            XCTAssertEqual(err?.missing, [.textModel, .imageModel])
+            XCTAssertEqual(err?.details.count, 2)
+        }
+    }
+
+    func testLocatorFindsBundleSubfolderRecursively() throws {
+        let fm = FileManager.default
+        let base = fm.temporaryDirectory.appendingPathComponent("ml32bundle-\(UUID().uuidString).bundle")
+        defer { try? fm.removeItem(at: base) }
+        let res = base.appendingPathComponent("Contents/Resources/Models/deeper", isDirectory: true)
+        try fm.createDirectory(at: res.appendingPathComponent("MobileCLIP_S0_Text.mlmodelc"), withIntermediateDirectories: true)
+        try Data().write(to: res.appendingPathComponent("vocab.json"))
+        try Data().write(to: base.appendingPathComponent("Contents/Resources/merges.txt"))
+        try fm.createDirectory(at: base.appendingPathComponent("Contents/Resources/MobileCLIP_S0_Image.mlmodelc"), withIntermediateDirectories: true)
+        try "<plist version=\"1.0\"><dict><key>CFBundleIdentifier</key><string>x.y</string></dict></plist>"
+            .write(to: base.appendingPathComponent("Contents/Info.plist"), atomically: true, encoding: .utf8)
+        guard let bundle = Bundle(url: base), let root = bundle.resourceURL else { return XCTFail("synthetic bundle did not load") }
+        XCTAssertTrue(fm.fileExists(atPath: root.path))
+        let loc = ModelLocator(bundles: [bundle], applicationSupport: nil)
+        let all = try loc.locateAll()
+        XCTAssertTrue(all.textModel.path.hasSuffix("Models/deeper/MobileCLIP_S0_Text.mlmodelc"))
+        XCTAssertTrue(all.imageModel.path.hasSuffix("Resources/MobileCLIP_S0_Image.mlmodelc"))
+        XCTAssertEqual(all.vocab.lastPathComponent, "vocab.json")
+    }
+
+    /// Runs the real Core ML models on this Mac: RECALL_MODELS_DIR holds the converter output (the two .mlpackage
+    /// folders, vocab.json, merges.txt) and RECALL_PREPROC_DIR holds dog.png (ml/conversion/data/dog.jpg, which is a photo of a TIGER) (preproc_reference.py make).
+    /// Exercises ModelLocator's compile-once path, the validated tokenizer and the real runners end to end.
+    func testRealCoreMLModelsRankTigerPhotoAsCatNotDog() throws {
+        #if canImport(CoreML) && canImport(ImageIO)
+        let env = ProcessInfo.processInfo.environment
+        guard let models = env["RECALL_MODELS_DIR"], let pre = env["RECALL_PREPROC_DIR"] else {
+            throw XCTSkip("RECALL_MODELS_DIR / RECALL_PREPROC_DIR not set")
+        }
+        let cache = FileManager.default.temporaryDirectory.appendingPathComponent("ml32real-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: cache, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: cache) }
+        for f in try FileManager.default.contentsOfDirectory(atPath: models) {
+            try FileManager.default.copyItem(at: URL(fileURLWithPath: models).appendingPathComponent(f), to: cache.appendingPathComponent(f))
+        }
+        let enc = try CoreMLEncoderFactory.make(locator: ModelLocator(bundles: [], applicationSupport: cache))
+        XCTAssertTrue(enc.text.tokenizer.isValidated)
+        func image(_ name: String) throws -> RawImage {
+            let u = URL(fileURLWithPath: pre).appendingPathComponent("\(name).png")
+            let cg = CGImageSourceCreateImageAtIndex(CGImageSourceCreateWithURL(u as CFURL, nil)!, 0, nil)!
+            var rgba = [UInt8](repeating: 0, count: cg.width * cg.height * 4)
+            let ctx = CGContext(data: &rgba, width: cg.width, height: cg.height, bitsPerComponent: 8, bytesPerRow: cg.width * 4,
+                                space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+            ctx.draw(cg, in: CGRect(x: 0, y: 0, width: cg.width, height: cg.height))
+            return RawImage(width: cg.width, height: cg.height, rgba: rgba)
+        }
+        func dot(_ a: [Float], _ b: [Float]) -> Float { zip(a, b).reduce(0) { $0 + $1.0 * $1.1 } }
+        let tiger = try enc.image.embedOne(try image("dog"))
+        let tDog = try enc.text.encode("a photo of a dog"), tCat = try enc.text.encode("a photo of a cat")
+        let tCar = try enc.text.encode("a photo of a car engine")
+        print("REALMODEL tiger image: cos(dog)=\(dot(tiger, tDog)) cos(cat)=\(dot(tiger, tCat)) cos(car engine)=\(dot(tiger, tCar))")
+        XCTAssertEqual(tiger.count, 512)
+        XCTAssertGreaterThan(dot(tiger, tCat), dot(tiger, tDog))
+        XCTAssertGreaterThan(dot(tiger, tDog), dot(tiger, tCar))
+        XCTAssertEqual(dot(tDog, tDog), 1, accuracy: 1e-3)
+        #else
+        throw XCTSkip("CoreML/ImageIO unavailable")
+        #endif
+    }
 }
