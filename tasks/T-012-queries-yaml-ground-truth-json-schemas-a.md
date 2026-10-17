@@ -7,8 +7,8 @@ owner: chatgpt
 depends: 
 read: docs/04_EVALS.md, docs/03_CONTRACTS.md#4
 created: 2026-10-17T03:26:03Z
-doing: Five fixture tests pass; validating sample isolation and documenting measurement limits
-doing_at: 2026-10-17T04:33:58Z
+doing: PR 9 opened with schemas, fixture-tested aggregation, and unmeasured limitations
+doing_at: 2026-10-17T04:34:21Z
 ---
 queries.yaml + ground_truth.json schemas and make_tables.py on labeled fixtures
 
