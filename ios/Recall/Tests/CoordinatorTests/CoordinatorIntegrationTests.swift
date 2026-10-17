@@ -113,7 +113,43 @@ struct CoordIntegrationRig {
 
 final class CoordTaskBox { var task: Task<Void, Error>? }
 
+/// Fixed pose: commands cannot turn this robot, so a requested final turn must time out.
+final class CoordFixedPoseRobot: PoseSource, DriveSink {
+    var trackingKind: TrackingKind = .normal
+    var loseTrackingOnStop = false
+    func latest() -> (pose: Pose2D?, tracking: TrackingKind) {
+        (trackingKind == .normal ? Pose2D(x: 0, z: 0, yawDeg: 0) : nil, trackingKind)
+    }
+    func drive(left: Int, right: Int) {}
+    func stop() { if loseTrackingOnStop { trackingKind = .notAvailable } }
+}
+
 final class CoordinatorIntegrationTests: XCTestCase {
+    func testFinalFacingTimeoutIsNotReportedAsArrived() async {
+        let robot = CoordFixedPoseRobot()
+        var time = 0.0
+        let controller = Controller(poses: robot, sink: robot,
+                                    clock: { time += 1; return time }, sleep: { _ in await Task.yield() })
+        let report = await ControllerApproachDriver(controller: controller, poses: robot)
+            .approach(x: 1, z: 0, stopDistance: 2)
+        XCTAssertEqual(report.outcome, .failed(reason: "timeout"))
+    }
+
+    func testMissingTrackingAfterTranslationIsNotReportedAsArrived() async {
+        let robot = CoordFixedPoseRobot()
+        robot.loseTrackingOnStop = true
+        var time = 0.0
+        let controller = Controller(poses: robot, sink: robot,
+                                    clock: { time += 1; return time }, sleep: { _ in await Task.yield() })
+        let report = await ControllerApproachDriver(controller: controller, poses: robot)
+            .approach(x: 1, z: 0, stopDistance: 2)
+        XCTAssertEqual(report.outcome, .failed(reason: "tracking lost"))
+    }
+
+    func testRunningControllerIsNotReportedAsCompleted() {
+        XCTAssertEqual(ControllerResultMapper.result(.running), .blocked(reason: "The controller did not finish"))
+    }
+
     func testTypedFindDrivesThenSpeaksResult() async throws {
         let rig = try CoordIntegrationRig(encoders: CoordIntegrationRig.working())
         try await rig.coordinator.execute(.findObject(description: "blue backpack"))

@@ -69,7 +69,8 @@ final class StoreWaypointsAdapter: CoordinatorWaypoints {
 enum ControllerResultMapper {
     static func result(_ s: ControlStatus) -> CoordinatorTaskResult {
         switch s {
-        case .done, .running: return .completed(summary: "arrived")
+        case .done: return .completed(summary: "arrived")
+        case .running: return .blocked(reason: "The controller did not finish")
         case .failed(.cancelled): return .cancelled
         case .failed(.timeout): return .blocked(reason: "I couldn't get there in time")
         case .failed(.trackingLost): return .blocked(reason: CoordinatorConfig.rescanReason)
@@ -105,10 +106,21 @@ final class ControllerApproachDriver: ApproachDriver {
         case .failed(.trackingLost): return ApproachReport(outcome: .failed(reason: "tracking lost"))
         case .running: return ApproachReport(outcome: .failed(reason: "controller did not finish"))
         case .done:
-            if let pose = poses.latest().pose {
-                let err = ControllerMath.headingError(pose: pose, targetX: x, targetZ: z)
-                if abs(err) > ControllerTuning.rotateToleranceDeg {
-                    if case .failed(.cancelled) = await controller.rotateBy(err) { return ApproachReport(outcome: .cancelled) }
+            guard !Task.isCancelled else { return ApproachReport(outcome: .cancelled) }
+            let snapshot = poses.latest()
+            guard snapshot.tracking == .normal, let pose = snapshot.pose else {
+                return ApproachReport(outcome: .failed(reason: "tracking lost"))
+            }
+            let err = ControllerMath.headingError(pose: pose, targetX: x, targetZ: z)
+            if abs(err) > ControllerTuning.rotateToleranceDeg {
+                let rotation = await controller.rotateBy(err)
+                if Task.isCancelled { return ApproachReport(outcome: .cancelled) }
+                switch rotation {
+                case .done: break
+                case .running: return ApproachReport(outcome: .failed(reason: "controller did not finish"))
+                case .failed(.cancelled): return ApproachReport(outcome: .cancelled)
+                case .failed(.timeout): return ApproachReport(outcome: .failed(reason: "timeout"))
+                case .failed(.trackingLost): return ApproachReport(outcome: .failed(reason: "tracking lost"))
                 }
             }
             return ApproachReport(outcome: .arrived)
