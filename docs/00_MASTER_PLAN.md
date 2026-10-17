@@ -18,10 +18,8 @@ Plan v2 (2026-10-17): autonomous exploration, LLM-first control and "come to me"
 
 **Must**
 - Drive and stop safely (ESP32 watchdog, ultrasonic stops, depth-based slowdown on the phone)
-- Explore mode: autonomous frontier exploration over a floor occupancy grid, scanning at stops, building object memory and the world map with no human driving
-- Teach mode (fallback): drive the home once by joystick, mark named waypoints, save the world map. Used when exploration fails or for a fast demo setup
-- LLM control: a speak or type bar in the app sends the request to the Gemini planner, which calls tools (`find_object`, `go_to_waypoint`, `explore`, `come_to_me`, `stop`, ...). The keyword grammar is the offline fallback. Manual drive is not the main interface
-- Come to me: the robot drives to the person using Nearby Interaction (UWB distance and direction) from a companion app on a second iPhone, with Vision person detection plus LiDAR depth for the last meters
+- Teach mode: drive the home once by joystick, mark named waypoints, save the world map. This is the MAIN map path in the demo (revised 2026-10-17); object memory is filled at scan stops during Teach
+- LLM control: a speak or type bar in the app sends the request to the Gemini planner, which calls tools (`find_object`, `go_to_waypoint`, `mark_waypoint`, `stop`, `say`; `explore` and `come_to_me` exist but are disabled by default). The keyword grammar is the offline fallback. Manual drive is not the main interface
 - Open-vocabulary object memory (crops, embeddings, 3D positions, tracks)
 - Find by description: retrieve, drive, **arrival check**, fall back to next candidate
 - ~~Patrol and change report with before and after thumbnails~~ moved to Cut on 2026-10-17 (see section 7); tasks T-040 and T-041 are parked
@@ -30,6 +28,8 @@ Plan v2 (2026-10-17): autonomous exploration, LLM-first control and "come to me"
 - Public repo with a README that explains the design choices and tradeoffs
 
 **Should**
+- Autonomous Explore (frontier exploration over the floor grid): code and tests exist (T-023), disabled by default; enable only after the typed find works on the robot and T-059 is fixed. See section 7 (cut order)
+- Come to me (UWB, companion app): code exists (T-028), frozen. Demo only if everything else is done
 - Voice in (on-device speech) and voice out (spoken briefing)
 - "Check the way to X" (drive a route, report clear or blocked)
 - Floor occupancy diffing (class-agnostic hazard detection from LiDAR; the grid itself is a Must because exploration needs it)
@@ -68,7 +68,7 @@ Plan for at least one 4 to 5 hour sleep each, staggered, so someone is awake to 
 | H0 to H1 | Wire TB6612 per pin table, bench-test motors with wheels off the ground | Scaffold `backend/` and `web/`, copy contracts, pick backend hosting after a wifi test | |
 | H1 to H3 | Firmware v1 (motors, watchdog, BLE, ultrasonics). iOS project, BLE drive from buttons. **ARKit tracking test at two phone heights** | Mock data generator and seed script. API endpoints with OpenAPI. Dashboard shell, routing, design tokens | **M1 (H2): contracts v1 frozen** |
 | H3 to H10 | Pose publisher, go-to-pose controller, obstacle guard, keyframe capture, proposals and embeddings, SQLite memory, typed query highlights an object on screen | Changes timeline, Objects grid, status header, media upload, SSE stream, all against mock data | **M2 (H10): first live heartbeat and object upload from the phone to the dashboard** |
-| H10 to H18 | Occupancy grid and frontier Explore, Teach fallback and waypoints, world map persistence, retrieval and find executor with arrival check, keyword planner then Gemini planner, find bar (type, then speech), sync client | Map page, Briefing player, Patrols page, error and empty states, Accessibility baseline | **M3 (H18): full find loop on the robot, visible on the dashboard** |
+| H10 to H18 | Occupancy grid, Teach and waypoints (main map path), Explore code (off by default), world map persistence, retrieval and find executor with arrival check, keyword planner then Gemini planner, find bar (type, then speech), sync client | Map page, Briefing player, Patrols page, error and empty states, Accessibility baseline | **M3 (H18): full find loop on the robot, visible on the dashboard** |
 | H18 to H24 | **Revised:** first real find on the robot, phone to dashboard sync, Teach waypoints, Explore only if the find loop works | Live before and after change cards, severity design, Evals page skeleton, README visuals started | **M4 (H24): FEATURE FREEZE. Tag `v0.9`** |
 | H24 to H32 | Run the eval protocol, fix only the top bugs, stretch work only if M4 was early | Evals page with real results, architecture diagram, pitch page, Devpost draft, record clips as things work | |
 | H32 to H36 | Rehearse the demo 3 times, charge everything, pre-save the map and memory | Final video edit, Devpost submit by H34, repo public check, secrets check | **Submit before the deadline, not at it** |
@@ -77,7 +77,7 @@ Plan for at least one 4 to 5 hour sleep each, staggered, so someone is awake to 
 
 - **M1 (H2):** `03_CONTRACTS.md` is v1. A fake robot script (`tools/mock_robot.py`) can post a heartbeat and the dashboard shows it.
 - **M2 (H10):** the real phone posts a heartbeat, one object with a thumbnail, and one waypoint. The dashboard shows them.
-- **M3 (H18):** after an autonomous Explore of one room (or the Teach fallback), say or type "find the blue backpack" in the app. The planner calls `find_object`, the robot drives there, runs the arrival check, speaks the result. The dashboard shows the objects found and the trace.
+- **M3 (H18):** after a Teach pass of one room (Explore is optional and last), say or type "find the blue backpack" in the app. The planner calls `find_object`, the robot drives there, runs the arrival check, speaks the result. The dashboard shows the objects found and the trace.
 - **M4 (H24, revised):** typed or spoken "find the X" works live on the robot with the arrival check, objects and status appear on the dashboard, and the safety demo (kill the app, rover stops) works. The original M4 (come to me, and a patrol producing two change events with before and after photos and a spoken briefing) is cut. No new features after this point.
 
 ## 6. Risks and mitigations
@@ -119,9 +119,9 @@ Revised 2026-10-17 07:50 EDT (about 24 hours left, nothing yet run on a real iPh
 
 ## 8. Definition of done
 
-- [ ] Robot explores the demo room on its own and the dashboard shows the objects it stored
+- [ ] The objects the robot stored during a Teach pass appear on the dashboard (autonomous Explore is optional; see section 7)
 - [ ] Robot finds at least 3 objects by free-form description typed or spoken into the find bar, live
-- [ ] Come to me reaches the person holding the companion iPhone (target within 1 m, measured, not assumed)
+- [ ] ~~Come to me reaches the person holding the companion iPhone~~ frozen on 2026-10-17 (section 7); demo only if everything else is done and it has been run on two phones
 - [ ] ~~A patrol reports at least 2 injected changes~~ cut on 2026-10-17 (section 7)
 - [ ] ESP32 stops the rover when the phone app is killed, with the wheels moving (watchdog demo)
 - [ ] `evals/results/` contains real runs, and every number in the README links to them
