@@ -6,6 +6,7 @@
 #include <BLEServer.h>
 #include <BLEUtils.h>
 #include <BLE2902.h>
+#include "safety.h"   // pure safety/motion logic + tuning constants (host-tested, firmware/test/)
 
 // ---------------------------------------------------------------- constants
 #define SERVICE_UUID "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
@@ -21,31 +22,17 @@ const int PIN_REAR_TRIG  = 5,  PIN_REAR_ECHO  = 18;
 const int PIN_LED = 2;
 
 // Motor tuning. Set from bench tests 3, 7, 8 (plan 1.3). Placeholders until measured.
-const int MAX_PWM   = 200;   // demo speed cap (contract)
-const int PWM_MIN   = 70;    // deadband: lowest PWM that moves the rover. MEASURE (bench test 8)
-const int LEFT_SIGN = 1;     // flip to -1 if left motors spin the wrong way (bench test 3)
-const int RIGHT_SIGN = 1;
-const int LEFT_TRIM  = 100;  // percent, for driving straight (bench test 7)
-const int RIGHT_TRIM = 100;
+// MAX_PWM, PWM_MIN, LEFT/RIGHT_SIGN, LEFT/RIGHT_TRIM now live in safety.h
 const int PWM_FREQ_HZ = 20000;
 const int PWM_BITS    = 8;
 
 // Timing
-const unsigned long WATCHDOG_MS = 300;
-const unsigned long LOOP_MS     = 10;
-const int SLEW_PER_TICK         = 10;    // max change of applied speed per 10 ms tick
+// WATCHDOG_MS, LOOP_MS, SLEW_PER_TICK, SONAR_TIMEOUT_US now live in safety.h
 const unsigned long SONAR_SLOT_MS = 50;  // alternate front/rear
-const unsigned long SONAR_TIMEOUT_US = 25000;
 const unsigned long STATUS_MS   = 200;   // 5 Hz
 const unsigned long DEBUG_MS    = 500;   // 2 Hz
 
-// Safety thresholds (contract)
-const int FRONT_STOP_CM = 20;
-const int REAR_STOP_CM  = 15;
-const int NO_ECHO_CM    = 999;
-
-// Status flags
-const int FLAG_WATCHDOG = 1, FLAG_FRONT = 2, FLAG_REAR = 4, FLAG_CONNECTED = 8;
+// Safety thresholds (FRONT_STOP_CM, REAR_STOP_CM, NO_ECHO_CM) and status FLAG_* now live in safety.h
 
 // ---------------------------------------------------------------- shared state
 BLEServer* server = nullptr;
@@ -74,30 +61,15 @@ void fatal(const char* why) {
 
 // One side of the TB6612. v in -255..255 after safety and ramping.
 void driveSide(int pwmPin, int in1, int in2, int v, int sign, int trim) {
-  v *= sign;
-  if (v == 0) {                            // short brake
-    digitalWrite(in1, HIGH);
-    digitalWrite(in2, HIGH);
-    ledcWrite(pwmPin, 0);
-    return;
-  }
-  int mag = abs(v);
-  int pwm = PWM_MIN + mag * (MAX_PWM - PWM_MIN) / 255;
-  pwm = constrain(pwm * trim / 100, 0, MAX_PWM);
-  digitalWrite(in1, v > 0 ? HIGH : LOW);
-  digitalWrite(in2, v > 0 ? LOW : HIGH);
-  ledcWrite(pwmPin, pwm);
+  nav::SideDrive d = nav::sideDrive(v, sign, trim);   // brake (IN1=IN2=HIGH, PWM 0) when v == 0
+  digitalWrite(in1, d.in1High ? HIGH : LOW);
+  digitalWrite(in2, d.in2High ? HIGH : LOW);
+  ledcWrite(pwmPin, d.pwm);
 }
 
 void applyMotors(int l, int r) {
   driveSide(PIN_PWMA, PIN_AIN1, PIN_AIN2, l, LEFT_SIGN, LEFT_TRIM);
   driveSide(PIN_PWMB, PIN_BIN1, PIN_BIN2, r, RIGHT_SIGN, RIGHT_TRIM);
-}
-
-int slew(int cur, int target) {
-  if (target > cur + SLEW_PER_TICK) return cur + SLEW_PER_TICK;
-  if (target < cur - SLEW_PER_TICK) return cur - SLEW_PER_TICK;
-  return target;
 }
 
 // ---------------------------------------------------------------- sonar
@@ -124,13 +96,6 @@ void IRAM_ATTR echoEdge(Sonar& s) {
 void IRAM_ATTR frontEdge() { echoEdge(sonars[0]); }
 void IRAM_ATTR rearEdge()  { echoEdge(sonars[1]); }
 
-int median3(const int* h) {
-  int a = h[0], b = h[1], c = h[2];
-  if (a > b) { int t = a; a = b; b = t; }
-  if (b > c) { b = c; }
-  return a > b ? a : b;
-}
-
 void sonarTick(unsigned long now) {
   static unsigned long lastSlot = 0;
   if (now - lastSlot < SONAR_SLOT_MS) return;
@@ -138,10 +103,9 @@ void sonarTick(unsigned long now) {
 
   if (sonarActive >= 0) {                  // collect the previous measurement
     Sonar& p = sonars[sonarActive];
-    int cm = NO_ECHO_CM;
-    if (p.done && p.widthUs < SONAR_TIMEOUT_US) cm = min((int)(p.widthUs / 58), NO_ECHO_CM);
+    int cm = nav::echoToCm(p.done, p.widthUs);
     p.hist[0] = p.hist[1]; p.hist[1] = p.hist[2]; p.hist[2] = cm;
-    p.cm = median3(p.hist);
+    p.cm = nav::median3(p.hist);
   }
   sonarActive = (sonarActive + 1) % 2;     // -1 -> 0 on the first call
   Sonar& s = sonars[sonarActive];
@@ -174,30 +138,23 @@ class ServerCb : public BLEServerCallbacks {
   }
 };
 
-// Accepts "L,R" with L and R integers; out-of-range values are clamped, anything else is ignored.
-bool parseSpeeds(const char* s, int& l, int& r) {
-  char* end;
-  long a = strtol(s, &end, 10);
-  if (end == s || *end != ',') return false;
-  const char* second = end + 1;
-  long b = strtol(second, &end, 10);
-  if (end == second || *end != '\0') return false;
-  l = constrain(a, -255, 255);
-  r = constrain(b, -255, 255);
-  return true;
-}
-
 void handleLine(const char* line) {
   int l, r;
-  if (strcmp(line, "STOP") == 0) {
-    cmdL = cmdR = 0;
-    cmdValid = false;
-  } else if (strcmp(line, "PING") == 0) {
-    pongPending = true;
-  } else if (parseSpeeds(line, l, r)) {
-    cmdL = l; cmdR = r;
-    lastCmdMs = millis();
-    cmdValid = true;
+  switch (nav::classifyLine(line, l, r)) {
+    case nav::LINE_STOP:
+      cmdL = cmdR = 0;
+      cmdValid = false;
+      break;
+    case nav::LINE_PING:
+      pongPending = true;
+      break;
+    case nav::LINE_SPEEDS:
+      cmdL = l; cmdR = r;
+      lastCmdMs = millis();
+      cmdValid = true;
+      break;
+    default:
+      break;
   }
 }
 
@@ -208,16 +165,7 @@ class RxCb : public BLECharacteristicCallbacks {
     if (!connected) { portEXIT_CRITICAL(&commandMux); return; }
     for (size_t i = 0; i < v.length(); i++) {
       char ch = v[i];
-      if (ch == '\n' || ch == '\r') {
-        if (!rxOverflow && rxLength > 0) { rxBuffer[rxLength] = '\0'; handleLine(rxBuffer); }
-        rxLength = 0; rxOverflow = false;
-      } else if (ch < 32 || ch > 126) {
-        rxOverflow = true;
-      } else if (rxLength < sizeof(rxBuffer) - 1) {
-        rxBuffer[rxLength++] = ch;
-      } else {
-        rxOverflow = true;
-      }
+      if (nav::rxFeed(rxBuffer, sizeof(rxBuffer), rxLength, rxOverflow, ch)) handleLine(rxBuffer);
     }
     portEXIT_CRITICAL(&commandMux);
   }
@@ -286,11 +234,9 @@ void loop() {
 
   sonarTick(now);
   int front = sonars[0].cm, rear = sonars[1].cm;
-  bool frontBlocked = front < FRONT_STOP_CM;
-  bool rearBlocked  = rear < REAR_STOP_CM;
+  bool frontBlocked = nav::frontBlocked(front);
+  bool rearBlocked  = nav::rearBlocked(rear);
 
-  // lastCmdMs is written from the BLE task and can be newer than `now`; compare as
-  // signed so that reads as age <= 0 (fresh) instead of wrapping to a huge age.
   portENTER_CRITICAL(&commandMux);
   unsigned long last = lastCmdMs;
   bool valid = cmdValid, connectedNow = connected;
@@ -298,31 +244,11 @@ void loop() {
   bool sendPong = pongPending;
   pongPending = false;
   portEXIT_CRITICAL(&commandMux);
-  bool fresh = valid && connectedNow && (long)(now - last) < (long)WATCHDOG_MS;
+  bool fresh = nav::commandFresh(valid, connectedNow, now, last);   // signed age: see safety.h
 
-  if (!fresh) {
-    // Watchdog / STOP / disconnect: brake and zero immediately, no ramp.
-    appliedL = appliedR = 0;
-    applyMotors(0, 0);
-  } else {
-    int l = requestedL, r = requestedR;
-    int linear = (l + r) / 2, angular = (r - l) / 2;
-    int safeLinear = linear;
-    if (frontBlocked) safeLinear = min(safeLinear, 0);
-    if (rearBlocked)  safeLinear = max(safeLinear, 0);
-    bool clamped = safeLinear != linear;
-    int tl = constrain(safeLinear - angular, -255, 255);
-    int tr = constrain(safeLinear + angular, -255, 255);
-    if (clamped) { appliedL = tl; appliedR = tr; }   // obstacle stops are immediate, not ramped
-    else { appliedL = slew(appliedL, tl); appliedR = slew(appliedR, tr); }
-    int appliedSum = appliedL + appliedR;
-    if ((frontBlocked && appliedSum > 0) || (rearBlocked && appliedSum < 0)) {
-      int appliedAngular = (appliedR - appliedL) / 2;
-      appliedL = -appliedAngular;
-      appliedR = appliedAngular;
-    }
-    applyMotors(appliedL, appliedR);
-  }
+  // Watchdog/STOP/disconnect brake and zero with no ramp; otherwise clamp, slew, clamp again (safety.h).
+  nav::computeApplied(fresh, requestedL, requestedR, frontBlocked, rearBlocked, appliedL, appliedR);
+  applyMotors(appliedL, appliedR);
 
   // LED: solid when commands are fresh, slow blink when connected and idle, fast blink when advertising
   if (fresh)          digitalWrite(PIN_LED, HIGH);
@@ -333,8 +259,7 @@ void loop() {
 
   if (connectedNow && now - lastStatus >= STATUS_MS) {
     lastStatus = now;
-    int flags = (fresh ? 0 : FLAG_WATCHDOG) | (frontBlocked ? FLAG_FRONT : 0) |
-                (rearBlocked ? FLAG_REAR : 0) | FLAG_CONNECTED;
+    int flags = nav::statusFlags(fresh, frontBlocked, rearBlocked);
     char buf[64];
     snprintf(buf, sizeof(buf), "T,%lu,%d,%d,%d,%d,%d\n", now, appliedL, appliedR, front, rear, flags);
     notifyText(buf);
