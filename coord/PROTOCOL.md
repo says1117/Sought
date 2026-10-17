@@ -17,6 +17,8 @@ Works the same for Claude, ChatGPT/Codex, or any agent that can run shell comman
 - The board is plain files on a separate git branch called `board`, checked out at `.board/` (gitignored). Code branches and PRs never carry board traffic.
 - A "ping" is a message file addressed to a role or person. The recipient sees it the next time a session runs `inbox`. Nothing polls, so idle cost is zero.
 - One message per file and one acks file per reader, so two people writing at once never conflict.
+- Commands sharing a checkout use `.board.lock` to prevent overlapping writes and Git operations. If the board is busy, retry after the other command finishes. The CLI requires macOS or Linux for its standard-library file lock.
+- Failed commits and pushes exit with an error. A failed push leaves a local commit: resolve any rebase conflicts and run `board.py sync` to pull and publish pending commits. `sync --no-push` only pulls.
 
 ## Roles
 

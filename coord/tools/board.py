@@ -6,10 +6,12 @@ Standard library only. Run from anywhere inside the repo. See coord/PROTOCOL.md.
 """
 import argparse
 import datetime as dt
+import fcntl
 import re
 import secrets
 import subprocess
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
@@ -38,6 +40,26 @@ def warn(msg):
     print(f"warning: {msg}", file=sys.stderr)
 
 
+def checked_git(*args, cwd=BOARD):
+    result = git(*args, cwd=cwd)
+    if result.returncode:
+        sys.exit(f"git {' '.join(args)} failed: {result.stderr.strip()}")
+    return result
+
+
+@contextmanager
+def board_lock():
+    with (BOARD.parent / ".board.lock").open("a") as handle:
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            sys.exit("Board is busy in another session; retry when that command finishes.")
+        try:
+            yield
+        finally:
+            fcntl.flock(handle, fcntl.LOCK_UN)
+
+
 def require_board():
     if not BOARD.exists():
         sys.exit("Board not set up. Run: python3 coord/tools/board.py init")
@@ -47,6 +69,7 @@ def sync():
     r = git("pull", "--rebase", "--autostash")
     if r.returncode:
         warn(f"sync failed (offline or no remote?): {r.stderr.strip()[:200]}")
+    return r.returncode == 0
 
 
 def render():
@@ -91,17 +114,21 @@ def render():
 def publish(message, push=True):
     if TASKS.exists():
         render()
-    git("add", "-A")
-    if git("diff", "--cached", "--quiet").returncode == 0:
+    checked_git("add", "-A")
+    diff = git("diff", "--cached", "--quiet")
+    if diff.returncode == 0:
         return
-    git("commit", "-m", f"board: {message}")
+    if diff.returncode != 1:
+        sys.exit(f"Unable to inspect staged board changes: {diff.stderr.strip()}")
+    checked_git("commit", "-m", f"board: {message}")
     if not push:
         return
     for _ in range(2):
         if git("push", "-u", "origin", "board").returncode == 0:
             return
-        git("pull", "--rebase", "--autostash")
-    warn("push failed; your change is saved locally, run `board.py sync` later")
+        if git("pull", "--rebase", "--autostash").returncode:
+            break
+    sys.exit("Push failed; your change is saved locally. Resolve any rebase conflicts, then run `board.py sync`.")
 
 
 # ---------- file format: "key: value" header, a --- line, then the body ----------
@@ -155,14 +182,17 @@ def cmd_init(args):
         print("Board already set up.")
         return
     git("fetch", "origin", cwd=REPO)
+    local = git("rev-parse", "--verify", "refs/heads/board", cwd=REPO).returncode == 0
     remote = git("rev-parse", "--verify", "origin/board", cwd=REPO).returncode == 0
-    if remote:
-        r = git("worktree", "add", "-B", "board", str(BOARD), "origin/board", cwd=REPO)
+    if local:
+        r = git("worktree", "add", str(BOARD), "board", cwd=REPO)
+    elif remote:
+        r = git("worktree", "add", "-b", "board", str(BOARD), "origin/board", cwd=REPO)
     else:
         r = git("worktree", "add", "--detach", str(BOARD), "HEAD", cwd=REPO)
         if r.returncode == 0:
-            git("checkout", "--orphan", "board")
-            git("rm", "-rf", "-q", ".")
+            checked_git("checkout", "--orphan", "board")
+            checked_git("rm", "-rf", "-q", ".")
     if r.returncode:
         sys.exit(f"init failed: {r.stderr.strip()}")
     for d in (TASKS, MSGS, ACKS):
@@ -174,7 +204,10 @@ def cmd_init(args):
 
 def cmd_sync(args):
     require_board()
-    sync()
+    if not sync():
+        sys.exit("Board sync failed; no successful synchronization was reported.")
+    if args.push:
+        checked_git("push", "-u", "origin", "board")
     print("synced")
 
 
@@ -222,6 +255,11 @@ def cmd_claim(args):
     require_board()
     sync()
     path, meta, body = find_task(args.task)
+    if meta["status"] != "open":
+        sys.exit(f"{args.task} is {meta['status']}; only open tasks can be claimed")
+    done = {task["id"] for _, task, _ in all_tasks() if task["status"] == "done"}
+    if not deps_done(meta, done):
+        sys.exit(f"{args.task} is waiting on dependencies")
     if meta["owner"] and meta["owner"] != args.who:
         sys.exit(f"{args.task} is already claimed by {meta['owner']}")
     meta.update(owner=args.who, status="claimed", doing=args.doing, doing_at=now())
@@ -361,7 +399,8 @@ def main():
     ib.add_argument("--ack", action="store_true", help="mark shown messages as read")
 
     args = p.parse_args()
-    args.fn(args)
+    with board_lock():
+        args.fn(args)
 
 
 if __name__ == "__main__":
