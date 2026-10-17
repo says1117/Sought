@@ -86,3 +86,4 @@ firmware/**/build/
 
 # message board worktree (lives on the "board" branch)
 .board/
+.board.lock

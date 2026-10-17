@@ -6,10 +6,13 @@ Standard library only. Run from anywhere inside the repo. See coord/PROTOCOL.md.
 """
 import argparse
 import datetime as dt
+import fcntl
+import json
 import re
 import secrets
 import subprocess
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
@@ -26,6 +29,8 @@ BOARD = shared_root() / ".board"
 TASKS, MSGS, ACKS = BOARD / "tasks", BOARD / "messages", BOARD / "acks"
 STATUSES = ("open", "claimed", "blocked", "review", "done")
 NOTIFY_ON = ("blocked", "review", "done")
+# A dependency in review already has code on a branch, so dependents may start "stacked" on it.
+UNBLOCKS = ("review", "done")
 
 
 # ---------- git plumbing ----------
@@ -38,6 +43,88 @@ def warn(msg):
     print(f"warning: {msg}", file=sys.stderr)
 
 
+# ---------- GitHub issue mirror (optional): pings show up where people already look ----------
+
+MARKER = "<!-- recall-board -->"
+CONFIG = BOARD / "config.json"
+
+
+def config():
+    return json.loads(CONFIG.read_text()) if CONFIG.exists() else {}
+
+
+def gh(*args, stdin=None):
+    try:
+        return subprocess.run(["gh", *args], capture_output=True, text=True, input=stdin,
+                              cwd=REPO, timeout=25)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+
+def mirror_comment(meta, body):
+    issue = config().get("issue")
+    if not issue:
+        return
+    text = f"{MARKER}\n**{meta['from']}** to **{meta['to']}** {meta['task'] or ''}\n### {meta['subject']}\n\n{body}"
+    gh("issue", "comment", str(issue), "--body-file", "-", stdin=text)
+
+
+def mirror_body():
+    issue = config().get("issue")
+    board_md = BOARD / "BOARD.md"
+    if issue and board_md.exists():
+        head = ("Shared message board for Recall. Comment here to ping the team; start a comment with "
+                "`@<role>` (for example `@firmware`) to address an agent role, otherwise it goes to everyone. "
+                "Agents read this through `coord/tools/board.py`. **This repo is public: no secrets or personal data.**\n\n")
+        gh("issue", "edit", str(issue), "--body-file", "-", stdin=MARKER + "\n" + head + board_md.read_text())
+
+
+def import_comments():
+    """Turn new human comments on the board issue into board messages."""
+    cfg = config()
+    issue = cfg.get("issue")
+    if not issue:
+        return
+    r = gh("api", f"repos/:owner/:repo/issues/{issue}/comments", "--paginate")
+    if not r or r.returncode:
+        return
+    last, new = cfg.get("last_comment", 0), 0
+    for c in json.loads(r.stdout or "[]"):
+        if c["id"] <= last:
+            continue
+        last = max(last, c["id"])
+        text = c["body"].strip()
+        if MARKER in text or not text:
+            continue
+        m = re.match(r"@([\w-]+)\s*(.*)", text, re.S)
+        to, text = (m.group(1), m.group(2).strip() or text) if m else ("ALL", text)
+        subject, _, rest = text.partition("\n")
+        post_message(f"gh-{c['user']['login']}", to, subject[:80], rest.strip() or subject, mirror=False)
+        new += 1
+    cfg["last_comment"] = last
+    CONFIG.write_text(json.dumps(cfg))
+    if new:
+        publish(f"imported {new} issue comment(s)")
+def checked_git(*args, cwd=BOARD):
+    result = git(*args, cwd=cwd)
+    if result.returncode:
+        sys.exit(f"git {' '.join(args)} failed: {result.stderr.strip()}")
+    return result
+
+
+@contextmanager
+def board_lock():
+    with (BOARD.parent / ".board.lock").open("a") as handle:
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            sys.exit("Board is busy in another session; retry when that command finishes.")
+        try:
+            yield
+        finally:
+            fcntl.flock(handle, fcntl.LOCK_UN)
+
+
 def require_board():
     if not BOARD.exists():
         sys.exit("Board not set up. Run: python3 coord/tools/board.py init")
@@ -47,12 +134,15 @@ def sync():
     r = git("pull", "--rebase", "--autostash")
     if r.returncode:
         warn(f"sync failed (offline or no remote?): {r.stderr.strip()[:200]}")
+    import_comments()
+    return r.returncode == 0
 
 
 def render():
     """Regenerate BOARD.md, the human-readable kanban view, from tasks and messages."""
     tasks = all_tasks()
-    done = {m["id"] for _, m, _ in tasks if m["status"] == "done"}
+    bodies = {m["id"]: b for _, m, b in tasks}
+    done = {m["id"] for _, m, _ in tasks if m["status"] in UNBLOCKS}
     columns = {"todo": [], "waiting": [], "claimed": [], "review": [], "blocked": [], "done": []}
     for _, m, _ in tasks:
         if m["status"] == "open":
@@ -74,8 +164,8 @@ def render():
            table(columns["claimed"], ["Task", "Agent", "Working on", "Updated", "Title"],
                  lambda m: [m["id"], m["owner"], m.get("doing") or "_no update yet_",
                             m.get("doing_at", "") or m["created"], m["title"]]),
-           "## In review\n", table(columns["review"], ["Task", "Agent", "Title"],
-                                   lambda m: [m["id"], m["owner"], m["title"]]),
+           "## In review\n", table(columns["review"], ["Task", "Agent", "Title", "Report"],
+                                   lambda m: [m["id"], m["owner"], m["title"], last_note(bodies[m["id"]])]),
            "## Blocked\n", table(columns["blocked"], ["Task", "Agent", "Why", "Title"],
                                  lambda m: [m["id"], m["owner"], m.get("doing") or "", m["title"]]),
            "## Waiting on dependencies\n", table(columns["waiting"], ["Task", "Size", "Role", "Title"], plain),
@@ -88,20 +178,43 @@ def render():
     (BOARD / "BOARD.md").write_text("\n".join(out) + "\n")
 
 
+def last_note(body, width=220):
+    """Last appended status note, one line, for the board table."""
+    note = body.split("\n\n")[-1].strip().replace("|", "/").replace("\n", " ")
+    return note if note.startswith("[") and len(note) <= width else (note[:width] + "...") if note.startswith("[") else ""
+
+
+def chat_lines(name=None, limit=40):
+    lines = []
+    for p in sorted(MSGS.glob("*.md"))[-limit * 4:]:
+        meta, body = parse(p)
+        if name and name not in (meta["from"], meta["to"], "ALL"):
+            continue
+        head = f"[{meta['time'][5:16].replace('T', ' ')}] {meta['from']} -> {meta['to']}  {meta['subject']}"
+        lines.append(head + "".join(f"\n    {ln}" for ln in body.splitlines()) + "\n")
+    return lines[-limit:]
+
+
 def publish(message, push=True):
     if TASKS.exists():
         render()
-    git("add", "-A")
-    if git("diff", "--cached", "--quiet").returncode == 0:
+        (BOARD / "CHAT.md").write_text("# Recall chat log\n\n```\n" + "\n".join(chat_lines(limit=100)) + "\n```\n")
+    checked_git("add", "-A")
+    diff = git("diff", "--cached", "--quiet")
+    if diff.returncode == 0:
         return
-    git("commit", "-m", f"board: {message}")
+    if diff.returncode != 1:
+        sys.exit(f"Unable to inspect staged board changes: {diff.stderr.strip()}")
+    checked_git("commit", "-m", f"board: {message}")
     if not push:
         return
+    mirror_body()
     for _ in range(2):
         if git("push", "-u", "origin", "board").returncode == 0:
             return
-        git("pull", "--rebase", "--autostash")
-    warn("push failed; your change is saved locally, run `board.py sync` later")
+        if git("pull", "--rebase", "--autostash").returncode:
+            break
+    sys.exit("Push failed; your change is saved locally. Resolve any rebase conflicts, then run `board.py sync`.")
 
 
 # ---------- file format: "key: value" header, a --- line, then the body ----------
@@ -137,7 +250,7 @@ def deps_done(meta, done_ids):
 
 
 def ready_tasks(role=None):
-    done = {m["id"] for _, m, _ in all_tasks() if m["status"] == "done"}
+    done = {m["id"] for _, m, _ in all_tasks() if m["status"] in UNBLOCKS}
     out = []
     for path, meta, body in all_tasks():
         if meta["status"] != "open" or not deps_done(meta, done):
@@ -155,14 +268,17 @@ def cmd_init(args):
         print("Board already set up.")
         return
     git("fetch", "origin", cwd=REPO)
+    local = git("rev-parse", "--verify", "refs/heads/board", cwd=REPO).returncode == 0
     remote = git("rev-parse", "--verify", "origin/board", cwd=REPO).returncode == 0
-    if remote:
-        r = git("worktree", "add", "-B", "board", str(BOARD), "origin/board", cwd=REPO)
+    if local:
+        r = git("worktree", "add", str(BOARD), "board", cwd=REPO)
+    elif remote:
+        r = git("worktree", "add", "-b", "board", str(BOARD), "origin/board", cwd=REPO)
     else:
         r = git("worktree", "add", "--detach", str(BOARD), "HEAD", cwd=REPO)
         if r.returncode == 0:
-            git("checkout", "--orphan", "board")
-            git("rm", "-rf", "-q", ".")
+            checked_git("checkout", "--orphan", "board")
+            checked_git("rm", "-rf", "-q", ".")
     if r.returncode:
         sys.exit(f"init failed: {r.stderr.strip()}")
     for d in (TASKS, MSGS, ACKS):
@@ -174,7 +290,10 @@ def cmd_init(args):
 
 def cmd_sync(args):
     require_board()
-    sync()
+    if not sync():
+        sys.exit("Board sync failed; no successful synchronization was reported.")
+    if args.push:
+        checked_git("push", "-u", "origin", "board")
     print("synced")
 
 
@@ -222,6 +341,11 @@ def cmd_claim(args):
     require_board()
     sync()
     path, meta, body = find_task(args.task)
+    if meta["status"] != "open":
+        sys.exit(f"{args.task} is {meta['status']}; only open tasks can be claimed")
+    done = {task["id"] for _, task, _ in all_tasks() if task["status"] == "done"}
+    if not deps_done(meta, done):
+        sys.exit(f"{args.task} is waiting on dependencies")
     if meta["owner"] and meta["owner"] != args.who:
         sys.exit(f"{args.task} is already claimed by {meta['owner']}")
     meta.update(owner=args.who, status="claimed", doing=args.doing, doing_at=now())
@@ -241,6 +365,41 @@ def cmd_working(args):
     write(path, meta, body)
     publish(f"{meta['owner']} working on {args.task}", args.push)
     print(f"{args.task}: {args.text}")
+
+
+def cmd_prs(args):
+    """Report what changed on open PRs since the last check (commits, comments, reviews, state)."""
+    require_board()
+    r = gh("pr", "list", "--state", "all", "--limit", "60", "--json",
+           "number,title,state,headRefOid,baseRefName,mergeable,comments,reviews")
+    if not r or r.returncode:
+        sys.exit("gh pr list failed (is gh signed in?)")
+    state_file = BOARD / "prwatch.json"
+    old = json.loads(state_file.read_text()) if state_file.exists() else {}
+    new, changes = {}, []
+    for pr in json.loads(r.stdout):
+        n = str(pr["number"])
+        cur = {"sha": pr["headRefOid"][:7], "state": pr["state"], "base": pr["baseRefName"],
+               "mergeable": pr["mergeable"], "comments": len(pr["comments"]), "reviews": len(pr["reviews"])}
+        new[n] = cur
+        prev = old.get(n)
+        if prev is None:
+            changes.append(f"#{n} NEW {cur['state']} {pr['title']}") if old else None
+            continue
+        diffs = [f"{k} {prev[k]} -> {cur[k]}" for k in cur if prev.get(k) != cur[k]]
+        if diffs:
+            changes.append(f"#{n} {pr['title']}: " + ", ".join(diffs))
+    state_file.write_text(json.dumps(new, indent=1))
+    print("\n".join(changes) if changes else ("Baseline saved." if not old else "No PR changes."))
+    if changes and args.post:
+        post_message("orchestrator", "ALL", "[FYI] PR changes", "\n".join(changes))
+        publish("pr watch digest", args.push)
+
+
+def cmd_chat(args):
+    require_board()
+    sync()
+    print("\n".join(chat_lines(args.name, args.limit)) or "No messages.")
 
 
 def cmd_view(args):
@@ -271,11 +430,13 @@ def cmd_status(args):
     print(f"{args.task} is now {args.status}")
 
 
-def post_message(sender, to, subject, body, task=""):
+def post_message(sender, to, subject, body, task="", mirror=True):
     mid = f"{dt.datetime.now(dt.timezone.utc):%Y%m%dT%H%M%SZ}-{sender}-to-{to}-{secrets.token_hex(2)}"
     write(MSGS / f"{mid}.md",
           {"id": mid, "from": sender, "to": to, "task": task, "subject": subject, "time": now()},
           body or "")
+    if mirror:
+        mirror_comment({"from": sender, "to": to, "task": task, "subject": subject}, body or "")
     return mid
 
 
@@ -345,6 +506,11 @@ def main():
     w = add("working", cmd_working, help="update your one-line 'working on' status")
     w.add_argument("task")
     w.add_argument("text", help="short, present tense, e.g. 'writing sonar median filter'")
+    pr = add("prs", cmd_prs, help="show what changed on PRs since the last check")
+    pr.add_argument("--post", action="store_true", help="also post the changes as a board ping")
+    ch = add("chat", cmd_chat, help="chat-style log of pings, newest last")
+    ch.add_argument("--with", dest="name", help="only messages to/from this role (plus ALL)")
+    ch.add_argument("--limit", type=int, default=20)
     add("view", cmd_view, help="print the kanban board (also saved as BOARD.md)")
     s = add("status", cmd_status, help="set task status; pings the orchestrator")
     s.add_argument("task")
@@ -361,7 +527,8 @@ def main():
     ib.add_argument("--ack", action="store_true", help="mark shown messages as read")
 
     args = p.parse_args()
-    args.fn(args)
+    with board_lock():
+        args.fn(args)
 
 
 if __name__ == "__main__":
