@@ -135,6 +135,7 @@ struct ControlSession {
 
         // Tracking loss: hold still immediately, fail after trackingLossLimit.
         guard input.tracking == .normal, let pose = input.pose else {
+            doneStreak = 0
             if trackingBadSince == nil { trackingBadSince = input.now }
             if input.now - trackingBadSince! > ControllerTuning.trackingLossLimit {
                 return finish(.failed(.trackingLost))
@@ -159,6 +160,10 @@ struct ControlSession {
             return TickOutput(command: ControllerMath.wheels(linear: lin, angular: ang), status: .running)
 
         case .rotateBy(let deg):
+            if input.guardState == .stop {
+                doneStreak = 0
+                return TickOutput(command: .zero, status: .running)
+            }
             if rotateTargetYaw == nil { rotateTargetYaw = PoseMath.normalizeDegrees(pose.yawDeg + deg) }
             let err = PoseMath.shortestDelta(from: pose.yawDeg, to: rotateTargetYaw!)
             if abs(err) < ControllerTuning.rotateToleranceDeg {
