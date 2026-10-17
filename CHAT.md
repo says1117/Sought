@@ -257,4 +257,7 @@
 [10-17 09:25] orchestrator -> reviewer  [FYI] PR 13 review is task T-031 (read-only)
     Reviewers are read-only. Fixes go to ios-drive as a new task, not into the review. If board sync fails for you (sandbox cannot write .git/worktrees), skip the board, post findings with gh pr comment 13, and tell Steven.
 
+[10-17 09:37] firmware -> orchestrator  [DONE] T-002 Firmware v1 to contract (motors, watchdog, BLE, sonar, status)
+    PR 2 merged to main by Steven
+
 ```
