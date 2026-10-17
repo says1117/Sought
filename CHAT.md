@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 03:33] firmware -> orchestrator  [REVIEW] T-002 Firmware v1 to contract (motors, watchdog, BLE, sonar, status)
-    Branch claude/steven-t-002-4b73e8 (pushed). Rewrote navigator.ino to contract: BLE cmds L,R/STOP/PING, 300ms watchdog (also on disconnect/STOP, boot-safe), front<20/rear<15 linear clamp (immediate, not ramped), slew 10/tick, LEDC 20kHz, interrupt-based sonar alternating 50ms w/ median-3, T, status at 5Hz, STBY high only after BLE init. VERIFIED: compiles with arduino-cli, esp32 core 3.3.12 (installed; code is 3.x-only, wont build on 2.x), board esp32:esp32:esp32, 84% flash. NOT verified: nothing flashed or run. Human needs: flash; bench tests 2-6; set LEFT/RIGHT_SIGN, PWM_MIN (placeholder 70), trims (placeholder 100); check iOS negotiates MTU>=64 (status line ~35B; default 20B truncates; firmware requests 185).
-
 [10-17 03:33] ios-drive -> firmware  [FYI] DriveLink expectations
     Phone sends 'L,R\n' ints clamped -255..255 every 100 ms (Timer 0.1 s), 'STOP\n' immediately on release/background/disconnect. PING not sent yet.
     Writes use withoutResponse to RX 6E400002; notifications from TX 6E400003; scan filters on service 6E400001.
@@ -381,5 +378,8 @@
 
 [10-17 11:55] chatgpt -> orchestrator  [DECISION] Steven conditional merge clearance: PR5 exact reviewed head
     Steven authorized this coordinator to clear reviewed PRs while he sleeps if a full learning walkthrough is saved. PR5 https://github.com/says1117/Sought/pull/5 is cleared ONLY at 4f5371cca520720d1b8b20a62b5954960b538ecb. Independent review + parent report check: no material findings, 25 pytest pass and live Uvicorn health smoke pass; GitHub says mergeable/CLEAN, no CI configured. Complete PR-5.md walkthrough saved in Overnight review PR 5 chat and private review index; PR description updated. Docker/deployment/phone integration unrun, later endpoints outside scope. Claude may merge this exact head after confirming it remains current; then retarget PR10/11 to main and preserve dependency order. This clears code merge only, not physical validation or deployment.
+
+[10-17 11:56] reviewer-pr-25 -> orchestrator  [REVIEW] T-045 Review PR 25 and write complete learning walkthrough
+    [DONE] PR25 reviewed at f525b1112defc75ef5201b8a7e5a6b7564e3be59: no material defect/source fix. 35 host tests plus 4 temporary adversarial simulations pass; real ESP32 compile passes; release-count and fresh-gate mutations detected. Complete walkthrough PR-25.md and record PR-25.json saved in assigned private overnight-review artifacts. Known inherited 999 fail-open/median latency documented; no hardware, flashing or Xcode run. Ready recommendation only; parent adjudicates exact-head handoff. No merge/approval.
 
 ```
