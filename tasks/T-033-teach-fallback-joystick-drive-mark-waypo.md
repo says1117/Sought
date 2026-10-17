@@ -7,7 +7,7 @@ owner: ios-drive
 depends: 
 read: docs/01_ROBOTICS_PLAN.md#3.2, #3.1 Teach
 created: 2026-10-17T10:26:36Z
-doing: WaypointStore + WorldMapStore written; doing relocalization monitor + view model
-doing_at: 2026-10-17T11:42:10Z
+doing: tests green (235), build ok; committing + PR
+doing_at: 2026-10-17T11:45:11Z
 ---
 Fallback for Explore. Rescan-needed message if no relocalization in 20 s.
