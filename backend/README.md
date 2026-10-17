@@ -39,3 +39,32 @@ publicly. Filename input is ignored, and writes replace the id atomically.
 `/media` serves existing files publicly. Startup creates the media directory.
 SSE, eval results, seed data and remote commands are outside this task.
 The Docker image creates the default media and database directories.
+
+### Isolated MOCK demo
+
+From the repository root, run `python -m backend.seed`. It writes only
+`backend/mock/` (never the real DB, media, or eval results). All generated images,
+labels, summaries, and evaluation values say MOCK or SAMPLE DATA. Do not use these
+values or screenshots as measured project results.
+
+Start a separate development server with your local token and:
+
+```sh
+export RECALL_DB_PATH=backend/mock/recall.sqlite3
+export RECALL_MEDIA_DIR=backend/mock/media
+export RECALL_EVALS_PATH=backend/mock/results.json
+python -m uvicorn backend.app:app
+```
+
+`GET /api/metadata` reports `{"mock":true}` for a seeded database so clients can
+show “Using mock data”. `python tools/mock_robot.py --steps 10` sends heartbeats
+at two-second intervals and a scripted sample patrol. Set `RECALL_TOKEN` locally.
+Only point this tool at the isolated mock server.
+
+Authenticated `GET /api/stream` emits heartbeat, event, object and patrol writes
+only after persistence. The broker also supports command notifications for future
+command endpoints. Idle connections receive comments every 15 seconds. Queues are
+bounded: slow clients disconnect and should reconnect and refresh GET snapshots.
+Use fetch streaming with an Authorization header. `/api/evals` reads the configured
+JSON path (default `evals/results.json`), returns `{}` when missing, and 503 for an
+unreadable or malformed file. This is process-local live fan-out; run one worker.

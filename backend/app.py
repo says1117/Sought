@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.staticfiles import StaticFiles
 
+from backend.stream import Broker
 from backend.db import Store, connect
 from backend.routes.api import router
 from backend.models import HealthResponse
@@ -32,6 +33,8 @@ def create_app() -> FastAPI:
         application.state.db = connect(database_path)
         application.state.store = Store(application.state.db)
         application.state.media_dir = media_dir
+        application.state.broker = Broker()
+        application.state.evals_path = Path(os.environ.get("RECALL_EVALS_PATH", "evals/results.json"))
         try:
             yield
         finally:

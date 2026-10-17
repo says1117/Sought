@@ -1,5 +1,6 @@
 """Authenticated phone sync endpoints; all persistence is independent of clients."""
 import io
+import json
 import os
 import re
 import tempfile
@@ -8,6 +9,7 @@ import warnings
 from datetime import datetime
 from typing import Annotated
 
+from fastapi.responses import StreamingResponse
 from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile
 from PIL import Image, UnidentifiedImageError
 from pydantic import AwareDatetime
@@ -22,10 +24,14 @@ def store(request: Request):
     return request.app.state.store
 
 
-def save(request: Request, family: str, id: str, payload):
+async def save(request: Request, family: str, id: str, payload):
     if id != payload.id:
         raise HTTPException(422, "URL id must match body id")
-    return store(request).put(family, id, payload.model_dump(mode="json"))
+    body = store(request).put(family, id, payload.model_dump(mode="json"))
+    event = {"objects": "object", "events": "event", "patrols": "patrol"}.get(family)
+    if event:
+        request.app.state.broker.publish(event, body)
+    return body
 
 
 def newer(value: str, since: datetime | None):
@@ -33,8 +39,10 @@ def newer(value: str, since: datetime | None):
 
 
 @router.post("/robot/heartbeat", response_model=Heartbeat)
-def heartbeat(payload: Heartbeat, request: Request):
-    return store(request).put("heartbeat", "latest", payload.model_dump(mode="json"), time.time())
+async def heartbeat(payload: Heartbeat, request: Request):
+    body = store(request).put("heartbeat", "latest", payload.model_dump(mode="json"), time.time())
+    request.app.state.broker.publish("heartbeat", body)
+    return body
 
 
 @router.get("/robot/status")
@@ -47,8 +55,8 @@ def robot_status(request: Request):
 
 
 @router.put("/waypoints/{id}", response_model=Waypoint)
-def put_waypoint(id: str, payload: Waypoint, request: Request):
-    return save(request, "waypoints", id, payload)
+async def put_waypoint(id: str, payload: Waypoint, request: Request):
+    return await save(request, "waypoints", id, payload)
 
 
 @router.get("/waypoints", response_model=list[Waypoint])
@@ -57,8 +65,8 @@ def waypoints(request: Request):
 
 
 @router.put("/routes/{id}", response_model=Route)
-def put_route(id: str, payload: Route, request: Request):
-    return save(request, "routes", id, payload)
+async def put_route(id: str, payload: Route, request: Request):
+    return await save(request, "routes", id, payload)
 
 
 @router.get("/routes", response_model=list[Route])
@@ -67,8 +75,8 @@ def routes(request: Request):
 
 
 @router.put("/objects/{id}", response_model=ObjectTrack)
-def put_object(id: str, payload: ObjectTrack, request: Request):
-    return save(request, "objects", id, payload)
+async def put_object(id: str, payload: ObjectTrack, request: Request):
+    return await save(request, "objects", id, payload)
 
 
 @router.get("/objects", response_model=list[ObjectTrack])
@@ -79,8 +87,8 @@ def objects(request: Request, q: str = "", limit: Annotated[int | None, Query(ge
 
 
 @router.put("/patrols/{id}", response_model=Patrol)
-def put_patrol(id: str, payload: Patrol, request: Request):
-    return save(request, "patrols", id, payload)
+async def put_patrol(id: str, payload: Patrol, request: Request):
+    return await save(request, "patrols", id, payload)
 
 
 @router.get("/patrols", response_model=list[Patrol])
@@ -89,8 +97,8 @@ def patrols(request: Request):
 
 
 @router.put("/events/{id}", response_model=ChangeEvent)
-def put_event(id: str, payload: ChangeEvent, request: Request):
-    return save(request, "events", id, payload)
+async def put_event(id: str, payload: ChangeEvent, request: Request):
+    return await save(request, "events", id, payload)
 
 
 @router.get("/events", response_model=list[ChangeEvent])
@@ -145,3 +153,25 @@ async def upload_media(request: Request, id: Annotated[str, Form()], file: Annot
         if temporary and os.path.exists(temporary):
             os.unlink(temporary)
     return {"id": id}
+
+
+@router.get("/stream")
+async def stream(request: Request):
+    broker = request.app.state.broker
+    queue = broker.subscribe()
+    return StreamingResponse(broker.messages(queue), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@router.get("/evals")
+def evals(request: Request):
+    try:
+        return json.loads(request.app.state.evals_path.read_text())
+    except FileNotFoundError:
+        return {}
+    except (ValueError, OSError):
+        raise HTTPException(503, "Evaluation results unavailable")
+
+
+@router.get("/metadata")
+def metadata(request: Request):
+    return {"mock": store(request).get("metadata", "mock") is not None}
