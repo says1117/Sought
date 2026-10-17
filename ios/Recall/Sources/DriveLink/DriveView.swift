@@ -7,6 +7,7 @@ struct DriveView: View {
     @Environment(\.scenePhase) private var scenePhase
     /// Resets to nil on release AND on cancellation (call, system gesture), unlike DragGesture.onEnded.
     @GestureState private var held: DriveIntent?
+    @State private var requireRelease = false
 
     var body: some View {
         VStack(spacing: 16) {
@@ -29,14 +30,25 @@ struct DriveView: View {
             HoldButton(title: "Back", intent: .back, held: $held)
         }
         .padding()
-        .onChange(of: held) { _, _ in apply() }
+        .allowsHitTesting(link.isConnected && scenePhase == .active)
+        .onChange(of: held) { _, intent in
+            if intent == nil { requireRelease = false }
+            apply()
+        }
         .onChange(of: speed) { _, _ in apply() }
-        .onChange(of: scenePhase) { _, phase in if phase != .active { link.stop() } }
+        .onChange(of: link.isConnected) { _, _ in
+            requireRelease = held != nil
+            link.stop()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active { requireRelease = held != nil; link.stop() }
+        }
         .onDisappear { link.stop() }
     }
 
     private func apply() {
-        switch DrivePad.action(held: held, speed: Int(speed)) {
+        switch DrivePad.action(held: held, speed: Int(speed),
+                               isEnabled: link.isConnected && scenePhase == .active && !requireRelease) {
         case .stop: link.stop()
         case .drive(let l, let r): link.drive(left: l, right: r)
         }

@@ -1,5 +1,6 @@
 import Foundation
 import CoreBluetooth
+import Combine
 
 // Needs NSBluetoothAlwaysUsageDescription in Info.plist. Real iPhone only (the simulator has no Bluetooth).
 
@@ -15,8 +16,9 @@ final class DriveLink: NSObject, ObservableObject, CBCentralManagerDelegate, CBP
     private var central: CBCentralManager!
     private var peripheral: CBPeripheral?
     private var rx: CBCharacteristic?
+    private var tx: CBCharacteristic?
     private var heartbeat: Timer?
-    private var left = 0, right = 0
+    private var session = DriveLinkSession()
     private var heartbeatSuspended = false
     /// Called for every well-formed status line (main queue). Used by the motion self-test to log each line with its receive time.
     var onStatus: ((RobotStatus) -> Void)?
@@ -29,13 +31,12 @@ final class DriveLink: NSObject, ObservableObject, CBCentralManagerDelegate, CBP
 
     /// Set wheel speeds (-255...255). The 10 Hz heartbeat keeps resending them.
     func drive(left: Int, right: Int) {
-        self.left = DriveProtocol.clamp(left)
-        self.right = DriveProtocol.clamp(right)
+        session.drive(left: left, right: right)
     }
 
     /// Zero the heartbeat and send an immediate STOP.
     func stop() {
-        left = 0; right = 0
+        session.stop()
         heartbeatSuspended = false
         send(DriveProtocol.stopCommand)
     }
@@ -51,10 +52,32 @@ final class DriveLink: NSObject, ObservableObject, CBCentralManagerDelegate, CBP
 
     private func startHeartbeat() {
         heartbeat?.invalidate()
-        heartbeat = Timer.scheduledTimer(withTimeInterval: DriveProtocol.heartbeatInterval, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: DriveProtocol.heartbeatInterval, repeats: true) { [weak self] _ in
             guard let self, !self.heartbeatSuspended else { return }
-            self.send(DriveProtocol.driveCommand(left: self.left, right: self.right))
+            self.send(DriveProtocol.driveCommand(left: self.session.left, right: self.session.right))
         }
+        heartbeat = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    private func resetConnection() {
+        heartbeat?.invalidate()
+        heartbeat = nil
+        session.reset()
+        heartbeatSuspended = false
+        isConnected = false
+        rx = nil; tx = nil
+        robot = nil
+        lines = LineBuffer()
+    }
+
+    private func failConnection(_ p: CBPeripheral, message: String) {
+        stop()
+        resetConnection()
+        peripheral = nil
+        central.cancelPeripheralConnection(p)
+        statusText = message
+        if central.state == .poweredOn { central.scanForPeripherals(withServices: [Self.service]) }
     }
 
     // MARK: CBCentralManagerDelegate
@@ -63,12 +86,15 @@ final class DriveLink: NSObject, ObservableObject, CBCentralManagerDelegate, CBP
             statusText = "Scanning for Navigator"
             c.scanForPeripherals(withServices: [Self.service])
         } else {
+            resetConnection()
+            peripheral = nil
             statusText = "Bluetooth unavailable (state \(c.state.rawValue))"
         }
     }
 
     func centralManager(_ c: CBCentralManager, didDiscover p: CBPeripheral,
                         advertisementData: [String: Any], rssi: NSNumber) {
+        guard peripheral == nil, c.state == .poweredOn else { return }
         let uuids = (advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID])?.map { $0.uuidString } ?? []
         guard PeripheralMatch.isNavigator(advertisedName: advertisementData[CBAdvertisementDataLocalNameKey] as? String,
                                           cachedName: p.name,
@@ -81,46 +107,73 @@ final class DriveLink: NSObject, ObservableObject, CBCentralManagerDelegate, CBP
     }
 
     func centralManager(_ c: CBCentralManager, didConnect p: CBPeripheral) {
+        guard p === peripheral else { return }
+        resetConnection()
         statusText = "Connected, finding service"
         p.discoverServices([Self.service])
     }
 
     func centralManager(_ c: CBCentralManager, didDisconnectPeripheral p: CBPeripheral, error: Error?) {
-        isConnected = false
-        heartbeat?.invalidate()
-        rx = nil
-        left = 0; right = 0
-        heartbeatSuspended = false
-        robot = nil
+        guard p === peripheral else { return }
+        resetConnection()
+        peripheral = nil
         statusText = "Disconnected, rescanning"
-        c.scanForPeripherals(withServices: [Self.service])
+        if c.state == .poweredOn { c.scanForPeripherals(withServices: [Self.service]) }
     }
 
     func centralManager(_ c: CBCentralManager, didFailToConnect p: CBPeripheral, error: Error?) {
+        guard p === peripheral else { return }
+        resetConnection()
+        peripheral = nil
         statusText = "Connect failed, rescanning"
-        c.scanForPeripherals(withServices: [Self.service])
+        if c.state == .poweredOn { c.scanForPeripherals(withServices: [Self.service]) }
     }
 
     // MARK: CBPeripheralDelegate
     func peripheral(_ p: CBPeripheral, didDiscoverServices error: Error?) {
-        guard let s = p.services?.first(where: { $0.uuid == Self.service }) else { return }
+        guard p === peripheral else { return }
+        guard error == nil, let s = p.services?.first(where: { $0.uuid == Self.service }) else {
+            failConnection(p, message: "Navigator service unavailable, rescanning")
+            return
+        }
         p.discoverCharacteristics([Self.rxUUID, Self.txUUID], for: s)
     }
 
     func peripheral(_ p: CBPeripheral, didDiscoverCharacteristicsFor s: CBService, error: Error?) {
+        guard p === peripheral, s.uuid == Self.service else { return }
+        guard error == nil else {
+            failConnection(p, message: "Characteristic discovery failed, rescanning")
+            return
+        }
         for c in s.characteristics ?? [] {
             if c.uuid == Self.rxUUID { rx = c }
-            if c.uuid == Self.txUUID { p.setNotifyValue(true, for: c) }
+            if c.uuid == Self.txUUID { tx = c }
         }
-        if rx != nil {
-            isConnected = true
-            statusText = "Linked to Navigator"
-            startHeartbeat()
+        guard let rx, rx.properties.contains(.writeWithoutResponse),
+              let tx, tx.properties.contains(.notify) else {
+            failConnection(p, message: "Required UART characteristics unavailable, rescanning")
+            return
         }
+        statusText = "Enabling Navigator status notifications"
+        p.setNotifyValue(true, for: tx)
+    }
+
+    func peripheral(_ p: CBPeripheral, didUpdateNotificationStateFor c: CBCharacteristic, error: Error?) {
+        guard p === peripheral, c === tx else { return }
+        guard error == nil, c.isNotifying, rx != nil else {
+            failConnection(p, message: "Status notifications unavailable, rescanning")
+            return
+        }
+        session.connect()
+        isConnected = true
+        statusText = "Linked to Navigator"
+        stop()
+        startHeartbeat()
     }
 
     func peripheral(_ p: CBPeripheral, didUpdateValueFor c: CBCharacteristic, error: Error?) {
-        guard c.uuid == Self.txUUID, let d = c.value, let s = String(data: d, encoding: .utf8) else { return }
+        guard p === peripheral, c === tx, error == nil,
+              let d = c.value, let s = String(data: d, encoding: .utf8) else { return }
         for line in lines.append(s) {
             if let st = RobotStatus.parse(line) { robot = st; onStatus?(st) }
         }

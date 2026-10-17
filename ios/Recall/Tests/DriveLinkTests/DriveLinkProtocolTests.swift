@@ -68,6 +68,14 @@ final class DrivePadTests: XCTestCase {
         XCTAssertEqual(DrivePad.action(held: .forward, speed: 0), .stop)
     }
 
+    func testDisabledPadStopsEvenWithHeldButton() {
+        XCTAssertEqual(DrivePad.action(held: .forward, speed: 150, isEnabled: false), .stop)
+    }
+
+    func testExtremeNegativeSpeedDoesNotOverflow() {
+        XCTAssertEqual(DrivePad.action(held: .forward, speed: Int.min), .drive(left: 255, right: 255))
+    }
+
     func testIntentsMapToWheels() {
         XCTAssertEqual(DrivePad.action(held: .forward, speed: 150), .drive(left: 150, right: 150))
         XCTAssertEqual(DrivePad.action(held: .back, speed: 150), .drive(left: -150, right: -150))
@@ -83,5 +91,43 @@ final class DrivePadTests: XCTestCase {
         XCTAssertFalse(PeripheralMatch.isNavigator(advertisedName: nil, cachedName: nil, advertisedServiceUUIDs: [uart]))
         XCTAssertFalse(PeripheralMatch.isNavigator(advertisedName: "Navigator", cachedName: nil, advertisedServiceUUIDs: []))
         XCTAssertFalse(PeripheralMatch.isNavigator(advertisedName: "Navigator", cachedName: nil, advertisedServiceUUIDs: ["180F"]))
+    }
+}
+
+final class DriveLinkSessionTests: XCTestCase {
+    func testCommandsBeforeReadinessAreDiscarded() {
+        var session = DriveLinkSession()
+        session.drive(left: 150, right: 150)
+        XCTAssertFalse(session.isReady)
+        session.connect()
+        XCTAssertTrue(session.isReady)
+        XCTAssertEqual(session.left, 0)
+        XCTAssertEqual(session.right, 0)
+    }
+
+    func testResetClearsMotionAndRejectsCommandsUntilReconnect() {
+        var session = DriveLinkSession()
+        session.connect()
+        session.drive(left: 150, right: -150)
+        session.reset()
+        session.drive(left: 200, right: 200)
+        XCTAssertFalse(session.isReady)
+        XCTAssertEqual(session.left, 0)
+        XCTAssertEqual(session.right, 0)
+        session.connect()
+        XCTAssertEqual(session.left, 0)
+        XCTAssertEqual(session.right, 0)
+    }
+
+    func testReadyCommandsClampAndStopZerosBothWheels() {
+        var session = DriveLinkSession()
+        session.connect()
+        session.drive(left: 999, right: -999)
+        XCTAssertEqual(session.left, 255)
+        XCTAssertEqual(session.right, -255)
+        session.stop()
+        XCTAssertTrue(session.isReady)
+        XCTAssertEqual(session.left, 0)
+        XCTAssertEqual(session.right, 0)
     }
 }
