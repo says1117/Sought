@@ -1,14 +1,16 @@
-# Frontend plan (website, dashboard, pitch page, README visuals)
+# Robot-side facts for the frontend (advisory)
 
-Owner: web lead. Written 2026-10-17 evening, after the scope cut. This replaces `02_WEB_PLAN.md` where they disagree. `03_CONTRACTS.md` still wins for interfaces and `00_MASTER_PLAN.md` section 7 wins for scope.
+**Status: advisory.** The web lead's own plan wins on pages, design, hosting, tooling and timeline. This file does not override it. It only records facts about the robot side, so his plan matches what the phone really sends and what can truthfully be shown. Sections marked "Suggestion" are ideas he can ignore. `03_CONTRACTS.md` still wins for interfaces and `00_MASTER_PLAN.md` section 7 wins for scope.
+
+Written 2026-10-17 evening, after the scope cut.
 
 Deadline is 8 am Sunday (EDT). Aim to be submitted by 6 am. Robot feature freeze is 8 pm Saturday, but the web side can keep working until about 2 am.
 
-## 1. What you are building and for whom
+## 1. What the frontend is for
 
 A caregiver or family member of someone with low vision opens a website and sees three things fast: is the robot OK, what has it stored (objects it found, where they are), and a map. The same site is also what judges open to see the project work, so it must be honest, readable, and accessible.
 
-You do not need Xcode or the robot. Build against the seed data and mock robot first, then switch to the real phone when Steven says the phone is posting.
+The frontend does not need Xcode or the robot. It can be built against the seed data and mock robot first, then switched to the real phone when Steven says the phone is posting.
 
 ## 2. What changed since the original plan
 
@@ -64,7 +66,7 @@ RECALL_TOKEN=change-me uvicorn backend.app:app --reload
 
 Auth is a bearer token from the `RECALL_TOKEN` environment variable. `GET /media/{id}.jpg` is public so image tags work. Use `.env.example`. **Never commit a real token.**
 
-## 5. Pages and acceptance
+## 5. Pages and acceptance (Suggestion: the web lead's plan overrides this)
 
 | Route | Purpose | Done when |
 |---|---|---|
@@ -77,7 +79,7 @@ Auth is a bearer token from the `RECALL_TOKEN` environment variable. `GET /media
 
 Every page needs loading, empty and error states. Never show invented numbers. Sample data must be labeled SAMPLE DATA in the UI and must never appear in public screenshots.
 
-## 6. Design direction
+## 6. Design direction (Suggestion: the web lead's design overrides this)
 
 Calm, trustworthy, spatial. A floor plan on paper: warm off-white, ink text, one signal color kept for hazards. One humane sans plus a monospace for ids and coordinates. Body text at least 17 px. Tokens as CSS variables with a full dark theme (respect `prefers-color-scheme`, plus a toggle). Severity is never color alone. Subtle motion, and respect `prefers-reduced-motion`. Copy is plain and specific ("The robot is exploring", not "Active"). No em dashes in any copy.
 
@@ -95,11 +97,11 @@ Built and unit-tested but not yet run on the robot: pose tracking, driving to a 
 
 Do not claim: that the robot finds objects (until a real find is logged), any accuracy, latency or success rate, patrol or change detection, come to me, autonomous exploration, or anything about the dashboard being fed by live objects before Steven says so.
 
-## 9. Hosting
+## 9. Hosting (Suggestion: the web lead decides)
 
 Decide quickly. Preferred: a public host so the phone reaches it from anywhere (Fly, Render, or Railway). Fallback: run on a Mac and use a phone hotspot. The API contract is identical either way. The backend can serve the built dashboard from `/`. The phone needs an HTTPS URL and the token in its gitignored `Secrets.xcconfig`. Test from the phone, not only from your laptop.
 
-## 10. Timeline (Saturday evening to Sunday morning, EDT)
+## 10. Timeline (Suggestion only; the web lead sets his own)
 
 | When | Work |
 |---|---|
