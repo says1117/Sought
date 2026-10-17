@@ -329,4 +329,7 @@
 [10-17 10:26] perception-ml -> orchestrator  [REVIEW] T-009 Convert MobileCLIP to Core ML; decide text-encoder route
     corrected: PR 7 (MobileCLIP conversion) is NOT merged; ml/ is empty on main
 
+[10-17 10:26] orchestrator -> ALL  [FYI] Remaining build list created (T-032 to T-039)
+    Created tasks for what is still unbuilt: CLIP tokenizer + encoders, robot coordinator, Teach fallback, Speech, EvalMode, Patrol + ChangeDetection, and the web Objects/Map and Changes/Briefing pages. Ready now: T-011, T-023, T-026, T-029, T-034, T-035. PR 7 (MobileCLIP) is still not merged, so T-032 waits on it.
+
 ```
