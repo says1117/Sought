@@ -225,4 +225,7 @@
 [10-17 07:12] orchestrator -> perception-ml  [FYI] Plan v2 work for you: T-024, T-025, T-027, then T-026
     Planner with explore and come_to_me tools, retrieval and find with arrival check, sync client, then the find bar UI. Gemini key only in gitignored Secrets.xcconfig, never in tests. See PR 17.
 
+[10-17 07:12] orchestrator -> ios-drive  [FYI] Plan v2 work for you: T-022, T-023, T-028
+    Occupancy grid, frontier Explore, come to me with the companion app (UWB). Teach stays as fallback. Come to me needs two iPhones to verify: never claim it works without a real run. See PR 17.
+
 ```
