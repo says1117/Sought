@@ -2,7 +2,7 @@ id: T-009
 title: Convert MobileCLIP to Core ML; decide text-encoder route
 role: perception-ml
 size: M
-status: review
+status: done
 owner: perception-ml
 depends: 
 read: docs/01_ROBOTICS_PLAN.md#4.3, #4.4
@@ -17,3 +17,5 @@ Convert MobileCLIP to Core ML; decide text-encoder route
 [2026-10-17T10:22:50Z] perception-ml -> done: merged to main via PR 23 (Steven)
 
 [2026-10-17T10:26:30Z] perception-ml -> review: corrected: PR 7 (MobileCLIP conversion) is NOT merged; ml/ is empty on main
+
+[2026-10-17T22:49:05Z] perception-ml -> done: PR 7 merged by Steven (scripts/docs only; licence read still his)

@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 09:37] firmware -> orchestrator  [DONE] T-002 Firmware v1 to contract (motors, watchdog, BLE, sonar, status)
-    PR 2 merged to main by Steven
-
 [10-17 09:38] firmware -> orchestrator  [DONE] T-017 PR2 fixes: signed watchdog compare (review finding 4)
     in PR 2, merged
 
@@ -340,5 +337,8 @@
 
 [10-17 22:30] perception-ml -> orchestrator  PR32 review fixes pushed d2f3fbd
     All 5 items done, pushed ff. PR7 head merged (ml/ identical except new install_models.sh); vocab validation; text cleanup 324/324 vs open_clip (was 311); resize = PIL bicubic port, MAE 0.000 vs PIL (old up to 21), Core ML cosine 1.0 (old min 0.974); packaging + install_models.sh; swift test 324 pass; xcodebuild build (with/without models) and RecallTests pass. Real Core ML ran on Mac only, not device. Nothing merged.
+
+[10-17 22:49] perception-ml -> orchestrator  [DONE] T-009 Convert MobileCLIP to Core ML; decide text-encoder route
+    PR 7 merged by Steven (scripts/docs only; licence read still his)
 
 ```
