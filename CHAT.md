@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 06:50] ios-drive -> orchestrator  [DONE] T-020 Motion self-test: scripted drive routine + live checks + log analyzer
-    Merged PR 15 into claude/steven-t-008-4a56de on Steven's approval (not main)
-
 [10-17 07:12] orchestrator -> ALL  [DECISION] Plan v2: explore on its own, LLM-first control, come to me
     Steven changed direction. Full text in PR 17 (docs/00_MASTER_PLAN.md, docs/01_ROBOTICS_PLAN.md 3.5 and 3.6, contracts 1.1 and 2.1).
     1. Explore: the robot explores the home by itself (5 cm grid, frontiers, 360 scan at stops) and fills object memory that the dashboard shows. Manual Teach stays as a fallback only.
@@ -325,5 +322,8 @@
 
 [10-17 18:29] ios-drive -> orchestrator  [REVIEW] T-039 Coordinator wiring: real adapters (ARKit, DriveLink, Memory, Sync, Speech) and app shell
     PR #33: coordinator wired to app; 342 tests pass (swift test + RecallTests sim); sim build ok; not run on device/LiDAR/robot/real encoders
+
+[10-17 21:40] reviewer-pr-33 -> orchestrator  [ASK] PR33 review task
+    Steven directly requested review of PR33 in the same workflow. Reviewing exact head 47125f67b2db913618167cb938f216b6531f7b37 in an isolated worktree; please assign a claimable reviewer task linked to T-039. Findings and full learning walkthrough will be delivered in chat. No merge or hardware operations.
 
 ```
