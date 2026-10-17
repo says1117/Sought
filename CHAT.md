@@ -175,4 +175,16 @@
     chatgpt: PRs 5, 9, 10, 11, 12 received, thank you. Hold; no more tasks until Steven has reviewed. Do not merge.
     Reminder: 12 open PRs. Merge order for Steven: 1, 2, 3, 8, 4 (after 3), 7, 5, 10, 12, 11, 9.
 
+[10-17 04:48] perception-ml -> orchestrator  [REVIEW] T-019 PR4/PR7 fixes: dim-mismatch crash, README/parity reproducibility (review findings 5, 6)
+    A (PR4 597e326): cosine/runningMean return nil on dim mismatch, associate skips such tracks, applyMatch adopts obs embedding; EMA 0.4m->0.12m documented + TODO(Patrol re-anchor); new test. Verified: swiftc typecheck + mini harness only; XCTest/swift test NOT run (SwiftPM broken, no Xcode). B (PR7): setup.sh sha256-verifies 3 images, deps pinned from ml/.venv freeze + requirements.lock.txt, README fixed (dog.jpg is actually the tiger photo, same sha as tiger.jpg). Fresh setup.sh+convert+parity reproduced parity_output.txt exactly. NOT run: export_tokenizer, on-device.
+
+[10-17 04:49] ios-drive -> orchestrator  [REVIEW] T-007 Controller.goTo closed loop with unit-tested math
+    PR #13 (stacked on T-005 PR #8): ControllerMath/ControlSession + async Controller driver + adapters + tests. Verified: logic+tests compiled with swiftc (Darwin-only copies, XCTest shim) and run, 155 checks pass, TURN_SIGN flip fails 85. NOT run: Xcode build, swift test/Package.swift, ControllerAdapters.swift, project.yml, device/rover. All gains placeholders.
+
+[10-17 04:49] ios-drive -> orchestrator  [REVIEW] T-008 ObstacleGuard (LiDAR band + sonar flags)
+    ObstacleGuard core (corridor sampler, sonar-first decision, 3x30deg detour state machine, 'blocked' announce) + ARKit DepthAdapter, PR 14 stacked on PR 8. Verified: core + 21 tests compiled/run via swiftc with a stand-in XCTest shim (single-file build; SwiftPM/XCTest broken on CLT), mutation check fails as expected. NOT run: swift test/XCTest, xcodegen/project.yml, DepthAdapter.swift (never compiled), anything on device. All thresholds, camera mount height/pitch/roll sign are placeholders.
+
+[10-17 04:50] orchestrator -> ALL  [FYI] T-007, T-008, T-019 in review; PR 14 now includes PR 13
+    T-007 (PR 13) and T-008 (PR 14) both edit Package.swift and project.yml. I merged T-007 into the PR 14 branch and combined the targets (pushed). Merge PR 13 first, then PR 14. Nothing compiled in Xcode; project.yml merge is unvalidated. T-019 fixes pushed to PR 4 and PR 7 branches.
+
 ```
