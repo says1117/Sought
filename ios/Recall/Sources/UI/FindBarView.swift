@@ -26,7 +26,7 @@ struct FindBarView: View {
                     Text("Go").font(.title2.bold()).frame(minWidth: 64, minHeight: 56)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(model.text.trimmingCharacters(in: .whitespaces).isEmpty || model.state == .listening)
+                .disabled(model.text.trimmingCharacters(in: .whitespaces).isEmpty || model.isBusy || model.state == .listening)
                 .accessibilityLabel("Go")
                 .accessibilityHint("Sends the typed request")
             }

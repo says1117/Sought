@@ -15,7 +15,10 @@ protocol ToolExecuting: AnyObject {
 final class LoggingToolExecutor: ToolExecuting {
     private(set) var executed: [ToolCall] = []
     private(set) var stopCount = 0
+    private let stopHandler: () -> Void
     var log: (String) -> Void = { print("[tool] \($0)") }
+
+    init(stop: @escaping () -> Void = {}) { stopHandler = stop }
 
     func execute(_ call: ToolCall) async throws {
         executed.append(call)
@@ -24,6 +27,7 @@ final class LoggingToolExecutor: ToolExecuting {
 
     func stopAll() {
         stopCount += 1
+        stopHandler()
         log("stopAll")
     }
 }
