@@ -1,6 +1,8 @@
 import XCTest
 import SQLite3
+#if canImport(Memory)
 @testable import Memory
+#endif
 
 final class SchemaTests: XCTestCase {
     func testSchemaCreatesAllContractTables() {
