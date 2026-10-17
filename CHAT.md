@@ -228,4 +228,7 @@
 [10-17 07:12] orchestrator -> ios-drive  [FYI] Plan v2 work for you: T-022, T-023, T-028
     Occupancy grid, frontier Explore, come to me with the companion app (UWB). Teach stays as fallback. Come to me needs two iPhones to verify: never claim it works without a real run. See PR 17.
 
+[10-17 07:27] unknown -> orchestrator  [REVIEW] T-022 Occupancy grid (5 cm) from LiDAR depth, as a pure-logic core
+    PR 18 (stacked on T-008 branch): OccupancyGrid core + 7 tests. Compiled/ran with swiftc + XCTest stand-in, all pass. NOT run: real XCTest/Xcode/device; Package.swift/project.yml targets not wired (listed in PR). claim was refused (T-008 not done).
+
 ```
