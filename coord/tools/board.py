@@ -6,6 +6,7 @@ Standard library only. Run from anywhere inside the repo. See coord/PROTOCOL.md.
 """
 import argparse
 import datetime as dt
+import json
 import re
 import secrets
 import subprocess
@@ -38,6 +39,70 @@ def warn(msg):
     print(f"warning: {msg}", file=sys.stderr)
 
 
+# ---------- GitHub issue mirror (optional): pings show up where people already look ----------
+
+MARKER = "<!-- recall-board -->"
+CONFIG = BOARD / "config.json"
+
+
+def config():
+    return json.loads(CONFIG.read_text()) if CONFIG.exists() else {}
+
+
+def gh(*args, stdin=None):
+    try:
+        return subprocess.run(["gh", *args], capture_output=True, text=True, input=stdin,
+                              cwd=REPO, timeout=25)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+
+def mirror_comment(meta, body):
+    issue = config().get("issue")
+    if not issue:
+        return
+    text = f"{MARKER}\n**{meta['from']}** to **{meta['to']}** {meta['task'] or ''}\n### {meta['subject']}\n\n{body}"
+    gh("issue", "comment", str(issue), "--body-file", "-", stdin=text)
+
+
+def mirror_body():
+    issue = config().get("issue")
+    board_md = BOARD / "BOARD.md"
+    if issue and board_md.exists():
+        head = ("Shared message board for Recall. Comment here to ping the team; start a comment with "
+                "`@<role>` (for example `@firmware`) to address an agent role, otherwise it goes to everyone. "
+                "Agents read this through `coord/tools/board.py`. **This repo is public: no secrets or personal data.**\n\n")
+        gh("issue", "edit", str(issue), "--body-file", "-", stdin=MARKER + "\n" + head + board_md.read_text())
+
+
+def import_comments():
+    """Turn new human comments on the board issue into board messages."""
+    cfg = config()
+    issue = cfg.get("issue")
+    if not issue:
+        return
+    r = gh("api", f"repos/:owner/:repo/issues/{issue}/comments", "--paginate")
+    if not r or r.returncode:
+        return
+    last, new = cfg.get("last_comment", 0), 0
+    for c in json.loads(r.stdout or "[]"):
+        if c["id"] <= last:
+            continue
+        last = max(last, c["id"])
+        text = c["body"].strip()
+        if MARKER in text or not text:
+            continue
+        m = re.match(r"@([\w-]+)\s*(.*)", text, re.S)
+        to, text = (m.group(1), m.group(2).strip() or text) if m else ("ALL", text)
+        subject, _, rest = text.partition("\n")
+        post_message(f"gh-{c['user']['login']}", to, subject[:80], rest.strip() or subject, mirror=False)
+        new += 1
+    cfg["last_comment"] = last
+    CONFIG.write_text(json.dumps(cfg))
+    if new:
+        publish(f"imported {new} issue comment(s)")
+
+
 def require_board():
     if not BOARD.exists():
         sys.exit("Board not set up. Run: python3 coord/tools/board.py init")
@@ -47,6 +112,7 @@ def sync():
     r = git("pull", "--rebase", "--autostash")
     if r.returncode:
         warn(f"sync failed (offline or no remote?): {r.stderr.strip()[:200]}")
+    import_comments()
 
 
 def render():
@@ -116,6 +182,7 @@ def publish(message, push=True):
     git("commit", "-m", f"board: {message}")
     if not push:
         return
+    mirror_body()
     for _ in range(2):
         if git("push", "-u", "origin", "board").returncode == 0:
             return
@@ -296,11 +363,13 @@ def cmd_status(args):
     print(f"{args.task} is now {args.status}")
 
 
-def post_message(sender, to, subject, body, task=""):
+def post_message(sender, to, subject, body, task="", mirror=True):
     mid = f"{dt.datetime.now(dt.timezone.utc):%Y%m%dT%H%M%SZ}-{sender}-to-{to}-{secrets.token_hex(2)}"
     write(MSGS / f"{mid}.md",
           {"id": mid, "from": sender, "to": to, "task": task, "subject": subject, "time": now()},
           body or "")
+    if mirror:
+        mirror_comment({"from": sender, "to": to, "task": task, "subject": subject}, body or "")
     return mid
 
 

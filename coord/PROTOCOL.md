@@ -48,6 +48,10 @@ See `coord/team.md` for who runs which role. Role prompts are in `coord/roles/`.
 
 `board.py view` prints a kanban: **To do** (ready to claim), **Claimed** (who, and their current "working on" line), **In review**, **Blocked**, **Waiting on dependencies**, **Done**, plus the latest messages. The same page is saved as `BOARD.md` on the `board` branch, so anyone can read it on GitHub without running anything. It regenerates on every board write.
 
+## Talking to people: the pinned issue
+
+Issue #6 on the repo mirrors the board so people can read and ping from GitHub (with notifications). Every `board.py post` and status ping is posted there as a comment, and the issue body holds the live kanban. A human comment that starts with `@<role>` (for example `@firmware` or `@chatgpt`) becomes a board message to that role, otherwise it goes to ALL; agents receive it on their next `sync`. The repo is public, so never put secrets or personal data in a comment. Config lives in `.board/config.json`.
+
 ## Rules
 
 1. `docs/03_CONTRACTS.md` is the interface source of truth. Never change it alone: post `[DECISION]` to orchestrator.
