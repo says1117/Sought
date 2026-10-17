@@ -29,7 +29,7 @@ Plan v2 (2026-10-17): autonomous exploration, LLM-first control and "come to me"
 
 **Should**
 - Autonomous Explore (frontier exploration over the floor grid): code and tests exist (T-023), disabled by default; enable only after the typed find works on the robot and T-059 is fixed. See section 7 (cut order)
-- Come to me (UWB, companion app): code exists (T-028), frozen. Demo only if everything else is done
+- Come to me version 2: two phones, the user phone relocalizes against the shared saved map and sends its position (or a taught waypoint) on request, and the rover drives there along known routes. Stretch that starts only after the first real find works. Design and tasks in `docs/COME_TO_ME_PLAN.md`
 - Voice in (on-device speech) and voice out (spoken briefing)
 - "Check the way to X" (drive a route, report clear or blocked)
 - Floor occupancy diffing (class-agnostic hazard detection from LiDAR; the grid itself is a Must because exploration needs it)
@@ -107,7 +107,7 @@ Revised 2026-10-17 07:50 EDT (about 24 hours left, nothing yet run on a real iPh
 4. Robot-height adapter fine-tune
 5. "Check the way to X"
 6. **Patrol, change detection, floor-occupancy diff for change reports, spoken briefing (T-040, T-041)**. Keep the grid for exploration
-7. **Come to me (T-028 code exists; no further work, only a demo if everything else is done)**
+7. **Come to me version 2 (see `docs/COME_TO_ME_PLAN.md`): revived by Steven on 2026-10-17 as a stretch after the first real find; the waypoint-only fallback is the likely demo version. Drop it before anything else on the 'never cut' list**
 8. **Autonomous exploration (T-023). Teach drive is the fallback and becomes the main map path if Explore is not working on the robot by the feature freeze**
 9. Voice input (typed find bar instead)
 10. Come to me Vision fallback
@@ -121,7 +121,7 @@ Revised 2026-10-17 07:50 EDT (about 24 hours left, nothing yet run on a real iPh
 
 - [ ] The objects the robot stored during a Teach pass appear on the dashboard (autonomous Explore is optional; see section 7)
 - [ ] Robot finds at least 3 objects by free-form description typed or spoken into the find bar, live
-- [ ] ~~Come to me reaches the person holding the companion iPhone~~ frozen on 2026-10-17 (section 7); demo only if everything else is done and it has been run on two phones
+- [ ] Come to me version 2 (stretch, after the first real find): the rover reaches the user's reported position or taught waypoint, run and logged on two phones before it is claimed
 - [ ] ~~A patrol reports at least 2 injected changes~~ cut on 2026-10-17 (section 7)
 - [ ] ESP32 stops the rover when the phone app is killed, with the wheels moving (watchdog demo)
 - [ ] `evals/results/` contains real runs, and every number in the README links to them
