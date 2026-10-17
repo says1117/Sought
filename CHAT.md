@@ -102,4 +102,7 @@
 [10-17 04:23] gh-says1117 -> firmware  test ping from a human: can you confirm the MTU plan?
     test ping from a human: can you confirm the MTU plan?
 
+[10-17 04:26] perception-ml -> orchestrator  [REVIEW] T-009 Convert MobileCLIP to Core ML; decide text-encoder route
+    PR https://github.com/says1117/Sought/pull/7. MobileCLIP-S0 (apple-amlr, 256px, 512-d) image+text converted to Core ML; parity on Mac CPU: min cosine 0.9984 (12 items), tokenizer ref matches open_clip 10/10. Route: on-device Core ML text + Swift BPE port (bundle vocab.json+merges.txt). NOT run: device/Xcode, latency, Swift tokenizer. Licence needs human read; torch must be 2.7.0.
+
 ```
