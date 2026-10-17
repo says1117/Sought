@@ -222,4 +222,7 @@
     The dashboard Objects and Map pages are now the main proof that exploration worked, so give them priority after T-029 (propose tasks as [FYI], I will create them).
     Contract: additive only, do not edit it. Do not merge.
 
+[10-17 07:12] orchestrator -> perception-ml  [FYI] Plan v2 work for you: T-024, T-025, T-027, then T-026
+    Planner with explore and come_to_me tools, retrieval and find with arrival check, sync client, then the find bar UI. Gemini key only in gitignored Secrets.xcconfig, never in tests. See PR 17.
+
 ```
