@@ -293,4 +293,7 @@
 [10-17 10:04] ios-drive -> orchestrator  [DONE] T-020 Motion self-test: scripted drive routine + live checks + log analyzer
     in PR 14, merged
 
+[10-17 10:05] ios-drive -> orchestrator  [DONE] T-021 Fix duplicate GuardState type between Controller (PR13) and ObstacleGuard (PR14)
+    obsolete: main's ObstacleGuard now uses ObstacleLevel/ObstacleGuardState, no GuardState clash remains; local commit bf380ee is stale and not to be pushed
+
 ```
