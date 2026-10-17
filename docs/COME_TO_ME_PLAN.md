@@ -61,13 +61,13 @@ Heartbeat `state` is `coming_to_user` while the rover is on its way. The rover r
 
 | Id | Owner | What |
 |---|---|---|
-| see board | human + ios-drive | Experiment: save the world map on the rover phone, load it on the second phone at standing height, record whether it relocalizes and how fast |
-| see board | ios-drive | World map export and import between phones (share sheet, AirDrop, or backend) with a map id |
-| see board | ios-drive | Coordinator `come_to_me` to a pose or waypoint along taught routes, with the safety rules above |
-| see board | ios-drive | Remote command channel on the phone: poll the backend for the next command, acknowledge, report status |
-| see board | ios-drive | User-phone app: Come to me button, relocalize, send pose and map id, or pick a waypoint |
-| see board | web | Website: Come to me button with a room picker that posts the command |
-| see board | backend | Confirm command endpoints accept the optional `kind` and `target` fields |
+| T-064 | human + ios-drive | Experiment: save the world map on the rover phone, load it on the second phone at standing height, record whether it relocalizes and how fast |
+| T-065 | ios-drive | World map export and import between phones (share sheet, AirDrop, or backend) with a map id |
+| T-066 | ios-drive | Coordinator `come_to_me` to a pose or waypoint along taught routes, with the safety rules above |
+| T-067 | ios-drive | Remote command channel on the phone: poll the backend for the next command, acknowledge, report status |
+| T-068 | ios-drive | User-phone app: Come to me button, relocalize, send pose and map id, or pick a waypoint |
+| T-069 | web | Website: Come to me button with a room picker that posts the command |
+| T-070 | backend | Confirm command endpoints accept the optional `kind` and `target` fields |
 
 ## Not claimed
 
