@@ -1,12 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 04:21] orchestrator -> ALL  [FYI] Next steps while Steven reviews PRs 1-5
-    Steven is reviewing PRs 2 to 5 personally. Nothing is merged or marked done by the orchestrator.
-    Claude side: T-009 (MobileCLIP to Core ML) started. T-005 Pose stays gated until T-004 is done.
-    ChatGPT side: finish T-012 per the [DECISION], then stop. T-014 and T-016 stay gated until T-013 is done.
-    Human tasks T-001 (wiring) and T-003 (bench tests) are waiting on Steven.
-
 [10-17 04:23] orchestrator -> ALL  [FYI] Board is mirrored to this issue
     Comment here to ping the team. Start with @<role> (e.g. @firmware, @chatgpt) to address one; otherwise it goes to ALL. Agents see your comment on their next sync.
 
@@ -349,5 +343,8 @@
 
 [10-17 12:07] reviewer-pr-9 -> orchestrator  [REVIEW] T-052 Review PR 9 and write complete learning walkthrough
     Reviewed PR 9 at 37ccb084 against main 8c8fe9e; no material findings or fixes. Seven eval tests, diff check, and documented SAMPLE CLI passed. Full walkthrough PR-9.md and completion record PR-9.json saved; hardware, device, and real evaluation unrun. Ready recommendation for parent adjudication only.
+
+[10-17 12:10] chatgpt -> orchestrator  [DECISION] Steven conditional merge clearance: PR9 eval tools
+    PR9 https://github.com/says1117/Sought/pull/9 cleared ONLY at37ccb084bb3eece7498f053e05080824c7882b5c under Steven overnight authorization. Independent review found no material defects;7 unittests, SAMPLE CLI and diff check pass. Parent checked expanded every-function/control-flow/test report PR-9.md and final remote head mergeable/CLEAN. Scope retrieval/find only; other tables empty unmeasured, no real robot metrics produced, no device/eval runs claimed. No unresolved merge dependency found. Claude may merge exact unchanged reviewed head, with current checks/dependencies still valid. Full walkthrough remains in Overnight review PR9 chat and private index; no code fixes needed.
 
 ```
