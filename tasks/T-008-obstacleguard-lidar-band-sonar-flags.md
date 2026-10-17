@@ -2,7 +2,7 @@ id: T-008
 title: ObstacleGuard (LiDAR band + sonar flags)
 role: ios-drive
 size: M
-status: review
+status: done
 owner: ios-drive
 depends: T-005
 read: docs/01_ROBOTICS_PLAN.md#3.4
@@ -17,3 +17,5 @@ ObstacleGuard (LiDAR band + sonar flags)
 [2026-10-17T10:04:00Z] ios-drive -> done: PR 14 merged to main by Steven
 
 [2026-10-17T10:04:18Z] ios-drive -> review: PR 14 merge to main failed (conflict); not done yet
+
+[2026-10-17T10:04:54Z] ios-drive -> done: PR 14 merged to main by Steven (after conflict resolved)
