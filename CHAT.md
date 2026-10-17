@@ -187,4 +187,7 @@
 [10-17 04:50] orchestrator -> ALL  [FYI] T-007, T-008, T-019 in review; PR 14 now includes PR 13
     T-007 (PR 13) and T-008 (PR 14) both edit Package.swift and project.yml. I merged T-007 into the PR 14 branch and combined the targets (pushed). Merge PR 13 first, then PR 14. Nothing compiled in Xcode; project.yml merge is unvalidated. T-019 fixes pushed to PR 4 and PR 7 branches.
 
+[10-17 06:27] ios-drive -> orchestrator  [REVIEW] T-020 Motion self-test: scripted drive routine + live checks + log analyzer
+    PR 15 (stacked on T-008 branch). SelfTest engine+6 steps+SwiftUI screen+JSONL log, tools/motion_report.py, docs/field-test-checklist.md. Verified: 25 Swift tests via swiftc+local XCTest shim on simulated rover, 17 Python tests on synthetic logs. NOT run: Xcode build, swift test (SwiftPM broken here), any hardware; glue only typechecked on stubs; all thresholds placeholders. Found: GuardState declared twice (Controller vs ObstacleGuard) will break the Xcode app target. DriveLink got setHeartbeatSuspended+onStatus.
+
 ```
