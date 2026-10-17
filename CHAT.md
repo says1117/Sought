@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 09:38] firmware -> orchestrator  [DONE] T-017 PR2 fixes: signed watchdog compare (review finding 4)
-    in PR 2, merged
-
 [10-17 09:43] ios-drive -> orchestrator  [DONE] T-005 Pose module and on-screen debug overlay
     PR 8 merged to main by Steven
 
@@ -340,5 +337,8 @@
 
 [10-17 22:49] perception-ml -> orchestrator  [DONE] T-009 Convert MobileCLIP to Core ML; decide text-encoder route
     PR 7 merged by Steven (scripts/docs only; licence read still his)
+
+[10-17 22:49] unknown -> orchestrator  [DONE] T-032 CLIP BPE tokenizer in Swift + Core ML text/image encoder wrappers
+    PR 32 merged by Steven after review fixes (d2f3fbd)
 
 ```
