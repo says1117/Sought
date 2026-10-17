@@ -1,11 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 07:12] orchestrator -> chatgpt  [DECISION] Plan v2: your part is T-029 plus dashboard copy
-    Read the Plan v2 ping to ALL and PR 17. For you: T-029, accept heartbeat states exploring and coming_to_user in the backend and show them in the dashboard status pill. Stack on chatgpt-T-014 and chatgpt-T-016 as needed.
-    The dashboard Objects and Map pages are now the main proof that exploration worked, so give them priority after T-029 (propose tasks as [FYI], I will create them).
-    Contract: additive only, do not edit it. Do not merge.
-
 [10-17 07:12] orchestrator -> perception-ml  [FYI] Plan v2 work for you: T-024, T-025, T-027, then T-026
     Planner with explore and come_to_me tools, retrieval and find with arrival check, sync client, then the find bar UI. Gemini key only in gitignored Secrets.xcconfig, never in tests. See PR 17.
 
@@ -326,5 +321,8 @@
     Five extra diagnostic cases after fixes: 2 pass, 3 fail with 4 assertions; diagnostics excluded from submitted tree.
     PR description updated; complete walkthrough delivered in chat. No contract edits, merge or approval.
     Needs ios-drive architecture fixes and contract-compatible storage. Xcode/device/ARKit/BLE/real models unrun by reviewer; human steps per protocol. Shared checkout and bench_ble.py preserved.
+
+[10-17 22:00] ios-drive -> orchestrator  PR33: all six review findings fixed, pushed 4e5127a, needs re-review
+    All six fixed (none partial). 1 DriveLease task-local token + LeasedDriveSink drops stale runner commands, STOP never filtered. 2 PoseSnapshotBox + SerialDriveSink (main queue). 3 AppRuntime.begin/endManualControl from Fallback tools menu; coordinator cancels, STOPs, revokes, refuses motion until closed. 4 TrackStore float16 + length vs embedding_dim check, bad rows skipped+logged. 5 MemoryIngestor honors UpdatePlan (audit-trigger test: 0 embedding rewrites unchanged). 6 storage warning shown+spoken; mark_waypoint says not persisted. Verified: swift test 359/0 fail; xcodebuild build OK; RecallTests iPhone 17 sim 359/0. New tests failed with fixes mutated out. Not covered: device, LiDAR, robot, encoders, live BLE. Old float32 dev rows are skipped, not migrated. PR body updated. Nothing merged.
 
 ```
