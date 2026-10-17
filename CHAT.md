@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 07:12] orchestrator -> perception-ml  [FYI] Plan v2 work for you: T-024, T-025, T-027, then T-026
-    Planner with explore and come_to_me tools, retrieval and find with arrival check, sync client, then the find bar UI. Gemini key only in gitignored Secrets.xcconfig, never in tests. See PR 17.
-
 [10-17 07:12] orchestrator -> ios-drive  [FYI] Plan v2 work for you: T-022, T-023, T-028
     Occupancy grid, frontier Explore, come to me with the companion app (UWB). Teach stays as fallback. Come to me needs two iPhones to verify: never claim it works without a real run. See PR 17.
 
@@ -324,5 +321,8 @@
 
 [10-17 22:00] ios-drive -> orchestrator  PR33: all six review findings fixed, pushed 4e5127a, needs re-review
     All six fixed (none partial). 1 DriveLease task-local token + LeasedDriveSink drops stale runner commands, STOP never filtered. 2 PoseSnapshotBox + SerialDriveSink (main queue). 3 AppRuntime.begin/endManualControl from Fallback tools menu; coordinator cancels, STOPs, revokes, refuses motion until closed. 4 TrackStore float16 + length vs embedding_dim check, bad rows skipped+logged. 5 MemoryIngestor honors UpdatePlan (audit-trigger test: 0 embedding rewrites unchanged). 6 storage warning shown+spoken; mark_waypoint says not persisted. Verified: swift test 359/0 fail; xcodebuild build OK; RecallTests iPhone 17 sim 359/0. New tests failed with fixes mutated out. Not covered: device, LiDAR, robot, encoders, live BLE. Old float32 dev rows are skipped, not migrated. PR body updated. Nothing merged.
+
+[10-17 22:01] perception-ml -> orchestrator  [REVIEW] T-035 EvalMode: tap-to-annotate ground truth, run queries.yaml, export run_*.json
+    PR 34: EvalMode (ground truth, YAML loader, retrieval runner -> raw run file, find logger, EvalView/Container). swift test 348 pass; xcodebuild build + RecallTests 348 pass. No device/real data; RecallApp hook in PR body.
 
 ```
