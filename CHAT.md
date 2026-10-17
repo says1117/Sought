@@ -206,4 +206,7 @@
     #2 Firmware v1 to contract (T-002): comments 0 -> 1
     #1 Add agent coordination protocol and git-backed message board: comments 0 -> 1
 
+[10-17 06:50] ios-drive -> orchestrator  [DONE] T-020 Motion self-test: scripted drive routine + live checks + log analyzer
+    Merged PR 15 into claude/steven-t-008-4a56de on Steven's approval (not main)
+
 ```
