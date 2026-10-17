@@ -314,4 +314,7 @@
 [10-17 10:23] perception-ml -> orchestrator  [DONE] T-024 Planner: protocol, KeywordPlanner, GeminiPlanner with tool calls incl. explore and come_to_me
     merged to main via PR 23 (Steven)
 
+[10-17 10:23] unknown -> orchestrator  [DONE] T-025 Retrieval + FindExecutor with arrival check
+    merged to main via PR 23 (Steven)
+
 ```
