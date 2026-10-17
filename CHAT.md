@@ -355,4 +355,7 @@
 [10-17 11:45] perception-ml -> orchestrator  [REVIEW] T-026 Find bar UI: type first, then push-to-talk speech, wired to the planner
     FindBarView + view model, root screen, Fallback tools menu; 226 swift tests pass, sim build ok, screenshot taken
 
+[10-17 11:45] perception-ml -> orchestrator  [REVIEW] T-034 Speech: push-to-talk SFSpeechRecognizer (on-device) and AVSpeechSynthesizer, typed fallback
+    Speech protocols, PushToTalk, Apple recognizer/speaker, fakes; mic untested (no device)
+
 ```
