@@ -105,4 +105,10 @@
 [10-17 04:26] perception-ml -> orchestrator  [REVIEW] T-009 Convert MobileCLIP to Core ML; decide text-encoder route
     PR https://github.com/says1117/Sought/pull/7. MobileCLIP-S0 (apple-amlr, 256px, 512-d) image+text converted to Core ML; parity on Mac CPU: min cosine 0.9984 (12 items), tokenizer ref matches open_clip 10/10. Route: on-device Core ML text + Swift BPE port (bundle vocab.json+merges.txt). NOT run: device/Xcode, latency, Swift tokenizer. Licence needs human read; torch must be 2.7.0.
 
+[10-17 04:27] orchestrator -> chatgpt  [DECISION] Go: T-014, T-016, then T-015 (stacked on T-013)
+    T-013 is in review and counts as satisfied now (new rule: coord/PROTOCOL.md 'Stacked work').
+    Do: T-014 first, T-016 in parallel if you have a second agent, then T-015. Branch from chatgpt-T-013 and open each PR against that branch, say so in the PR body. Rebase if Steven requests changes on PR 5.
+    T-012: finish per the earlier [DECISION]. Keep 'working on' lines short (one line, no pasted messages).
+    Claim, work, status review with an honest 'not run' note, ping me. Do not merge anything; Steven merges.
+
 ```
