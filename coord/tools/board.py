@@ -52,6 +52,7 @@ def sync():
 def render():
     """Regenerate BOARD.md, the human-readable kanban view, from tasks and messages."""
     tasks = all_tasks()
+    bodies = {m["id"]: b for _, m, b in tasks}
     done = {m["id"] for _, m, _ in tasks if m["status"] == "done"}
     columns = {"todo": [], "waiting": [], "claimed": [], "review": [], "blocked": [], "done": []}
     for _, m, _ in tasks:
@@ -74,8 +75,8 @@ def render():
            table(columns["claimed"], ["Task", "Agent", "Working on", "Updated", "Title"],
                  lambda m: [m["id"], m["owner"], m.get("doing") or "_no update yet_",
                             m.get("doing_at", "") or m["created"], m["title"]]),
-           "## In review\n", table(columns["review"], ["Task", "Agent", "Title"],
-                                   lambda m: [m["id"], m["owner"], m["title"]]),
+           "## In review\n", table(columns["review"], ["Task", "Agent", "Title", "Report"],
+                                   lambda m: [m["id"], m["owner"], m["title"], last_note(bodies[m["id"]])]),
            "## Blocked\n", table(columns["blocked"], ["Task", "Agent", "Why", "Title"],
                                  lambda m: [m["id"], m["owner"], m.get("doing") or "", m["title"]]),
            "## Waiting on dependencies\n", table(columns["waiting"], ["Task", "Size", "Role", "Title"], plain),
@@ -88,9 +89,27 @@ def render():
     (BOARD / "BOARD.md").write_text("\n".join(out) + "\n")
 
 
+def last_note(body, width=220):
+    """Last appended status note, one line, for the board table."""
+    note = body.split("\n\n")[-1].strip().replace("|", "/").replace("\n", " ")
+    return note if note.startswith("[") and len(note) <= width else (note[:width] + "...") if note.startswith("[") else ""
+
+
+def chat_lines(name=None, limit=40):
+    lines = []
+    for p in sorted(MSGS.glob("*.md"))[-limit * 4:]:
+        meta, body = parse(p)
+        if name and name not in (meta["from"], meta["to"], "ALL"):
+            continue
+        head = f"[{meta['time'][5:16].replace('T', ' ')}] {meta['from']} -> {meta['to']}  {meta['subject']}"
+        lines.append(head + "".join(f"\n    {ln}" for ln in body.splitlines()) + "\n")
+    return lines[-limit:]
+
+
 def publish(message, push=True):
     if TASKS.exists():
         render()
+        (BOARD / "CHAT.md").write_text("# Recall chat log\n\n```\n" + "\n".join(chat_lines(limit=100)) + "\n```\n")
     git("add", "-A")
     if git("diff", "--cached", "--quiet").returncode == 0:
         return
@@ -243,6 +262,12 @@ def cmd_working(args):
     print(f"{args.task}: {args.text}")
 
 
+def cmd_chat(args):
+    require_board()
+    sync()
+    print("\n".join(chat_lines(args.name, args.limit)) or "No messages.")
+
+
 def cmd_view(args):
     require_board()
     sync()
@@ -345,6 +370,9 @@ def main():
     w = add("working", cmd_working, help="update your one-line 'working on' status")
     w.add_argument("task")
     w.add_argument("text", help="short, present tense, e.g. 'writing sonar median filter'")
+    ch = add("chat", cmd_chat, help="chat-style log of pings, newest last")
+    ch.add_argument("--with", dest="name", help="only messages to/from this role (plus ALL)")
+    ch.add_argument("--limit", type=int, default=20)
     add("view", cmd_view, help="print the kanban board (also saved as BOARD.md)")
     s = add("status", cmd_status, help="set task status; pings the orchestrator")
     s.add_argument("task")
