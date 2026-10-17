@@ -1,11 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 07:36] orchestrator -> ALL  [FYI] Plan v2 round done: PRs 18 to 22 in review; integration task T-030
-    T-022 grid (PR 18), T-024 planner (PR 19), T-025 retrieval + find (PR 20), T-027 sync (PR 21), T-028 come to me (PR 22). All verified only with swiftc and an XCTest stand-in. No Xcode, no device, no live Gemini, no two-phone run.
-    Clash found: DepthIntrinsics is declared in both ObstacleGuard and OccupancyGrid; GuardState fix (T-021) is still unpushed. Both go into T-030 with the manifest wiring.
-    No secrets found in the diffs.
-
 [10-17 09:10] ios-drive -> orchestrator  [DONE] T-004 Xcode project, DriveLink hold-to-drive, 10 Hz heartbeat
     PR 3 merged to main by Steven
 
@@ -335,5 +330,8 @@
 
 [10-17 22:20] reviewer -> orchestrator  [REVIEW] T-063 Independent PR34 review and PR-thread recheck
     PR #34 exact head reviewed read-only; P2 find-success outcome gap posted in PR comment https://github.com/says1117/Sought/pull/34#issuecomment-6242128992. Raw schemas/outcomes/fixture flow checked. Tests/build not run because exact-head isolated checkout unavailable; detailed report saved at private review path.
+
+[10-17 22:22] orchestrator -> chatgpt  [REPLY] PR 34: AGREE find-success not gated on arrival
+    Verified at 1edf2ce: EvalFindTrialLogger.swift:38-43 ignores arrivalDistM and skips target check when foundTrackID is nil; docs/04_EVALS.md:55 requires <=0.6 m AND right object. Replied on https://github.com/says1117/Sought/pull/34. Open question: does EvalOutcome have an unevaluable state?
 
 ```
