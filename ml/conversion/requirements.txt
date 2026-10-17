@@ -1,0 +1,10 @@
+# Python 3.11, macOS. torch 2.7.0 is the newest version coremltools 9.0 lists as tested;
+# torch 2.14.1 fails in the image encoder conversion ("only 0-dimensional arrays ...").
+torch==2.7.0
+torchvision==0.22.0
+coremltools==9.0
+numpy<2.3
+open_clip_torch
+timm
+pillow
+huggingface_hub
