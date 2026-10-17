@@ -22,6 +22,11 @@ public func updatedPersistence(_ p: Float, seen: Bool) -> Float {
 }
 
 /// EMA position update for a matched track.
+///
+/// Caveat: with alpha 0.3 a single observation of an object that moved 0.4 m only shifts the stored
+/// position by 0.12 m, so a moved object's stored position lags the truth and converges only over
+/// several sightings. TODO(Patrol task): moved-object handling needs an explicit re-anchor path
+/// (e.g. snap position to the observation when distance > movedDistance); not implemented here.
 public func emaPosition(old: SIMD3<Float>, observed: SIMD3<Float>,
                         alpha: Float = MemoryThresholds.positionAlpha) -> SIMD3<Float> {
     old + (observed - old) * alpha
@@ -58,14 +63,17 @@ public func applyMatch(track: Track, observation: Observation, cosine sim: Float
         case .bestConfidence(let stored):
             if observation.confidence > stored { t.embedding = observation.embedding }
         case .runningMean:
+            // Dimension mismatch (model changed): adopt the new embedding rather than trap.
             t.embedding = runningMean(track.embedding, count: track.sightings, adding: observation.embedding)
+                ?? observation.embedding
         }
     }
     return (t, plan)
 }
 
-func runningMean(_ mean: [Float], count n: Int, adding x: [Float]) -> [Float] {
-    precondition(mean.count == x.count, "embedding dimension mismatch")
+/// Running mean renormalised, or nil when dimensions differ.
+func runningMean(_ mean: [Float], count n: Int, adding x: [Float]) -> [Float]? {
+    guard mean.count == x.count else { return nil }
     let merged = zip(mean, x).map { ($0 * Float(n) + $1) / Float(n + 1) }
     let norm = merged.reduce(0) { $0 + $1 * $1 }.squareRoot()
     return norm > 0 ? merged.map { $0 / norm } : merged

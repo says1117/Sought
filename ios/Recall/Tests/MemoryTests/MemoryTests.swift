@@ -95,7 +95,20 @@ final class UpdateTests: XCTestCase {
         let obs = Observation(position: [0.4, 0, 0], embedding: [1, 0, 0])
         let (u, plan) = applyMatch(track: t, observation: obs, cosine: 0.99, distance: 0.4)
         XCTAssertTrue(plan.rewritePosition)
+        // EMA alpha 0.3: a 0.4 m shift is stored as only 0.12 m, so a moved object's position lags.
+        // TODO(Patrol task): add a re-anchor path for moved objects; this test pins the lag.
         XCTAssertEqual(u.position.x, 0.12, accuracy: 1e-5)
+    }
+
+    func testDimensionMismatchIsHandledNotFatal() {
+        XCTAssertNil(cosine([1, 0, 0], [1, 0]))
+        let t = Track(id: "a", position: [0, 0, 0], embedding: [1, 0], sightings: 3, persistence: 0.9)
+        let obs = Observation(position: [0, 0, 0], embedding: [1, 0, 0])
+        XCTAssertEqual(associate(obs, tracks: [t]).result, .newTrack)
+        XCTAssertTrue(associate(obs, tracks: [t]).candidates.isEmpty)
+        XCTAssertNil(runningMean([1, 0], count: 3, adding: [1, 0, 0]))
+        let (u, _) = applyMatch(track: t, observation: obs, cosine: 0.5, distance: 0)
+        XCTAssertEqual(u.embedding, [1, 0, 0])
     }
 
     func testLowSimilarityRewritesEmbedding() {
@@ -104,7 +117,7 @@ final class UpdateTests: XCTestCase {
         let (u, plan) = applyMatch(track: t, observation: obs, cosine: 0.88, distance: 0)
         XCTAssertTrue(plan.rewriteEmbedding)
         XCTAssertNotEqual(u.embedding, t.embedding)
-        XCTAssertEqual(cosine(u.embedding, u.embedding), 1, accuracy: 1e-5)
+        XCTAssertEqual(cosine(u.embedding, u.embedding) ?? 0, 1, accuracy: 1e-5)
     }
 
     func testPersistenceCrossingRewrites() {

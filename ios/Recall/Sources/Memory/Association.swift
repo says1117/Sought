@@ -47,8 +47,10 @@ public struct Association {
     public var candidates: [Candidate]
 }
 
-public func cosine(_ a: [Float], _ b: [Float]) -> Float {
-    precondition(a.count == b.count, "embedding dimension mismatch")
+/// Cosine similarity, or nil when the embeddings differ in dimension (e.g. a stored track from a
+/// different model than the live observation). Never traps: callers treat nil as "not comparable".
+public func cosine(_ a: [Float], _ b: [Float]) -> Float? {
+    guard a.count == b.count else { return nil }
     var dot: Float = 0, na: Float = 0, nb: Float = 0
     for i in a.indices { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i] }
     let denom = (na * nb).squareRoot()
@@ -62,9 +64,10 @@ func distance(_ a: SIMD3<Float>, _ b: SIMD3<Float>) -> Float {
 
 /// Match an observation to the best existing track: cosine >= matchCosine AND distance < matchDistance.
 /// Among passing tracks the highest cosine wins (ties: nearer). Otherwise it is a new track.
+/// Tracks whose embedding dimension differs from the observation's are skipped (not candidates).
 public func associate(_ obs: Observation, tracks: [Track]) -> Association {
-    let candidates = tracks.map { t -> Candidate in
-        let c = cosine(obs.embedding, t.embedding)
+    let candidates = tracks.compactMap { t -> Candidate? in
+        guard let c = cosine(obs.embedding, t.embedding) else { return nil }
         let d = distance(obs.position, t.position)
         return Candidate(trackID: t.id, cosine: c, distance: d,
                          passes: c >= MemoryThresholds.matchCosine && d < MemoryThresholds.matchDistance)
