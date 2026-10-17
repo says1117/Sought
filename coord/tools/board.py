@@ -396,6 +396,26 @@ def cmd_prs(args):
         publish("pr watch digest", args.push)
 
 
+def cmd_review(args):
+    """Ask the ChatGPT reviewer to review a PR: posts a standard [REVIEW-REQUEST] ping with the exact head commit."""
+    require_board()
+    r = gh("pr", "view", str(args.pr), "--json", "title,url,headRefOid,baseRefName,additions,deletions,changedFiles")
+    if not r or r.returncode:
+        sys.exit(f"gh pr view {args.pr} failed")
+    pr = json.loads(r.stdout)
+    body = (f"{pr['url']}\nHead {pr['headRefOid']}, base {pr['baseRefName']}, "
+            f"{pr['changedFiles']} files (+{pr['additions']}/-{pr['deletions']}).\n"
+            f"{args.note}\n" if args.note else
+            f"{pr['url']}\nHead {pr['headRefOid']}, base {pr['baseRefName']}, "
+            f"{pr['changedFiles']} files (+{pr['additions']}/-{pr['deletions']}).\n")
+    body += ("Please review independently and read-only at that exact head: run the tests, check safety and contract "
+             "drift, and check that the PR description claims only what was run. Post findings (most severe first, "
+             "file:line) as a PR comment and one board message to orchestrator. Do not merge, push, or approve.")
+    post_message("orchestrator", args.to, f"[REVIEW-REQUEST] PR {args.pr}: {pr['title']}", body, args.task)
+    publish(f"review request for PR {args.pr}", args.push)
+    print(f"review requested from {args.to} for PR {args.pr} at {pr['headRefOid'][:7]}")
+
+
 def cmd_chat(args):
     require_board()
     sync()
@@ -508,6 +528,11 @@ def main():
     w.add_argument("text", help="short, present tense, e.g. 'writing sonar median filter'")
     pr = add("prs", cmd_prs, help="show what changed on PRs since the last check")
     pr.add_argument("--post", action="store_true", help="also post the changes as a board ping")
+    rv = add("review", cmd_review, help="ping the reviewer to review a PR (standard request)")
+    rv.add_argument("pr", type=int)
+    rv.add_argument("--to", default="chatgpt")
+    rv.add_argument("--task", default="")
+    rv.add_argument("--note", default="", help="extra focus areas for the reviewer")
     ch = add("chat", cmd_chat, help="chat-style log of pings, newest last")
     ch.add_argument("--with", dest="name", help="only messages to/from this role (plus ALL)")
     ch.add_argument("--limit", type=int, default=20)
