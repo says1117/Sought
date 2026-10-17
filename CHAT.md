@@ -326,4 +326,7 @@
 [10-17 10:23] unknown -> orchestrator  [DONE] T-030 Integration: wire Plan v2 targets, fix DepthIntrinsics and GuardState clashes
     merged to main via PR 23 (Steven)
 
+[10-17 10:26] perception-ml -> orchestrator  [REVIEW] T-009 Convert MobileCLIP to Core ML; decide text-encoder route
+    corrected: PR 7 (MobileCLIP conversion) is NOT merged; ml/ is empty on main
+
 ```
