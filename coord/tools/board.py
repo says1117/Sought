@@ -1,0 +1,289 @@
+#!/usr/bin/env python3
+"""Message board and task list for human + agent coordination.
+
+Data lives as plain files on the git branch `board`, checked out at `.board/`.
+Standard library only. Run from anywhere inside the repo. See coord/PROTOCOL.md.
+"""
+import argparse
+import datetime as dt
+import re
+import secrets
+import subprocess
+import sys
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parents[2]
+BOARD = REPO / ".board"
+TASKS, MSGS, ACKS = BOARD / "tasks", BOARD / "messages", BOARD / "acks"
+STATUSES = ("open", "claimed", "blocked", "review", "done")
+NOTIFY_ON = ("blocked", "review", "done")
+
+
+# ---------- git plumbing ----------
+
+def git(*args, cwd=BOARD):
+    return subprocess.run(["git", "-C", str(cwd), *args], capture_output=True, text=True)
+
+
+def warn(msg):
+    print(f"warning: {msg}", file=sys.stderr)
+
+
+def require_board():
+    if not BOARD.exists():
+        sys.exit("Board not set up. Run: python3 coord/tools/board.py init")
+
+
+def sync():
+    r = git("pull", "--rebase", "--autostash")
+    if r.returncode:
+        warn(f"sync failed (offline or no remote?): {r.stderr.strip()[:200]}")
+
+
+def publish(message, push=True):
+    git("add", "-A")
+    if git("diff", "--cached", "--quiet").returncode == 0:
+        return
+    git("commit", "-m", f"board: {message}")
+    if not push:
+        return
+    for _ in range(2):
+        if git("push", "-u", "origin", "board").returncode == 0:
+            return
+        git("pull", "--rebase", "--autostash")
+    warn("push failed; your change is saved locally, run `board.py sync` later")
+
+
+# ---------- file format: "key: value" header, a --- line, then the body ----------
+
+def parse(path):
+    head, _, body = path.read_text().partition("\n---\n")
+    meta = {}
+    for line in head.splitlines():
+        key, _, value = line.partition(":")
+        meta[key.strip()] = value.strip()
+    return meta, body.strip()
+
+
+def write(path, meta, body):
+    head = "\n".join(f"{k}: {v}" for k, v in meta.items())
+    path.write_text(f"{head}\n---\n{body}\n")
+
+
+def all_tasks():
+    return [(p, *parse(p)) for p in sorted(TASKS.glob("T-*.md"))]
+
+
+def find_task(tid):
+    for path, meta, body in all_tasks():
+        if meta["id"] == tid:
+            return path, meta, body
+    sys.exit(f"No such task: {tid}")
+
+
+def deps_done(meta, done_ids):
+    deps = [d for d in re.split(r"[,\s]+", meta.get("depends", "")) if d]
+    return all(d in done_ids for d in deps)
+
+
+def ready_tasks(role=None):
+    done = {m["id"] for _, m, _ in all_tasks() if m["status"] == "done"}
+    out = []
+    for path, meta, body in all_tasks():
+        if meta["status"] != "open" or not deps_done(meta, done):
+            continue
+        if role and meta["role"] != role:
+            continue
+        out.append((path, meta, body))
+    return out
+
+
+# ---------- commands ----------
+
+def cmd_init(args):
+    if BOARD.exists():
+        print("Board already set up.")
+        return
+    git("fetch", "origin", cwd=REPO)
+    remote = git("rev-parse", "--verify", "origin/board", cwd=REPO).returncode == 0
+    if remote:
+        r = git("worktree", "add", "-B", "board", str(BOARD), "origin/board", cwd=REPO)
+    else:
+        r = git("worktree", "add", "--detach", str(BOARD), "HEAD", cwd=REPO)
+        if r.returncode == 0:
+            git("checkout", "--orphan", "board")
+            git("rm", "-rf", "-q", ".")
+    if r.returncode:
+        sys.exit(f"init failed: {r.stderr.strip()}")
+    for d in (TASKS, MSGS, ACKS):
+        d.mkdir(exist_ok=True)
+        (d / ".gitkeep").touch()
+    publish("init board")
+    print("Board ready at .board/")
+
+
+def cmd_sync(args):
+    require_board()
+    sync()
+    print("synced")
+
+
+def cmd_task(args):
+    require_board()
+    sync()
+    nums = [int(m["id"][2:]) for _, m, _ in all_tasks()]
+    tid = f"T-{max(nums, default=0) + 1:03d}"
+    slug = re.sub(r"[^a-z0-9]+", "-", args.title.lower()).strip("-")[:40]
+    meta = {"id": tid, "title": args.title, "role": args.role, "size": args.size,
+            "status": "open", "owner": "", "depends": args.depends,
+            "read": args.read, "created": now()}
+    write(TASKS / f"{tid}-{slug}.md", meta, args.body or args.title)
+    publish(f"new task {tid}", args.push)
+    print(tid)
+
+
+def cmd_tasks(args):
+    require_board()
+    sync()
+    ready = {m["id"] for _, m, _ in ready_tasks()}
+    for _, m, _ in all_tasks():
+        if args.role and m["role"] != args.role:
+            continue
+        if args.status and m["status"] != args.status:
+            continue
+        if m["status"] == "done" and not args.status and not args.all:
+            continue
+        flag = "ready" if m["id"] in ready else m["status"]
+        print(f"{m['id']}  {flag:<8} {m['size']}  {m['role']:<13} {m['owner'] or '-':<13} {m['title']}")
+
+
+def cmd_next(args):
+    require_board()
+    sync()
+    ready = ready_tasks(args.role)
+    if not ready:
+        print(f"No ready tasks for {args.role}.")
+        return
+    _, meta, body = ready[0]
+    print(f"{meta['id']} [{meta['size']}] {meta['title']}\nRead: {meta['read'] or '-'}\n\n{body}")
+
+
+def cmd_claim(args):
+    require_board()
+    sync()
+    path, meta, body = find_task(args.task)
+    if meta["owner"] and meta["owner"] != args.who:
+        sys.exit(f"{args.task} is already claimed by {meta['owner']}")
+    meta.update(owner=args.who, status="claimed")
+    write(path, meta, body)
+    publish(f"{args.who} claimed {args.task}", args.push)
+    print(f"claimed {args.task}")
+
+
+def cmd_status(args):
+    require_board()
+    sync()
+    path, meta, body = find_task(args.task)
+    meta["status"] = args.status
+    if args.status == "open":
+        meta["owner"] = ""
+    note = f"\n\n[{now()}] {meta['owner'] or 'someone'} -> {args.status}: {args.note}" if args.note else ""
+    write(path, meta, body + note)
+    if args.status in NOTIFY_ON:
+        post_message(meta["owner"] or "unknown", "orchestrator",
+                     f"[{'DONE' if args.status == 'done' else args.status.upper()}] {args.task} {meta['title']}",
+                     args.note, args.task)
+    publish(f"{args.task} -> {args.status}", args.push)
+    print(f"{args.task} is now {args.status}")
+
+
+def post_message(sender, to, subject, body, task=""):
+    mid = f"{dt.datetime.now(dt.timezone.utc):%Y%m%dT%H%M%SZ}-{sender}-to-{to}-{secrets.token_hex(2)}"
+    write(MSGS / f"{mid}.md",
+          {"id": mid, "from": sender, "to": to, "task": task, "subject": subject, "time": now()},
+          body or "")
+    return mid
+
+
+def cmd_post(args):
+    require_board()
+    sync()
+    body = args.body if args.body is not None else (sys.stdin.read() if not sys.stdin.isatty() else "")
+    mid = post_message(args.sender, args.to, args.subject, body, args.task)
+    publish(f"{args.sender} -> {args.to}", args.push)
+    print(f"sent {mid}")
+
+
+def cmd_inbox(args):
+    require_board()
+    sync()
+    ack_file = ACKS / f"{args.name}.txt"
+    acked = set(ack_file.read_text().split()) if ack_file.exists() else set()
+    new = []
+    for p in sorted(MSGS.glob("*.md")):
+        meta, body = parse(p)
+        if meta["to"] in (args.name, "ALL") and meta["from"] != args.name and meta["id"] not in acked:
+            new.append((meta, body))
+    if not new:
+        print("Inbox empty.")
+        return
+    for meta, body in new:
+        print(f"--- {meta['from']} | {meta['subject']} | {meta['task'] or '-'} | {meta['time']}\n{body}\n")
+    if args.ack:
+        with ack_file.open("a") as f:
+            f.writelines(m["id"] + "\n" for m, _ in new)
+        publish(f"{args.name} acked", args.push)
+
+
+def now():
+    return dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__)
+    sub = p.add_subparsers(dest="cmd", required=True)
+
+    def add(name, fn, **kw):
+        sp = sub.add_parser(name, **kw)
+        sp.set_defaults(fn=fn)
+        sp.add_argument("--no-push", dest="push", action="store_false", help="commit locally only")
+        return sp
+
+    add("init", cmd_init, help="set up .board/ (first time)")
+    add("sync", cmd_sync, help="pull the latest board")
+    t = add("task", cmd_task, help="create a task (orchestrator)")
+    t.add_argument("--role", required=True)
+    t.add_argument("--title", required=True)
+    t.add_argument("--size", choices=("S", "M"), default="S")
+    t.add_argument("--depends", default="", help="comma separated task ids")
+    t.add_argument("--read", default="", help="files/sections the agent should read")
+    t.add_argument("--body", default="")
+    ls = add("tasks", cmd_tasks, help="list tasks")
+    ls.add_argument("--role")
+    ls.add_argument("--status", choices=STATUSES)
+    ls.add_argument("--all", action="store_true", help="include done")
+    n = add("next", cmd_next, help="show the first ready task for a role")
+    n.add_argument("role")
+    c = add("claim", cmd_claim, help="claim a task")
+    c.add_argument("task")
+    c.add_argument("who")
+    s = add("status", cmd_status, help="set task status; pings the orchestrator")
+    s.add_argument("task")
+    s.add_argument("status", choices=STATUSES)
+    s.add_argument("--note", default="")
+    po = add("post", cmd_post, help="send a message (a ping)")
+    po.add_argument("--from", dest="sender", required=True)
+    po.add_argument("--to", required=True, help="role, person, or ALL")
+    po.add_argument("--subject", required=True)
+    po.add_argument("--task", default="")
+    po.add_argument("--body", default=None, help="or pipe the body on stdin")
+    ib = add("inbox", cmd_inbox, help="show unread messages for a role")
+    ib.add_argument("name")
+    ib.add_argument("--ack", action="store_true", help="mark shown messages as read")
+
+    args = p.parse_args()
+    args.fn(args)
+
+
+if __name__ == "__main__":
+    main()
