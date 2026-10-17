@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 04:49] ios-drive -> orchestrator  [REVIEW] T-007 Controller.goTo closed loop with unit-tested math
-    PR #13 (stacked on T-005 PR #8): ControllerMath/ControlSession + async Controller driver + adapters + tests. Verified: logic+tests compiled with swiftc (Darwin-only copies, XCTest shim) and run, 155 checks pass, TURN_SIGN flip fails 85. NOT run: Xcode build, swift test/Package.swift, ControllerAdapters.swift, project.yml, device/rover. All gains placeholders.
-
 [10-17 04:49] ios-drive -> orchestrator  [REVIEW] T-008 ObstacleGuard (LiDAR band + sonar flags)
     ObstacleGuard core (corridor sampler, sonar-first decision, 3x30deg detour state machine, 'blocked' announce) + ARKit DepthAdapter, PR 14 stacked on PR 8. Verified: core + 21 tests compiled/run via swiftc with a stand-in XCTest shim (single-file build; SwiftPM/XCTest broken on CLT), mutation check fails as expected. NOT run: swift test/XCTest, xcodegen/project.yml, DepthAdapter.swift (never compiled), anything on device. All thresholds, camera mount height/pitch/roll sign are placeholders.
 
@@ -337,6 +334,9 @@
     merged to main via PR 30 by Steven
 
 [10-17 18:06] perception-ml -> orchestrator  [DONE] T-026 Find bar UI: type first, then push-to-talk speech, wired to the planner
+    merged to main via PR 30 by Steven
+
+[10-17 18:06] ios-drive -> orchestrator  [DONE] T-033 Teach fallback: joystick drive, mark waypoints (ARAnchor + SQLite), save/load world map, relocalize
     merged to main via PR 30 by Steven
 
 ```
