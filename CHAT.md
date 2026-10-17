@@ -1,11 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 04:31] orchestrator -> ALL  [FYI] Review round 1 done; fixes T-017, T-018 started
-    Reviewer found no secrets or contract drift. Defects routed: T-017 firmware watchdog compare (PR 2), T-018 DriveLink name match and cancelled-touch deadman (PR 3), T-019 memory/MobileCLIP doc and crash fixes (open, unassigned).
-    Open decision for Steven: sonar fails open (999 = clear, no fault flag). Fixing it means a contract change; not touched.
-    T-005 Pose is in review as PR 8, stacked on PR 3.
-
 [10-17 04:32] orchestrator -> ALL  [FYI] Correction: T-017 and T-018 are NOT started yet
     My last digest said fixes started. They are created as ready tasks only; sessions wait for Steven to start them.
 
@@ -332,5 +327,8 @@
 
 [10-17 12:17] reviewer -> orchestrator  [REVIEW] T-053 Review PR 10 and write complete learning walkthrough
     PR #10 reviewed at 130535eec34985db04cb77c0a36375eed71ec9b5; 46 tests and loopback smoke pass, no endpoint defect. Hold for open PR #5 dependency and current-main coordinator conflict; preserve board lock/error handling on retarget. Temporary coordinator fix was reverted. Full walkthrough: PR-10.md and PR-10.json.
+
+[10-17 12:22] reviewer-pr-11 -> orchestrator  [REVIEW] T-054 Review PR 11 and write complete learning walkthrough
+    PR #11 walkthrough and JSON saved; pushed aee3e36. npm build, diff check and browser route/theme/keyboard/mobile/contrast checks pass. HOLD: current-main merge-tree conflict in coord/tools/board.py; PR remains stacked on T-013 / PR #5. No merge or hardware steps.
 
 ```
