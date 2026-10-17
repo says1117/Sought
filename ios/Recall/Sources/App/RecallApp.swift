@@ -20,11 +20,16 @@ struct RecallApp: App {
                 .sheet(isPresented: $showSelfTest) { SelfTestContainer(link: link, tracker: pose) }
                 .onAppear {
                     UIApplication.shared.isIdleTimerDisabled = true
-                    pose.start()
+                    startPoseSession()
                 }
                 .onChange(of: phase) { _, new in
-                    if new != .active { link.stop(); pose.pause() } else { pose.start() }
+                    if new != .active { link.stop(); pose.pause() } else { startPoseSession() }
                 }
         }
+    }
+
+    private func startPoseSession() {
+        let mapAdapter = ARWorldMapAdapter(tracker: pose)
+        pose.start(initialWorldMap: mapAdapter.initialWorldMap)
     }
 }

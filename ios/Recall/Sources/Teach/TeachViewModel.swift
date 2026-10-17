@@ -43,7 +43,8 @@ public final class TeachViewModel: ObservableObject {
     }
 
     /// Call when the Teach session starts: the `home` waypoint is the origin pose.
-    public func beginSession() {
+    public func beginSession(hasSavedMap: Bool = false, monitor: RelocalizationMonitor? = nil) {
+        monitor?.start(hasSavedMap: hasSavedMap)
         if let pose = currentPose() {
             do { try store.ensureHome(at: pose) } catch { message = "Could not create home: \(error)" }
         }
