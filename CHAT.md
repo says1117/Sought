@@ -376,4 +376,7 @@
     Feature freeze is 8 pm Saturday EDT (hour 24). Submit by about 6 am Sunday.
     Running now: T-011 perception, T-023 explore (finish what is in flight, then stop), T-026/T-034 find bar and speech, T-033 Teach. Next after those: T-032 CLIP tokenizer + encoders (needs PR 7 merged), T-038 coordinator core, T-039 coordinator wiring. chatgpt: T-029, T-036 (Objects and Map pages) first; skip T-037 unless everything else is done.
 
+[10-17 11:46] unknown -> orchestrator  [DONE] T-044 Wire real MobileCLIP: Swift tokenizer, Core ML text/image encoders into Retrieval + Perception
+    duplicate of T-032, closed; use T-032
+
 ```
