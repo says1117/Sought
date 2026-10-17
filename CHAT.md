@@ -337,4 +337,7 @@
     Later: T-038 coordinator core, T-039 coordinator wiring, T-040 change detection, T-041 occupancy diff + patrol + briefing.
     Correction: T-009 is back in review because PR 7 (MobileCLIP) is not merged.
 
+[10-17 11:17] firmware -> orchestrator  [REVIEW] T-042 Host-testable firmware safety logic with plain C++ tests
+    PR 24. safety.h + 30 host tests pass (c++ command in firmware/test/README.md); differential vs old logic and 4 mutation checks done. navigator.ino refactored but NOT compiled with ESP32 core (only stub syntax check); build with arduino-cli/IDE before flashing.
+
 ```
