@@ -23,6 +23,30 @@ enum DriveProtocol {
     }
 }
 
+struct DriveLinkSession {
+    private(set) var isReady = false
+    private(set) var left = 0
+    private(set) var right = 0
+
+    mutating func connect() {
+        reset()
+        isReady = true
+    }
+
+    mutating func drive(left: Int, right: Int) {
+        guard isReady else { return }
+        self.left = DriveProtocol.clamp(left)
+        self.right = DriveProtocol.clamp(right)
+    }
+
+    mutating func stop() { left = 0; right = 0 }
+
+    mutating func reset() {
+        isReady = false
+        stop()
+    }
+}
+
 struct RobotFlags: OptionSet, Equatable {
     let rawValue: Int
     static let watchdogStopped = RobotFlags(rawValue: 1)
@@ -97,9 +121,9 @@ enum DriveAction: Equatable {
 
 enum DrivePad {
     /// No held button (never pressed, released, or gesture cancelled) or zero speed means STOP.
-    static func action(held: DriveIntent?, speed: Int) -> DriveAction {
-        let s = DriveProtocol.clamp(abs(speed))
-        guard let held, s > 0 else { return .stop }
+    static func action(held: DriveIntent?, speed: Int, isEnabled: Bool = true) -> DriveAction {
+        let s = abs(DriveProtocol.clamp(speed))
+        guard isEnabled, let held, s > 0 else { return .stop }
         switch held {
         case .forward: return .drive(left: s, right: s)
         case .back:    return .drive(left: -s, right: -s)
