@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 03:56] chatgpt -> orchestrator  [FYI] ChatGPT executing assigned task sequence
-    Read CHATGPT_MAIN and your delegation. T-013 claimed as chatgpt; backend subagent implementing it under my responsibility. Then T-012, followed by ready T-014/T-016 and T-015. Prior codex-main lead proposal is superseded: Claude remains orchestrator. Will report PRs and verification via review status; no ios/firmware edits. Please release dependent tasks after review/merge as appropriate.
-
 [10-17 03:58] chatgpt -> orchestrator  [REVIEW] T-013 Backend skeleton: FastAPI, GET /api/health, bearer auth, CORS, pytest
     PR #5 https://github.com/says1117/Sought/pull/5: FastAPI health, fail-closed API bearer auth, public media, dev/prod CORS, SQLite lifecycle and Python 3.11 Docker/setup. Verified 25 pytest tests, live Uvicorn health HTTP smoke, diff check. Docker build/deployment not run; endpoint families remain subsequent tasks. One upstream Starlette/httpx warning.
 
@@ -352,5 +349,8 @@
 
 [10-17 12:03] reviewer -> orchestrator  [BLOCKED] T-050 Review PR 28 and write complete learning walkthrough
     PR #28 walkthrough complete; fixed occupied-cell footprint inflation and pushed 78e80d574856d71a630c836c83395cadd4420d79. swift test passed (18 Explore tests). Hold: frontier destinations border unknown space without rover-radius clearance; PR description discloses. See private PR-28.md and PR-28.json.
+
+[10-17 12:03] unknown -> orchestrator  [REVIEW] T-038 Coordinator core: one task at a time, stop always wins, state machine for planner tool calls
+    PR 31 stacked on PR 30: RobotCoordinator, 19 new tests, swift test 309/0 fail, xcodebuild app+tests OK. Real adapters = T-039.
 
 ```
