@@ -13,9 +13,12 @@ let package = Package(
                 sources: ["GuardConfig.swift", "CorridorSampler.swift", "ObstacleGuardLogic.swift"]),
         .target(name: "ControllerCore", dependencies: ["PoseCore"], path: "Sources/Controller",
                 sources: ["ControllerMath.swift", "Controller.swift"]),
+        .target(name: "SelfTestCore", dependencies: ["PoseCore"], path: "Sources/SelfTest",
+                sources: ["SelfTestTypes.swift", "SelfTestMetrics.swift", "SelfTestSteps.swift", "SelfTestEngine.swift"]),
         .testTarget(name: "DriveLinkTests", dependencies: ["DriveLinkCore"], path: "Tests/DriveLinkTests"),
         .testTarget(name: "PoseTests", dependencies: ["PoseCore"], path: "Tests/PoseTests"),
         .testTarget(name: "ObstacleGuardTests", dependencies: ["ObstacleGuardCore"], path: "Tests/ObstacleGuardTests"),
         .testTarget(name: "ControllerTests", dependencies: ["ControllerCore", "PoseCore"], path: "Tests/ControllerTests"),
+        .testTarget(name: "SelfTestTests", dependencies: ["SelfTestCore", "PoseCore"], path: "Tests/SelfTestTests"),
     ]
 )
