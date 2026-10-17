@@ -110,14 +110,17 @@ SwiftUI, iOS 17+, runs on a real device only. Info.plist keys: `NSCameraUsageDes
 | `Memory` | SQLite per `03_CONTRACTS.md`, track association, persistence, selective update | Re-scanning an unchanged room adds no new rows except `last_seen` |
 | `Retrieval` | Text embedding, cosine search, scoring | Top-3 contains the target for simple queries |
 | `FindExecutor` | Retrieve, drive, arrival check, next candidate, speak result | "find the X" end to end |
-| `Teach` | Joystick drive, waypoint marking, save and load world map | Relocalizes against a saved map after an app restart |
+| `Explore` | Occupancy grid, frontier selection, drive and scan loop, world map save | Explores a 3 x 4 m room within 5 min with no human input and stores its objects |
+| `Teach` | Fallback: joystick drive, waypoint marking, save and load world map | Relocalizes against a saved map after an app restart |
+| `ComeToMe` | Nearby Interaction (UWB) session with the companion app, approach controller, Vision person fallback | Stops within about 1 m of the person in the same room |
+| `Companion` | Second iPhone app (separate target): token exchange over MultipeerConnectivity, "come to me" button | Robot receives the request and a live distance and direction |
 | `Patrol` | Route following, scan at waypoints, change detection, report | Detects a moved chair and a new box |
 | `ChangeDetection` | Object-level and floor-occupancy diffs, severity rules | Meets the false alarm target in `04_EVALS.md` |
 | `Speech` | On-device recognition (push to talk), `AVSpeechSynthesizer` | Command recognized with the robot stationary |
 | `Planner` | `protocol Planner`, `KeywordPlanner`, `GeminiPlanner` | Same commands work offline via keywords |
 | `Sync` | Queue and upload per REST contract | Airplane mode in, then out: data arrives, nothing lost |
 | `EvalMode` | Annotate ground truth by tapping, run the query set, export JSON | Produces a valid `run_*.json` |
-| `UI` | Teach, Find, Patrol, Report screens | Big buttons, VoiceOver labels |
+| `UI` | Find bar (speak or type) as the main screen, plus Explore, Teach fallback, Patrol, Report | Big buttons, VoiceOver labels. Manual drive is hidden behind a fallback menu |
 
 ### 3.2 ARKit configuration
 
@@ -159,7 +162,22 @@ stop and announce if tracking != normal for > 1 s
 - Sonar flags from the ESP32 are the last line of defense and always win.
 - LiDAR has a minimum range, so rely on sonar for the very close range.
 
-### 3.5 Phone power and heat
+### 3.5 Explore (autonomous, plan v2)
+
+- **Grid:** 5 cm cells around `floor_y`, built from LiDAR depth each keyframe: free (floor hit), occupied low (3 to 40 cm), occupied high (above 40 cm), unknown. The same grid feeds floor hazards (section 5.2) and the map snapshot in the contract.
+- **Frontiers:** free cells next to unknown cells, clustered; skip clusters under 0.3 m. Pick the goal by `distance + visited_penalty - size_bonus`, at least 0.5 m from the last goal.
+- **Loop:** pick a frontier, drive with `Controller.goTo` (straight segments, ObstacleGuard detours), stop, rotate 360 degrees in 4 steps to scan (keyframes, proposals, embeddings, memory), repeat. End when no frontier is reachable, after 5 min, or on tracking loss (stop and report).
+- **Waypoints:** auto-create an anchor at the start (`home`) and at each scan stop; the user can name one by voice ("this is the kitchen").
+- **Fallback:** the Teach screen (joystick) stays one tap away.
+
+### 3.6 Come to me (plan v2)
+
+- **Companion app:** a small second target on the user's iPhone. It advertises over MultipeerConnectivity (service type `recall-ni`), exchanges `NIDiscoveryToken`s with the robot, and sends a `come_to_me` request.
+- **Approach:** the robot runs an `NISession` and reads distance and direction to the user. Turn toward the direction, drive with the Controller, stop at 1.0 m. If direction is missing, rotate in place sampling distance and drive along the decreasing gradient.
+- **Last meters:** Vision `VNDetectHumanRectanglesRequest` plus LiDAR depth confirms the person in view and centers the approach.
+- **Safety:** ObstacleGuard and the ESP32 stops apply; cap speed lower than normal; stop if the UWB session drops for more than 2 s.
+
+### 3.7 Phone power and heat
 
 Run ML at no more than 2 Hz while moving. Keep the screen on and at low brightness. Plug the phone into a power bank. If it throttles, pause scanning, not driving.
 
@@ -284,6 +302,8 @@ protocol Planner { func plan(_ utterance: String, context: PlannerContext) async
 | `what_changed` | `since` (optional) | Read the latest report aloud |
 | `stop` | none | Brake and cancel the task |
 | `say` | `text` | Speak text |
+| `explore` | `max_minutes` (optional) | Run Explore mode |
+| `come_to_me` | none | Drive to the companion iPhone |
 
 Guardrails: the model can only call these tools. Speeds, distances, and safety are constants in code. Any `go_to` target must resolve to a known waypoint or track. Timeout 3 s, then fall back to the keyword planner.
 
@@ -295,6 +315,8 @@ Guardrails: the model can only call these tools. Speeds, distances, and safety a
 - `patrol|start patrol` is `start_patrol`
 - `what changed` is `what_changed`
 - `stop|halt` is `stop`
+- `explore|look around|map the house` is `explore`
+- `come here|come to me` is `come_to_me`
 
 ### 6.4 Gemini
 
@@ -340,7 +362,9 @@ Guardrails: the model can only call these tools. Speeds, distances, and safety a
 - [ ] R2.4 Teach mode, waypoints, world map save and relocalize
 - [ ] R2.5 Speech in and out
 - [ ] R2.6 `KeywordPlanner`, then `GeminiPlanner`
-- [ ] R2.7 `Sync` queue. **M3 demo:** "find the blue backpack"
+- [ ] R2.7 `Sync` queue. **M3 demo:** "find the blue backpack" typed or spoken in the find bar after an Explore
+- [ ] R2.8 Occupancy grid and frontier `Explore` (Teach stays as fallback)
+- [ ] R2.9 Find bar UI (type first, then speech) wired to the planner
 
 ### Phase 3 (H18 to H24): patrol and change detection
 
@@ -348,7 +372,8 @@ Guardrails: the model can only call these tools. Speeds, distances, and safety a
 - [ ] R3.2 Object-level change detection
 - [ ] R3.3 Floor occupancy diff
 - [ ] R3.4 Before and after keyframes, events, spoken briefing
-- [ ] R3.5 `check_route`
+- [ ] R3.5 Come to me: companion app, UWB approach, Vision fallback
+- [ ] R3.5b `check_route` (cut first if behind)
 - [ ] R3.6 **M4 freeze.** Tag `v0.9`
 
 ### Phase 4 (H24 to H32): measure

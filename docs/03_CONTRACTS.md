@@ -45,6 +45,20 @@ T,<uptime_ms>,<L>,<R>,<front_cm>,<rear_cm>,<flags>\n
 - BLE disconnect: brake and zero, restart advertising.
 - Speed cap in firmware `MAX_PWM = 200` for the demo (adjustable constant).
 
+## 1.1 Companion link (robot iPhone to user iPhone), added in plan v2
+
+Local only, no backend. MultipeerConnectivity service type `recall-ni`. JSON messages, one per send:
+
+| Message | Fields | Meaning |
+|---|---|---|
+| `hello` | `role: "robot" or "companion"`, `version: 1` | Sent on connect |
+| `ni_token` | `token_b64` | Archived `NIDiscoveryToken`, both directions |
+| `come_to_me` | `id` (`cmd_` prefix) | Companion asks the robot to come |
+| `status` | `id`, `state: accepted / approaching / arrived / failed`, `distance_m` (optional), `reason` (optional) | Robot reports progress |
+| `cancel` | `id` | Companion cancels; robot stops |
+
+The robot treats a lost session (no update for 2 s) as `failed` and stops.
+
 ## 2. Phone to backend (REST over HTTPS)
 
 Base URL is a config value (`Secrets.xcconfig`, gitignored). Auth: header `Authorization: Bearer <RECALL_TOKEN>`. All bodies JSON except media. CORS open in dev.
@@ -74,7 +88,7 @@ Responses: `200` with the stored object for PUT/POST, `404` for missing, `422` f
 ```json
 {
   "t": "2026-10-17T14:03:22Z",
-  "state": "idle | teaching | finding | patrolling | checking_route | blocked | error",
+  "state": "idle | exploring | teaching | finding | coming_to_user | patrolling | checking_route | blocked | error",
   "task": "find: blue backpack",
   "tracking": "normal | limited | not_available",
   "mapping_status": "mapped | limited | extending | not_available",

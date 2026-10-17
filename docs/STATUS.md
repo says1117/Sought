@@ -38,3 +38,10 @@ Power design: 4xAA (about 6 V) feeds only VM and GND of the TB6612. ESP32 runs f
 - [ ] Hackathon start time (this plan uses relative hours H0 to H36)
 - [ ] Which Gemini model id to use (look up the current Flash-class id in Google AI Studio docs)
 - [ ] Text encoder tokenizer route for MobileCLIP (see `01_ROBOTICS_PLAN.md`, section 4.4)
+
+## Plan v2 decisions (2026-10-17)
+
+- [x] Primary control is the LLM planner from a speak or type bar. Manual drive is fallback only.
+- [x] Autonomous Explore replaces Teach as the main way to build memory. Teach stays as a quick fallback.
+- [x] Come to me uses UWB (Nearby Interaction). A second, newer iPhone is available for the companion app.
+- [x] Contract additions (additive only): heartbeat states `exploring` and `coming_to_user`, and the companion link in section 1.1.

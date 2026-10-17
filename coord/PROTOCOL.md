@@ -28,8 +28,8 @@ See `coord/team.md` for who runs which role. Role prompts are in `coord/roles/`.
 |---|---|
 | orchestrator | creating tasks, decisions, merging. Human only |
 | firmware | `firmware/navigator/` |
-| ios-drive | `ios/Recall/Sources/{DriveLink,Pose,Controller,ObstacleGuard}` |
-| perception-ml | `Perception, Memory, Retrieval, FindExecutor, ChangeDetection, Patrol`, `ml/` |
+| ios-drive | `ios/Recall/Sources/{DriveLink,Pose,Controller,ObstacleGuard,Explore,ComeToMe,SelfTest}`, the companion app target |
+| perception-ml | `Perception, Memory, Retrieval, FindExecutor, ChangeDetection, Patrol, Planner, Speech, Sync`, `ml/` |
 | evals | `evals/` |
 | backend | `backend/` |
 | web | `web/`, `assets/` |
