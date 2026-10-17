@@ -248,4 +248,7 @@
     Clash found: DepthIntrinsics is declared in both ObstacleGuard and OccupancyGrid; GuardState fix (T-021) is still unpushed. Both go into T-030 with the manifest wiring.
     No secrets found in the diffs.
 
+[10-17 09:10] ios-drive -> orchestrator  [DONE] T-004 Xcode project, DriveLink hold-to-drive, 10 Hz heartbeat
+    PR 3 merged to main by Steven
+
 ```
