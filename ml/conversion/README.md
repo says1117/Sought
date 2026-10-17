@@ -74,12 +74,17 @@ Query embedding per plan 4.6: encode `phrase` and `"a photo of " + phrase`, aver
 
 ```bash
 cd ml/conversion
-./setup.sh                      # needs python3.11; creates ml/.venv, installs pins, downloads checkpoint + 3 sample images
+./setup.sh                      # needs python3.11; creates ml/.venv, installs pins, downloads checkpoint + 3 sample images (sha256-verified)
 source ../.venv/bin/activate
 python convert.py               # -> build/MobileCLIP_S0_Image.mlpackage, build/MobileCLIP_S0_Text.mlpackage
 python export_tokenizer.py      # -> build/tokenizer/{vocab.json,merges.txt}, golden_tokens.json (+ self-check vs open_clip)
 python parity.py                # PyTorch vs Core ML cosines (exit 1 if min cosine <= 0.99)
 ```
+
+Reproducibility: `setup.sh` verifies the checkpoint and all three sample images by sha256 (the script fails on
+a mismatch). `requirements.txt` pins every direct dependency to the version used for `parity_output.txt`;
+`requirements.lock.txt` is the full `pip freeze` of that environment. A fresh `./setup.sh && python convert.py &&
+python parity.py` on 2026-10-17 (macOS 15.0 arm64, Python 3.11) reproduced `parity_output.txt` row for row.
 
 Notes on versions: torch 2.14.1 failed inside coremltools 9.0 on the image encoder
 (`TypeError: only 0-dimensional arrays can be converted to Python scalars`), torch 2.7.0 (the newest
@@ -99,8 +104,10 @@ Machine: macOS 15.0, arm64 (Apple Silicon), Python 3.11, coremltools 9.0, torch 
   real photos (~0.9984). The Core ML path is fed a PIL bicubic resize+crop while PyTorch uses
   torchvision's transform, and the model is fp16, so this mixes fp16 error with a small
   preprocessing difference; I did not separate the two.
-- Sanity: on the 3 sample photos, the tiger photo scores highest on "a tiger" (0.281 vs 0.046 to 0.096 for
-  other phrases), and the cat photos score highest on "a cat". That is 3 images, a smoke test, **not an
+- Sanity: on the 3 sample photos, `data/dog.jpg` scores highest on "a tiger" (0.281 vs 0.046 to 0.145 for
+  other phrases) and the two cat photos score highest on "a cat" (0.132 and 0.165). Despite its name,
+  `dog.jpg` is the Siberian tiger photo (sha256 `2ae007fb...`, from `mishig/sample_images/tiger.jpg`); the original
+  run saved it under that name and `setup.sh` keeps it so `parity_output.txt` row labels stay valid. That is 3 images, a smoke test, **not an
   accuracy measure**. Retrieval accuracy and the 0.85 association threshold must be calibrated on the
   real eval set (`docs/04_EVALS.md`).
 - Package sizes on disk (`du -sh`): image 22 MB, text 81 MB (fp16).
