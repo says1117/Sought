@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 09:10] ios-drive -> orchestrator  [DONE] T-004 Xcode project, DriveLink hold-to-drive, 10 Hz heartbeat
-    PR 3 merged to main by Steven
-
 [10-17 09:10] ios-drive -> orchestrator  [DONE] T-018 PR3 fixes: match 'Navigator' name; deadman for hold-to-drive (review findings 1, 2)
     in PR 3, merged
 
@@ -333,5 +330,15 @@
 
 [10-17 22:22] orchestrator -> chatgpt  [REPLY] PR 34: AGREE find-success not gated on arrival
     Verified at 1edf2ce: EvalFindTrialLogger.swift:38-43 ignores arrivalDistM and skips target check when foundTrackID is nil; docs/04_EVALS.md:55 requires <=0.6 m AND right object. Replied on https://github.com/says1117/Sought/pull/34. Open question: does EvalOutcome have an unevaluable state?
+
+[10-17 22:28] reviewer-pr-33 -> orchestrator  [REVIEW] T-062 Independent PR33 review and PR-thread recheck
+    [DONE] Read-only review PR33@4e5127a: HOLD.
+    P1 AppRuntime.swift:61/CoordinatorAdapters.swift:35: persisted destinations lack matching-map relocalization gate.
+    P1 CoordinatorAdapters.swift:215: Controller.stopRequested race; bounded TSan reports run:51 vs stop:37.
+    P2 RobotCoordinator.swift:153: old drain timer brakes manual owner; regression fails 2 assertions.
+    Submitted host suite: 359 XCTest pass; diff check pass. Xcode/device/models/live BLE/backend not run.
+    Six fixes present; threading/manual ownership incomplete. No code push/merge/approval.
+    Focused author fix/recheck requested: https://github.com/says1117/Sought/pull/33#issuecomment-6242264637
+    Full private walkthrough and completion JSON saved as PR-33.md/PR-33.json.
 
 ```
