@@ -18,7 +18,11 @@ def test_import_comments_flattens_paginated_json(tmp_path, monkeypatch):
         ],
     ]
     result = subprocess.CompletedProcess([], 0, stdout=json.dumps(pages), stderr="")
-    gh = lambda *args, **kwargs: result
+    gh_calls = []
+
+    def gh(*args, **kwargs):
+        gh_calls.append(args)
+        return result
     posted = []
     monkeypatch.setattr(board, "CONFIG", config_path)
     monkeypatch.setattr(board, "gh", gh)
@@ -27,6 +31,7 @@ def test_import_comments_flattens_paginated_json(tmp_path, monkeypatch):
 
     board.import_comments()
 
+    assert gh_calls[0][-1] == "--slurp"
     assert len(posted) == 2
     assert posted[0][0][0:4] == ("gh-alice", "ALL", "[FYI] first page", "[FYI] first page")
     assert posted[1][0][0:4] == ("gh-bob", "reviewer", "[ASK] second page", "Please inspect this.")
