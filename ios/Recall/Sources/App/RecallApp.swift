@@ -7,26 +7,7 @@ struct RecallApp: App {
     @StateObject private var findBar = RecallApp.makeFindBar()
     @Environment(\.scenePhase) private var phase
     @State private var showSelfTest = false
-<<<<<<< HEAD
     @State private var showTeach = false
-
-    var body: some Scene {
-        WindowGroup {
-            DriveView(link: link)
-                .overlay(alignment: .topTrailing) { PoseOverlay(tracker: pose).padding(8) }
-                .overlay(alignment: .topLeading) {
-                    Button("Self-test") { showSelfTest = true }.buttonStyle(.bordered).padding(8)
-                }
-                .overlay(alignment: .bottomTrailing) { FallbackToolsMenu { showTeach = true }.padding(8) }
-                .sheet(isPresented: $showTeach) { TeachContainer(link: link, tracker: pose) }
-                .sheet(isPresented: $showSelfTest) { SelfTestContainer(link: link, tracker: pose) }
-                .onAppear {
-                    UIApplication.shared.isIdleTimerDisabled = true
-                    pose.start()
-                }
-                .onChange(of: phase) { _, new in
-                    if new != .active { link.stop(); pose.pause() } else { pose.start() }
-=======
     @State private var showDrive = false
 
     /// Planner = Gemini when a key is configured, offline keywords otherwise. The executor is a logging
@@ -46,6 +27,7 @@ struct RecallApp: App {
                         ToolbarItem(placement: .topBarTrailing) {
                             Menu {
                                 Button("Manual drive") { showDrive = true }
+                                Button("Teach (waypoints, map)") { showTeach = true }
                                 Button("Self-test") { showSelfTest = true }
                             } label: {
                                 HStack(spacing: 6) {
@@ -55,7 +37,7 @@ struct RecallApp: App {
                                 .font(.headline)
                             }
                             .accessibilityLabel("Fallback tools")
-                            .accessibilityHint("Manual drive and self-test")
+                            .accessibilityHint("Manual drive, Teach, and self-test")
                         }
                     }
                     .navigationBarTitleDisplayMode(.inline)
@@ -65,9 +47,9 @@ struct RecallApp: App {
                     DriveView(link: link)
                         .overlay(alignment: .topTrailing) { PoseOverlay(tracker: pose).padding(8) }
                         .toolbar { ToolbarItem(placement: .topBarLeading) { Button("Done") { link.stop(); showDrive = false } } }
->>>>>>> origin/claude/steven-t-026-7dec7c
                 }
             }
+            .sheet(isPresented: $showTeach) { TeachContainer(link: link, tracker: pose) }
             .sheet(isPresented: $showSelfTest) { SelfTestContainer(link: link, tracker: pose) }
             .onAppear {
                 UIApplication.shared.isIdleTimerDisabled = true

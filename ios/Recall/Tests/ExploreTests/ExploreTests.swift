@@ -13,7 +13,7 @@ import XCTest
 // Nothing is a measurement of a real robot or a real room.
 
 /// Ground-truth world + revealed map + fakes for every ExploreSession protocol.
-final class SimWorld: ExploreDrive, ScanHook, ExploreClock, ExplorePoseSource, ExploreGridSource, WaypointSink {
+final class ExploreSimWorld: ExploreDrive, ScanHook, ExploreClock, ExplorePoseSource, ExploreGridSource, WaypointSink {
     let truth: ExploreMap
     var known: ExploreMap
     var pose: Pose2D
@@ -174,7 +174,7 @@ final class ExploreTests: XCTestCase {
     }
 
     func testScanRoutineFourQuarterTurnsWithCapture() async {
-        let w = SimWorld(truth: makeRoom(w: 60, h: 60), start: (1.5, 1.5))
+        let w = ExploreSimWorld(truth: makeRoom(w: 60, h: 60), start: (1.5, 1.5))
         let r = await ScanRoutine().run(stopIndex: 3, drive: w, hook: w, clock: w, shouldAbort: { false })
         XCTAssertEqual(r, .reached)
         XCTAssertEqual(w.rotations, [90, 90, 90, 90])
@@ -186,12 +186,12 @@ final class ExploreTests: XCTestCase {
 
     // MARK: session on synthetic worlds
 
-    private func session(_ w: SimWorld, config: ExploreConfig = ExploreConfig(), progress: @escaping (ExploreProgress) -> Void = { _ in }) -> ExploreSession {
+    private func session(_ w: ExploreSimWorld, config: ExploreConfig = ExploreConfig(), progress: @escaping (ExploreProgress) -> Void = { _ in }) -> ExploreSession {
         ExploreSession(grid: w, drive: w, hook: w, clock: w, poses: w, waypoints: w, config: config, onProgress: progress)
     }
 
     func testOpenRoomFullyExploredEndsDone() async {
-        let w = SimWorld(truth: makeRoom(w: 100, h: 80), start: (2.5, 2.0))    // 5 m x 4 m
+        let w = ExploreSimWorld(truth: makeRoom(w: 100, h: 80), start: (2.5, 2.0))    // 5 m x 4 m
         var states: [ExploreProgress] = []
         let rep = await session(w, progress: { states.append($0) }).run()
         XCTAssertEqual(rep.end, .noReachableFrontier)
@@ -210,7 +210,7 @@ final class ExploreTests: XCTestCase {
 
     func testRoomWithObstacleAvoidsItAndFinishes() async {
         let truth = makeRoom(w: 100, h: 80, obstacle: (cols: 40..<60, rows: 30..<50))   // 1 m block in the middle
-        let w = SimWorld(truth: truth, start: (1.0, 1.0))
+        let w = ExploreSimWorld(truth: truth, start: (1.0, 1.0))
         let rep = await session(w).run()
         XCTAssertEqual(rep.end, .noReachableFrontier)
         // Every straight leg the fake rover "drove" must stay clear of the real obstacle.
@@ -225,7 +225,7 @@ final class ExploreTests: XCTestCase {
 
     func testClosedRoomEndsDone() async {
         // Tiny fully known room: no frontier at all, so exploration ends right after the home scan.
-        let w = SimWorld(truth: makeRoom(w: 30, h: 30), start: (0.75, 0.75))
+        let w = ExploreSimWorld(truth: makeRoom(w: 30, h: 30), start: (0.75, 0.75))
         w.known = makeRoom(w: 30, h: 30)
         w.reveals = false
         let rep = await session(w).run()
@@ -240,7 +240,7 @@ final class ExploreTests: XCTestCase {
         for r in 18..<44 { for c in 68..<92 { m.set(GridCell(col: c, row: r), .occupiedHigh) } }
         for r in 21..<41 { for c in 71..<89 { m.set(GridCell(col: c, row: r), .free) } }
         for c in 72..<88 { m.set(GridCell(col: c, row: 21), .unknown) }
-        let w = SimWorld(truth: m, start: (1.0, 1.5))
+        let w = ExploreSimWorld(truth: m, start: (1.0, 1.5))
         w.known = m; w.reveals = false
         let rep = await session(w).run()
         XCTAssertEqual(rep.end, .noReachableFrontier)
@@ -248,7 +248,7 @@ final class ExploreTests: XCTestCase {
     }
 
     func testFailedDriveSkipsGoalAndReportsBlocked() async {
-        let w = SimWorld(truth: makeRoom(w: 100, h: 80), start: (2.5, 2.0))
+        let w = ExploreSimWorld(truth: makeRoom(w: 100, h: 80), start: (2.5, 2.0))
         w.goToResults = [.failed]     // first leg fails once
         var states: [ExploreProgress] = []
         let rep = await session(w, progress: { states.append($0) }).run()
@@ -259,7 +259,7 @@ final class ExploreTests: XCTestCase {
 
     func testFiveMinuteCapEndsExploration() async {
         XCTAssertEqual(ExploreConfig().timeCapS, 300)
-        let w = SimWorld(truth: makeRoom(w: 240, h: 240), start: (6.0, 6.0))     // 12 m x 12 m, too big for 5 min here
+        let w = ExploreSimWorld(truth: makeRoom(w: 240, h: 240), start: (6.0, 6.0))     // 12 m x 12 m, too big for 5 min here
         w.goToCost = 40
         let rep = await session(w).run()
         XCTAssertEqual(rep.end, .timeCap)
@@ -269,7 +269,7 @@ final class ExploreTests: XCTestCase {
     }
 
     func testTrackingLossStopsAndReportsBlocked() async {
-        let w = SimWorld(truth: makeRoom(w: 100, h: 80), start: (2.5, 2.0))
+        let w = ExploreSimWorld(truth: makeRoom(w: 100, h: 80), start: (2.5, 2.0))
         w.onGoTo = { n in if n == 2 { w.tracking = .limited } }
         var states: [ExploreProgress] = []
         let rep = await session(w, progress: { states.append($0) }).run()
@@ -280,14 +280,14 @@ final class ExploreTests: XCTestCase {
     }
 
     func testControllerReportedTrackingLossEnds() async {
-        let w = SimWorld(truth: makeRoom(w: 100, h: 80), start: (2.5, 2.0))
+        let w = ExploreSimWorld(truth: makeRoom(w: 100, h: 80), start: (2.5, 2.0))
         w.goToResults = [.trackingLost]
         let rep = await session(w).run()
         XCTAssertEqual(rep.end, .trackingLost)
     }
 
     func testStopRequestWinsOverEverything() async {
-        let w = SimWorld(truth: makeRoom(w: 100, h: 80), start: (2.5, 2.0))
+        let w = ExploreSimWorld(truth: makeRoom(w: 100, h: 80), start: (2.5, 2.0))
         var s: ExploreSession!
         s = session(w)
         w.onGoTo = { n in if n == 1 { s.requestStop(); w.t += 1000; w.tracking = .limited } }   // also past the cap and tracking lost
@@ -299,7 +299,7 @@ final class ExploreTests: XCTestCase {
     }
 
     func testStartingWithoutTrackingReportsBlocked() async {
-        let w = SimWorld(truth: makeRoom(w: 60, h: 60), start: (1.5, 1.5))
+        let w = ExploreSimWorld(truth: makeRoom(w: 60, h: 60), start: (1.5, 1.5))
         w.tracking = .notAvailable
         let rep = await session(w).run()
         XCTAssertEqual(rep.end, .trackingLost)
