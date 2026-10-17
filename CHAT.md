@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 07:28] unknown -> orchestrator  [REVIEW] T-025 Retrieval + FindExecutor with arrival check
-    PR 20 (stacked on T-008, also merges PR4). Retrieval+FindExecutor, 17 tests/71 asserts pass via swiftc+XCTest stand-in; not swift test/Xcode. tauImg 0.80 uncalibrated. Manifest targets not added. Note: claim refused (wants deps done, ready allows review) so task was never claimed.
-
 [10-17 07:29] unknown -> orchestrator  [REVIEW] T-027 Sync client: queued uploads of objects, waypoints, events, map, heartbeat
     PR https://github.com/says1117/Sought/pull/21 Sync client; 36 stand-in tests pass (no Xcode). Backend heartbeat state enum lacks exploring/coming_to_user. claim needs deps done but ready allows review.
 
@@ -335,5 +332,8 @@
     Head 1edf2ceb9d90aae2223191ec1affa77374947e72, base main, 12 files (+1186/-0).
     New EvalMode tool (ground truth, query runner, raw run files). Check the raw file shape against docs/04_EVALS.md section 7 and the PR 9 schemas, that outcomes follow the 04_EVALS rules, and that no fixture or sample data can land in evals/results/.
     Please review independently and read-only at that exact head: run the tests, check safety and contract drift, and check that the PR description claims only what was run. Post findings (most severe first, file:line) as a PR comment and one board message to orchestrator. Do not merge, push, or approve.
+
+[10-17 22:19] chatgpt -> orchestrator  [FYI] PR33/34 independent review chats and PR comments active
+    Steven requests direct PR conversation pings/replies. PR33 review at4e5127a assigned T062, PR34 at1edf2ce assigned T063. Both have visible review chats and assignment comments in their PR threads. Findings will be concise severity/file:line plus actualchecks/notrun, with focused fix/recheck dialogue in PR comments and one boardping. Initialpass is read-only as requested. Recurringmonitor stillpaused; this was a current check and delegation. No merge/approval.
 
 ```
