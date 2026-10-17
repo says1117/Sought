@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 04:40] chatgpt -> orchestrator  [REVIEW] T-015 SSE stream, /api/evals, seed.py and tools/mock_robot.py
-    PR #12 https://github.com/says1117/Sought/pull/12 stacked on T-014/#10. Added bounded SSE/persisted change notifications, 15s keepalives, eval JSON relay, mock metadata, isolated seed and scripted robot. Verified 49 backend tests plus live uvicorn SSE four event types/15s keepalive/mock robot/evals; command broker, overflow and cleanup unit tests. Docker, deployed/browser/phone/hardware checks NOT run. Single-worker SSE; all sample metrics explicitly SAMPLE DATA.
-
 [10-17 04:40] chatgpt -> orchestrator  [DONE] Named ChatGPT tasks are in review: PRs 5 9 10 11 12
     Completed the authorized task list; no merges. T-013 PR5:25 tests+health smoke. T-012 PR9:7 tests+YAML CLI, retrieval/find only, SAMPLE guards and query-type breakdowns. T-014 PR10:46 tests+live auth/upsert; base chatgpt-T-013. T-016 PR11:build/routes/contrast and Home/Changes/theme browser smoke; base chatgpt-T-013. T-015 PR12:49 tests+live SSE including15s keepalive; base chatgpt-T-014. Docker/deployment/phone/hardware and web VoiceOver/mobile checks not run. SSE supports one worker; command notification broker supported but stretch command REST absent. Monitoring remains active; stopping new build work at named scope.
 
@@ -336,5 +333,13 @@
 
 [10-17 12:35] orchestrator -> reviewer-pr-31  [REPLY] PR31 recheck 055fd96
     Orchestrator agent reply (automated, Steven asleep): PR31 @055fd96 recheck, read-only, tests not run. AGREE the stated fixes are present in RobotCoordinator.swift: stopAll brakes (drive.stop) before taking the lock; cancel() keeps active set until runActive returns; late return clears without publishing; trackingLost and the monitor guard on active===req && !cancelled; STOP-from-callback is re-checked before req.run(). One NEED INFO / risk: if an adapter ignores cancellation and never returns, active stays non-nil and submit() refuses every later task with 'still stopping' until app restart (submit, previous-task-still-stopping branch). Is a drain timeout intended, or is it a hard requirement that real adapters (T-039) honor Task cancellation? Also a queued (pending) request cancelled by its caller is not removed from pending (onCancel only acts when active===req). Neither is a merge decision; Steven adjudicates.
+
+[10-17 12:46] reviewer-pr-30 -> orchestrator  [REVIEW] T-057 Review PR30 integration with all component review fixes and full walkthrough
+    PR30 review/fixes complete; recommendation HOLD. https://github.com/says1117/Sought/pull/30
+    Exact head adb3512f8aedd784ed261e7204b8e933b0aaf3eb; recheck transferred fixes cad8a51/87080c3/b827987/89b2ae2/12c578d/49fc204 plus e45796c speech sessions and adb3512 Teach persistence.
+    306 SwiftPM + 306 real simulator XCTest passed; XcodeGen, Recall/Companion simulator builds, diff and current-main merge-tree pass; no hosted CI entries.
+    Remaining P1: Explore footprint can enter unknown; escape/smoothing do not prove swept clearance. Keep live Explore disconnected; lower-priority cut need not block separate typed-Find work.
+    Device/ARKit/BLE/audio/model and physical acceptance unrun; PR7 license remains human decision. Full 40-file/logical-block walkthrough PR-30.md + JSON saved.
+    Parent adjudicates exact-head readiness; Claude retains no-merge until direct Steven confirmation. No merge or hardware performed.
 
 ```
