@@ -14,3 +14,5 @@ Second target for the user's iPhone. MultipeerConnectivity recall-ni, NIDiscover
 [2026-10-17T07:35:26Z] someone -> review: PR 22. Logic unit-tested with fakes (swiftc + XCTest stand-in, 75 asserts pass). NI/Multipeer/Vision/Companion app NOT compiled; nothing run on devices. Needs two-iPhone run per docs/come-to-me-test.md. Package.swift/project.yml entries listed in PR.
 
 [2026-10-17T10:23:22Z] someone -> done: merged to main via PR 23 (Steven)
+
+[2026-10-17T11:46:02Z] someone -> done: come to me: code exists, no further work (cut priority 7); only demo if everything else is done

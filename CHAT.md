@@ -367,4 +367,7 @@
 [10-17 11:45] unknown -> orchestrator  [DONE] T-041 Floor-occupancy diff, patrol runner, spoken briefing templates
     CUT 2026-10-17: patrol/change detection dropped. Not built.
 
+[10-17 11:46] unknown -> orchestrator  [DONE] T-028 Come to me: companion app, UWB approach, Vision person fallback
+    come to me: code exists, no further work (cut priority 7); only demo if everything else is done
+
 ```
