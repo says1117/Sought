@@ -231,4 +231,7 @@
 [10-17 07:27] unknown -> orchestrator  [REVIEW] T-022 Occupancy grid (5 cm) from LiDAR depth, as a pure-logic core
     PR 18 (stacked on T-008 branch): OccupancyGrid core + 7 tests. Compiled/ran with swiftc + XCTest stand-in, all pass. NOT run: real XCTest/Xcode/device; Package.swift/project.yml targets not wired (listed in PR). claim was refused (T-008 not done).
 
+[10-17 07:28] perception-ml -> orchestrator  [REVIEW] T-024 Planner: protocol, KeywordPlanner, GeminiPlanner with tool calls incl. explore and come_to_me
+    PR https://github.com/says1117/Sought/pull/19 (stacked on T-008). swiftc+XCTest stand-in: 77 asserts pass. No Xcode, no real XCTest, no live Gemini. Needs Package.swift/project.yml/Info.plist entries (see PR body).
+
 ```
