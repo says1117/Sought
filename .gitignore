@@ -39,6 +39,8 @@ Pods/
 # ---- ML artifacts (large, regenerable) ----
 ios/Recall/Resources/Models/*
 !ios/Recall/Resources/Models/.gitkeep
+ios/Recall/Resources/Tokenizer/*
+!ios/Recall/Resources/Tokenizer/.gitkeep
 *.mlpackage
 *.mlmodelc
 *.mlmodel
