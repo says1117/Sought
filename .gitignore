@@ -1,0 +1,20 @@
+# secrets
+.env
+*.env.local
+Secrets.xcconfig
+# media and models
+assets/clips/
+ios/Recall/Resources/Models/*.mlpackage
+ios/Recall/Resources/Models/*.mlmodelc
+backend/media/
+*.db
+# Xcode / build
+xcuserdata/
+DerivedData/
+build/
+.DS_Store
+# python / node
+__pycache__/
+.venv/
+node_modules/
+dist/
