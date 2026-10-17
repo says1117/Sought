@@ -1,0 +1,24 @@
+{
+  "sample": true,
+  "kind": "find",
+  "commit": "SAMPLE",
+  "variant": "SAMPLE_variant",
+  "phone_height": "SAMPLE",
+  "thresholds": {},
+  "trials": [
+    {
+      "query_id": "SAMPLE_q",
+      "target": "SAMPLE_obj",
+      "outcome": "success",
+      "time_s": 2,
+      "near_misses": 1
+    },
+    {
+      "query_id": "SAMPLE_q",
+      "target": "SAMPLE_obj",
+      "outcome": "wrong_object",
+      "time_s": 4,
+      "near_misses": 0
+    }
+  ]
+}
