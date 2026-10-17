@@ -25,6 +25,9 @@ final class RobotCoordinator {
         var worker: Task<Void, Error>?
         var cancelled = false
         var started = false
+        var drainWatch: Task<Void, Never>?
+        var result: Result<Void, Error>?
+        var waiters: [CheckedContinuation<Void, Error>] = []
         init(kind: CoordinatorTaskKind, label: String, run: @escaping () async throws -> CoordinatorTaskResult,
              cancel: @escaping () -> Void) {
             self.kind = kind; self.label = label; self.run = run; self.cancel = cancel
@@ -78,12 +81,14 @@ final class RobotCoordinator {
         case .markWaypoint(let name):
             markWaypoint(name)
         case .explore(let minutes):
+            guard config.features.exploreEnabled else { refuseDisabled("explore", "Sorry, exploring is turned off in this build."); return }
             try await submit(makeRequest(.explore, "explore", { [deps] in try await deps.explorer.explore(maxMinutes: minutes) },
                                          { [deps] in deps.explorer.cancel() }))
         case .findObject(let description):
             try await submit(makeRequest(.find, "find: \(description)", { [deps] in try await deps.finder.find(description: description) },
                                          { [deps] in deps.finder.cancel() }))
         case .comeToMe:
+            guard config.features.comeToMeEnabled else { refuseDisabled("come_to_me", "Sorry, coming to you is turned off in this build."); return }
             try await submit(makeRequest(.comeToMe, "come to me", { [deps] in try await deps.comer.comeToMe() },
                                          { [deps] in deps.comer.cancel() }))
         case .goToWaypoint(let name):
@@ -120,7 +125,54 @@ final class RobotCoordinator {
         req.cancelled = true
         req.monitor?.cancel()
         req.worker?.cancel()
-        if req.started { req.cancel() }
+        if req.started {
+            req.cancel()
+            let limit = config.drainTimeoutS
+            req.drainWatch = Task { [weak self] in
+                do { try await self?.deps.clock.sleep(seconds: limit) } catch { return }
+                self?.forceComplete(req)
+            }
+        }
+    }
+
+    /// A cancelled runner that never returns must not wedge the coordinator. The drive STOP was already
+    /// sent when the task was cancelled; this releases the slot so new requests are accepted again.
+    private func forceComplete(_ req: Request) {
+        synchronized {
+            guard active === req, req.cancelled else { return }
+            deps.drive.stop()
+            active = nil
+            pending = nil
+            record("drain-timeout", "\(req.label) did not return within \(config.drainTimeoutS) s; released")
+            if _status.state != .blocked && _status.state != .error { publish(.idle) }
+            deps.speaker.say("I stopped, but the last task did not finish cleanly. I'm ready for a new request.")
+            finishRequest(req, .success(()))
+        }
+    }
+
+    private func refuseDisabled(_ what: String, _ spoken: String) {
+        record("refused", "\(what): disabled by feature flag")
+        deps.speaker.say(spoken)
+    }
+
+    /// Resolve the request's awaiting caller exactly once (runner returned, or drain timeout).
+    private func finishRequest(_ req: Request, _ r: Result<Void, Error>) {
+        synchronized {
+            guard req.result == nil else { return }
+            req.result = r
+            req.drainWatch?.cancel()
+            let waiters = req.waiters
+            req.waiters = []
+            for w in waiters { w.resume(with: r) }
+        }
+    }
+
+    private func awaitCompletion(_ req: Request) async throws {
+        try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in
+            synchronized {
+                if let r = req.result { c.resume(with: r) } else { req.waiters.append(c) }
+            }
+        }
     }
 
     // MARK: - Internals
@@ -159,10 +211,16 @@ final class RobotCoordinator {
                 }
                 return nil
             }
-            guard let worker else { return }
-            try await worker.value
+            guard worker != nil else { return }
+            try await awaitCompletion(req)
         } onCancel: {
             self.synchronized {
+                if self.pending === req {
+                    // Cancelled while queued (possibly before submit even returned): drop it.
+                    self.pending = nil
+                    self.record("cancelled", "\(req.label): caller cancelled while queued")
+                    return
+                }
                 guard self.active === req else { return }
                 self.deps.drive.stop()
                 self.pending = nil
@@ -175,7 +233,10 @@ final class RobotCoordinator {
     /// Reserve and create the owned task in the same transition. Called with the lock held.
     private func start(_ req: Request) -> Task<Void, Error> {
         active = req
-        let worker = Task { try await self.runActive(req) }
+        let worker = Task<Void, Error> {
+            do { try await self.runActive(req); self.finishRequest(req, .success(())) }
+            catch { self.finishRequest(req, .failure(error)); throw error }
+        }
         req.worker = worker
         return worker
     }
@@ -248,6 +309,10 @@ final class RobotCoordinator {
             case .success(.completed(let summary)):
                 record("done", "\(req.label)\(summary.map { ": \($0)" } ?? "")")
                 publish(.idle)
+            case .success(.refused(let spoken)):
+                record("refused", "\(req.label): \(spoken)")
+                publish(.idle)
+                deps.speaker.say(spoken)
             case .success(.cancelled):
                 pending = nil
                 record("cancelled", req.label)

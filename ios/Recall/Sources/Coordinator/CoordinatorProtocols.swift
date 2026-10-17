@@ -11,6 +11,9 @@ enum CoordinatorTaskResult: Equatable {
     /// The task could not continue (controller gave up, no route, nothing found to drive to...).
     case blocked(reason: String)
     case cancelled
+    /// The task cannot run in this build or state (e.g. image models not installed). The coordinator speaks
+    /// `spoken`, returns to idle, and does not treat it as a failure.
+    case refused(spoken: String)
 }
 
 enum CoordinatorTracking: String, Equatable {

@@ -4,6 +4,7 @@ import SwiftUI
 struct RecallApp: App {
     @StateObject private var link: DriveLink
     @StateObject private var pose: PoseTracker
+    @StateObject private var runtime: AppRuntime
     @StateObject private var findBar: FindBarViewModel
     @Environment(\.scenePhase) private var phase
     @State private var showSelfTest = false
@@ -15,24 +16,26 @@ struct RecallApp: App {
         let pose = PoseTracker()
         _link = StateObject(wrappedValue: link)
         _pose = StateObject(wrappedValue: pose)
-        _findBar = StateObject(wrappedValue: Self.makeFindBar(link: link))
+        let runtime = AppRuntime(link: link, pose: pose)
+        _runtime = StateObject(wrappedValue: runtime)
+        _findBar = StateObject(wrappedValue: Self.makeFindBar(link: link, runtime: runtime))
     }
 
-    /// Planner = Gemini when a key is configured, offline keywords otherwise. The tool executor remains
-    /// a logging stand-in until the coordinator exists; STOP and speech gating use live DriveLink state.
+    /// Planner = Gemini when a key is configured, offline keywords otherwise. Tool calls run on the real
+    /// RobotCoordinator; STOP and speech gating use live DriveLink state.
     @MainActor
-    private static func makeFindBar(link: DriveLink) -> FindBarViewModel {
+    private static func makeFindBar(link: DriveLink, runtime: AppRuntime) -> FindBarViewModel {
         let talk = PushToTalk(recognizer: AppleSpeechRecognizer(), isStationary: {
             link.isRobotStationary
         })
-        return FindBarViewModel(planner: FallbackPlanner.make(), executor: LoggingToolExecutor(stop: { link.stop() }),
-                                speaker: AppleSpeaker(), talk: talk)
+        return FindBarViewModel(planner: FallbackPlanner.make(), executor: runtime.coordinator,
+                                speaker: runtime.speaker, talk: talk, context: { runtime.plannerContext() })
     }
 
     var body: some Scene {
         WindowGroup {
             NavigationStack {
-                FindBarView(model: findBar)
+                FindBarView(model: findBar, robotStatus: runtime.statusLine)
                     .toolbar {
                         ToolbarItem(placement: .topBarTrailing) {
                             Menu {
@@ -64,11 +67,14 @@ struct RecallApp: App {
             .onAppear {
                 UIApplication.shared.isIdleTimerDisabled = true
                 startPoseSession()
+                runtime.start()
             }
             .onChange(of: phase) { _, new in
                 if new == .active {
                     startPoseSession()
+                    runtime.start()
                 } else {
+                    runtime.pause()          // brakes, cancels the coordinator task, stops the heartbeat
                     link.stop()
                     pose.pause()
                     // The speech permission dialog can briefly make the scene inactive.

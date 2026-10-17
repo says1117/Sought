@@ -74,7 +74,9 @@ final class CoordTestSpeaker: CoordinatorSpeaking {
     private let lock = NSLock()
     private var words: [String] = []
     var said: [String] { lock.lock(); defer { lock.unlock() }; return words }
-    func say(_ text: String) { lock.lock(); words.append(text); lock.unlock() }
+    /// Runs after the text is recorded, on the speaking thread (may be inside the coordinator's lock).
+    var onSay: ((String) -> Void)?
+    func say(_ text: String) { lock.lock(); words.append(text); lock.unlock(); onSay?(text) }
 }
 
 final class CoordTestWaypoints: CoordinatorWaypoints {
@@ -145,7 +147,9 @@ struct CoordRig {
     init() {
         let e = explorer, f = finder, c = comer, n = navigator, w = waypoints, d = drive, s = speaker, k = clock, p = pose
         coordinator = RobotCoordinator(dependencies: CoordinatorDependencies(
-            explorer: e, finder: f, comer: c, navigator: n, waypoints: w, drive: d, speaker: s, clock: k, pose: p))
+            explorer: e, finder: f, comer: c, navigator: n, waypoints: w, drive: d, speaker: s, clock: k, pose: p),
+            // These tests exercise sequencing for every task type, so all features are on here.
+            config: CoordinatorConfig(features: RecallFeatureFlags(exploreEnabled: true, comeToMeEnabled: true)))
         let log = StateLog()
         states = log
         coordinator.onChange = { log.append($0) }

@@ -1,0 +1,211 @@
+import Foundation
+#if canImport(PoseCore)
+import PoseCore
+#endif
+#if canImport(ControllerCore)
+@testable import ControllerCore
+#endif
+#if canImport(ObstacleGuardCore)
+import ObstacleGuardCore
+#endif
+#if canImport(FindExecutor)
+import FindExecutor
+#endif
+#if canImport(Retrieval)
+import Retrieval
+#endif
+#if canImport(Memory)
+import Memory
+#endif
+#if canImport(TeachCore)
+import TeachCore
+#endif
+
+// Concrete adapters between the coordinator's protocols and the existing modules. ARKit and BLE specifics stay
+// out: they arrive as `PoseSource` (PoseTracker) and `DriveSink` (DriveLink), both defined by Controller.
+// Hardware safety is not owned here. The ESP32 watchdog and sonar stop independently.
+
+/// Drive sink as the coordinator's synchronous brake.
+final class DriveStopAdapter: CoordinatorDriveStopping {
+    private let sink: DriveSink
+    init(sink: DriveSink) { self.sink = sink }
+    func stop() { sink.stop() }
+}
+
+final class ControllerPoseAdapter: CoordinatorPoseSource {
+    private let source: PoseSource
+    init(source: PoseSource) { self.source = source }
+    func tracking() -> CoordinatorTracking {
+        let s = source.latest()
+        guard s.pose != nil else { return .notAvailable }   // PoseTracker reports nil for stale/absent frames
+        switch s.tracking {
+        case .normal: return .normal
+        case .limited: return .limited
+        case .notAvailable: return .notAvailable
+        }
+    }
+}
+
+/// Waypoint names to Teach `WaypointStore` rows; `markHere` saves the live pose.
+final class StoreWaypointsAdapter: CoordinatorWaypoints {
+    enum MarkError: Error { case noPose }
+    private let store: WaypointStore
+    private let poses: PoseSource
+    init(store: WaypointStore, poses: PoseSource) { self.store = store; self.poses = poses }
+
+    func lookup(_ name: String) -> CoordinatorWaypoint? {
+        guard let w = try? store.waypoint(named: name) else { return nil }
+        return CoordinatorWaypoint(name: w.name, x: w.x, z: w.z, yawDeg: w.yawDeg)
+    }
+
+    func markHere(name: String) throws -> CoordinatorWaypoint {
+        let s = poses.latest()
+        guard s.tracking == .normal, let pose = s.pose else { throw MarkError.noPose }
+        let w = try store.addWaypoint(name: name, pose: pose)
+        return CoordinatorWaypoint(name: w.name, x: w.x, z: w.z, yawDeg: w.yawDeg)
+    }
+}
+
+enum ControllerResultMapper {
+    static func result(_ s: ControlStatus) -> CoordinatorTaskResult {
+        switch s {
+        case .done, .running: return .completed(summary: "arrived")
+        case .failed(.cancelled): return .cancelled
+        case .failed(.timeout): return .blocked(reason: "I couldn't get there in time")
+        case .failed(.trackingLost): return .blocked(reason: CoordinatorConfig.rescanReason)
+        }
+    }
+}
+
+/// go_to_waypoint: Controller.goTo to the stored pose.
+final class ControllerNavigator: CoordinatorNavigating {
+    private let controller: Controller
+    private let stopDistance: Double
+    init(controller: Controller, stopDistance: Double = 0.3) { self.controller = controller; self.stopDistance = stopDistance }
+
+    func goTo(_ waypoint: CoordinatorWaypoint) async throws -> CoordinatorTaskResult {
+        try Task.checkCancellation()
+        let status = await controller.goTo(x: waypoint.x, z: waypoint.z, stopDistance: stopDistance)
+        return ControllerResultMapper.result(status)
+    }
+    func cancel() { controller.stop() }
+}
+
+/// FindExecutor's drive step: go to within `stopDistance`, then turn to face the remembered position.
+final class ControllerApproachDriver: ApproachDriver {
+    private let controller: Controller
+    private let poses: PoseSource
+    init(controller: Controller, poses: PoseSource) { self.controller = controller; self.poses = poses }
+
+    func approach(x: Double, z: Double, stopDistance: Double) async -> ApproachReport {
+        let status = await controller.goTo(x: x, z: z, stopDistance: stopDistance)
+        switch status {
+        case .failed(.cancelled): return ApproachReport(outcome: .cancelled)
+        case .failed(.timeout): return ApproachReport(outcome: .failed(reason: "timeout"))
+        case .failed(.trackingLost): return ApproachReport(outcome: .failed(reason: "tracking lost"))
+        case .running: return ApproachReport(outcome: .failed(reason: "controller did not finish"))
+        case .done:
+            if let pose = poses.latest().pose {
+                let err = ControllerMath.headingError(pose: pose, targetX: x, targetZ: z)
+                if abs(err) > ControllerTuning.rotateToleranceDeg {
+                    if case .failed(.cancelled) = await controller.rotateBy(err) { return ApproachReport(outcome: .cancelled) }
+                }
+            }
+            return ApproachReport(outcome: .arrived)
+        }
+    }
+}
+
+/// find_object: Retrieval over the stored tracks, then FindExecutor drives and checks arrival.
+/// Refuses (spoken by the coordinator) when the image models are not installed.
+final class FindRunnerAdapter: CoordinatorFinding {
+    private let tracks: TrackProviding
+    private let encoders: EncoderProvider
+    private let driver: ApproachDriver
+    private let speaker: CoordinatorSpeaking
+    private let config: FindConfig
+    private let stopMotion: () -> Void
+
+    init(tracks: TrackProviding, encoders: EncoderProvider, driver: ApproachDriver, speaker: CoordinatorSpeaking,
+         config: FindConfig = FindConfig(), stopMotion: @escaping () -> Void) {
+        self.tracks = tracks; self.encoders = encoders; self.driver = driver; self.speaker = speaker
+        self.config = config; self.stopMotion = stopMotion
+    }
+
+    func find(description: String) async throws -> CoordinatorTaskResult {
+        try Task.checkCancellation()
+        let set = encoders.encoders()
+        guard set.isAvailable else {
+            return .refused(spoken: set.unavailableMessage ?? ModelsMissingEncoderProvider.spoken)
+        }
+        let known = try tracks.allTracks()
+        let executor = FindExecutor(retriever: Retriever(encoder: set.text), driver: driver, images: set.images, config: config)
+        let result = await executor.find(phrase: description, tracks: known)
+        if Task.isCancelled || result.outcome == .aborted { return .cancelled }
+        speaker.say(result.spoken)
+        return .completed(summary: "\(result.outcome.rawValue): \(result.spoken)")
+    }
+
+    func cancel() { stopMotion() }
+}
+
+/// Explore and come-to-me are behind feature flags and off in this build. These keep the dependency struct
+/// total; the coordinator refuses before they are ever called, and they refuse again if a flag is flipped
+/// before the real runner is wired.
+final class UnwiredExplorer: CoordinatorExploring {
+    func explore(maxMinutes: Int?) async throws -> CoordinatorTaskResult {
+        .refused(spoken: "Exploring is not wired up in this build.")
+    }
+    func cancel() {}
+}
+final class UnwiredComeToMe: CoordinatorComingToUser {
+    func comeToMe() async throws -> CoordinatorTaskResult {
+        .refused(spoken: "Coming to you is not wired up in this build.")
+    }
+    func cancel() {}
+}
+
+/// Obstacle level for the Controller from the latest depth corridor and ESP32 sonar telemetry.
+/// Sonar flags win; a missing depth frame is treated as blind (slow), never as clear.
+enum GuardStateMapper {
+    static func state(corridor: CorridorResult?, sonar: SonarSample?) -> GuardState {
+        switch ObstacleLogic.evaluate(corridor: corridor, sonar: sonar, direction: .forward).level {
+        case .clear: return .clear
+        case .slow: return .slow
+        case .stop: return .stop
+        }
+    }
+}
+
+struct CoordinatorWiring {
+    var poses: PoseSource
+    var drive: DriveSink
+    var guardState: () -> GuardState
+    var waypointStore: WaypointStore
+    var trackStore: TrackProviding
+    var encoders: EncoderProvider
+    var speaker: CoordinatorSpeaking
+    var clock: CoordinatorClock = SystemCoordinatorClock()
+    var features = RecallFeatureFlags()
+    var controllerClock: () -> Double = { ProcessInfo.processInfo.systemUptime }
+    var controllerSleep: (Double) async -> Void = { try? await Task.sleep(nanoseconds: UInt64($0 * 1_000_000_000)) }
+    var config = CoordinatorConfig()
+
+    func makeCoordinator() -> RobotCoordinator {
+        let controller = Controller(poses: poses, sink: drive, guardState: guardState,
+                                    clock: controllerClock, sleep: controllerSleep)
+        let driver = ControllerApproachDriver(controller: controller, poses: poses)
+        let finder = FindRunnerAdapter(tracks: trackStore, encoders: encoders, driver: driver, speaker: speaker,
+                                       stopMotion: { controller.stop() })
+        var cfg = config
+        cfg.features = features
+        return RobotCoordinator(
+            dependencies: CoordinatorDependencies(
+                explorer: UnwiredExplorer(), finder: finder, comer: UnwiredComeToMe(),
+                navigator: ControllerNavigator(controller: controller),
+                waypoints: StoreWaypointsAdapter(store: waypointStore, poses: poses),
+                drive: DriveStopAdapter(sink: drive), speaker: speaker, clock: clock,
+                pose: ControllerPoseAdapter(source: poses)),
+            config: cfg)
+    }
+}

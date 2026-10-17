@@ -33,5 +33,8 @@ struct CoordinatorConfig {
     /// Tracking must be non-normal for longer than this to cancel motion.
     var trackingLossLimitS: TimeInterval = 1.0
     var trackingPollS: TimeInterval = 0.1
+    /// A cancelled runner that has not returned after this long is force-released (the STOP was already sent).
+    var drainTimeoutS: TimeInterval = 3.0
+    var features = RecallFeatureFlags()
     static let rescanReason = "need a rescan"
 }
