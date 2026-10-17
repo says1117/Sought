@@ -29,6 +29,11 @@ struct CoordinatorWaypoint: Equatable {
     }
 }
 
+/// Runner lifetime contract (all four motion protocols): check Task cancellation before issuing
+/// any command and after every await; cancel() must promptly revoke command production. Returning
+/// means all child work and callbacks are drained, with no later drive side effects. Dependencies
+/// and synchronous methods must be thread-safe and must not synchronously wait for coordinator
+/// re-entry from a different thread. The coordinator retains ownership until the runner returns.
 /// Explore mode. The adapter wraps ExploreSession (`requestStop()` is `cancel()`).
 protocol CoordinatorExploring: AnyObject {
     func explore(maxMinutes: Int?) async throws -> CoordinatorTaskResult
@@ -98,9 +103,9 @@ protocol CoordinatorDependenciesFactory {
     func makeCoordinatorDependencies() -> CoordinatorDependencies
 }
 
-/// Wall-clock implementation for the real app. Pure Foundation, so it lives here.
+/// Monotonic-clock implementation for the real app. Pure Foundation, so it lives here.
 final class SystemCoordinatorClock: CoordinatorClock {
-    func now() -> TimeInterval { Date().timeIntervalSinceReferenceDate }
+    func now() -> TimeInterval { ProcessInfo.processInfo.systemUptime }
     func sleep(seconds: TimeInterval) async throws {
         try await Task.sleep(nanoseconds: UInt64(max(0, seconds) * 1_000_000_000))
     }

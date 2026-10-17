@@ -10,17 +10,22 @@ import Foundation
 final class CoordTestClock: CoordinatorClock {
     private let lock = NSLock()
     private var t: TimeInterval = 0
-    private var waiters: [(deadline: TimeInterval, cont: CheckedContinuation<Void, Error>)] = []
+    private var waiters: [(id: UUID, deadline: TimeInterval, cont: CheckedContinuation<Void, Error>)] = []
     func now() -> TimeInterval { lock.lock(); defer { lock.unlock() }; return t }
     func sleep(seconds: TimeInterval) async throws {
+        let id = UUID()
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in
-                lock.lock(); waiters.append((t + seconds, c)); lock.unlock()
+                lock.lock()
+                if Task.isCancelled { lock.unlock(); c.resume(throwing: CancellationError()); return }
+                waiters.append((id, t + seconds, c)); lock.unlock()
             }
         } onCancel: {
-            self.lock.lock(); let all = self.waiters; self.waiters = []; self.lock.unlock()
-            // Cancel wakes everyone; live sleepers re-check Task.isCancelled and re-sleep via loop.
-            for w in all { w.cont.resume(throwing: CancellationError()) }
+            self.lock.lock()
+            let own = self.waiters.filter { $0.id == id }
+            self.waiters.removeAll { $0.id == id }
+            self.lock.unlock()
+            for w in own { w.cont.resume(throwing: CancellationError()) }
         }
     }
     func advance(by s: TimeInterval) async {
@@ -31,26 +36,45 @@ final class CoordTestClock: CoordinatorClock {
             waiters.removeAll { $0.deadline <= t + 1e-9 }
             lock.unlock()
             for w in due { w.cont.resume() }
+            // Do not advance virtual time again until the monitor has consumed this tick
+            // and registered its next sleep (or exited). Yield counts alone lose short dips.
+            for _ in 0..<10_000 {
+                lock.lock(); let registered = !waiters.isEmpty; lock.unlock()
+                if registered { break }
+                await Task.yield()
+            }
             await coordSettle()
         }
     }
 }
 
-func coordSettle() async { for _ in 0..<30 { await Task.yield() } }
+func coordSettle() async {
+    for _ in 0..<100 { await Task.yield() }
+    try? await Task.sleep(nanoseconds: 1_000_000)
+}
 
 final class CoordTestPose: CoordinatorPoseSource {
-    var value: CoordinatorTracking = .normal
+    private let lock = NSLock()
+    private var stored: CoordinatorTracking = .normal
+    var value: CoordinatorTracking {
+        get { lock.lock(); defer { lock.unlock() }; return stored }
+        set { lock.lock(); stored = newValue; lock.unlock() }
+    }
     func tracking() -> CoordinatorTracking { value }
 }
 
 final class CoordTestDrive: CoordinatorDriveStopping {
-    private(set) var stops = 0
-    func stop() { stops += 1 }
+    private let lock = NSLock()
+    private var count = 0
+    var stops: Int { lock.lock(); defer { lock.unlock() }; return count }
+    func stop() { lock.lock(); count += 1; lock.unlock() }
 }
 
 final class CoordTestSpeaker: CoordinatorSpeaking {
-    private(set) var said: [String] = []
-    func say(_ text: String) { said.append(text) }
+    private let lock = NSLock()
+    private var words: [String] = []
+    var said: [String] { lock.lock(); defer { lock.unlock() }; return words }
+    func say(_ text: String) { lock.lock(); words.append(text); lock.unlock() }
 }
 
 final class CoordTestWaypoints: CoordinatorWaypoints {
@@ -71,17 +95,24 @@ struct CoordTestFailure: Error {}
 final class CoordTestRunner: CoordinatorExploring, CoordinatorFinding, CoordinatorComingToUser, CoordinatorNavigating {
     private let lock = NSLock()
     private var cont: CheckedContinuation<CoordinatorTaskResult, Error>?
-    private(set) var started: [String] = []
-    private(set) var cancels = 0
+    private var starts: [String] = []
+    private var cancelCount = 0
+    var started: [String] { lock.lock(); defer { lock.unlock() }; return starts }
+    var cancels: Int { lock.lock(); defer { lock.unlock() }; return cancelCount }
+    /// Deliberately uncooperative cancellation to test ownership while a runner drains.
+    var finishOnCancel = true
     var onStart: ((String) -> Void)?
 
     var isRunning: Bool { lock.lock(); defer { lock.unlock() }; return cont != nil }
 
     private func run(_ name: String) async throws -> CoordinatorTaskResult {
-        started.append(name)
-        onStart?(name)
+        try Task.checkCancellation()
         return try await withCheckedThrowingContinuation { (c: CheckedContinuation<CoordinatorTaskResult, Error>) in
-            lock.lock(); cont = c; lock.unlock()
+            lock.lock()
+            if Task.isCancelled { lock.unlock(); c.resume(throwing: CancellationError()); return }
+            starts.append(name)
+            cont = c; lock.unlock()
+            onStart?(name)
         }
     }
     func finish(_ r: CoordinatorTaskResult) { lock.lock(); let c = cont; cont = nil; lock.unlock(); c?.resume(returning: r) }
@@ -91,7 +122,10 @@ final class CoordTestRunner: CoordinatorExploring, CoordinatorFinding, Coordinat
     func find(description: String) async throws -> CoordinatorTaskResult { try await run("find:\(description)") }
     func comeToMe() async throws -> CoordinatorTaskResult { try await run("come") }
     func goTo(_ waypoint: CoordinatorWaypoint) async throws -> CoordinatorTaskResult { try await run("go:\(waypoint.name)") }
-    func cancel() { lock.lock(); cancels += 1; lock.unlock(); finish(.cancelled) }
+    func cancel() {
+        lock.lock(); cancelCount += 1; let shouldFinish = finishOnCancel; lock.unlock()
+        if shouldFinish { finish(.cancelled) }
+    }
 }
 
 struct CoordRig {
@@ -101,7 +135,12 @@ struct CoordRig {
     let coordinator: RobotCoordinator
     let states: StateLog
 
-    final class StateLog { var seen: [CoordinatorStatus] = [] }
+    final class StateLog {
+        private let lock = NSLock()
+        private var statuses: [CoordinatorStatus] = []
+        var seen: [CoordinatorStatus] { lock.lock(); defer { lock.unlock() }; return statuses }
+        func append(_ status: CoordinatorStatus) { lock.lock(); statuses.append(status); lock.unlock() }
+    }
 
     init() {
         let e = explorer, f = finder, c = comer, n = navigator, w = waypoints, d = drive, s = speaker, k = clock, p = pose
@@ -109,7 +148,7 @@ struct CoordRig {
             explorer: e, finder: f, comer: c, navigator: n, waypoints: w, drive: d, speaker: s, clock: k, pose: p))
         let log = StateLog()
         states = log
-        coordinator.onChange = { log.seen.append($0) }
+        coordinator.onChange = { log.append($0) }
     }
 
     /// Start a call in the background and let it reach its first suspension.

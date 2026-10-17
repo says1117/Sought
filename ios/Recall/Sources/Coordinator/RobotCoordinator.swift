@@ -10,7 +10,8 @@ import Foundation
 /// - Exactly one task (explore, find, go_to_waypoint, come_to_me) runs at a time.
 /// - A second task request while one runs is held as the single pending request. If that slot is also full,
 ///   or the request is mark_waypoint, it is refused with a spoken reason. Never throws for that.
-/// - `stopAll()` is synchronous: drive STOP first, then cancel the sub-task, clear pending, state idle.
+/// - `stopAll()` is synchronous: drive STOP first, cancel the owned task and adapter, clear pending,
+///   state idle. Movement ownership stays busy until the cancelled runner returns.
 /// - Tracking not normal for more than 1 s cancels the motion task and reports "need a rescan" (blocked).
 /// - Reported failures become `blocked`; a thrown error becomes `error` and is rethrown to the caller.
 final class RobotCoordinator {
@@ -21,6 +22,9 @@ final class RobotCoordinator {
         let run: () async throws -> CoordinatorTaskResult
         let cancel: () -> Void
         var monitor: Task<Void, Never>?
+        var worker: Task<Void, Error>?
+        var cancelled = false
+        var started = false
         init(kind: CoordinatorTaskKind, label: String, run: @escaping () async throws -> CoordinatorTaskResult,
              cancel: @escaping () -> Void) {
             self.kind = kind; self.label = label; self.run = run; self.cancel = cancel
@@ -29,14 +33,26 @@ final class RobotCoordinator {
 
     private let deps: CoordinatorDependencies
     private let config: CoordinatorConfig
-    private let lock = NSLock()
+    // Lifecycle transitions and synchronous collaborator calls are serialized. Recursive so an
+    // onChange callback can call stopAll without deadlocking. Callbacks must never wait on
+    // another thread to re-enter the coordinator.
+    private let lock = NSRecursiveLock()
     private var active: Request?
     private var pending: Request?
     private var _status = CoordinatorStatus.idle
     private var _trace: [CoordinatorTraceEntry] = []
 
-    /// Called on every status change, outside the lock, possibly from any thread.
-    var onChange: (CoordinatorStatus) -> Void = { _ in }
+    /// Synchronous, serialized status notification; may re-enter (e.g. STOP). Keep it brief;
+    /// dispatch UI updates asynchronously and never synchronously wait on another thread.
+    private var _onChange: (CoordinatorStatus) -> Void = { _ in }
+    var onChange: (CoordinatorStatus) -> Void {
+        get { synchronized { _onChange } }
+        set { synchronized { _onChange = newValue } }
+    }
+
+    private func synchronized<T>(_ body: () throws -> T) rethrows -> T {
+        lock.lock(); defer { lock.unlock() }; return try body()
+    }
 
     init(dependencies: CoordinatorDependencies, config: CoordinatorConfig = CoordinatorConfig()) {
         self.deps = dependencies
@@ -51,6 +67,8 @@ final class RobotCoordinator {
     // MARK: - ToolExecuting surface
 
     func execute(_ call: ToolCall) async throws {
+        // Local STOP must reach the brake before tracing or any lifecycle lock.
+        if case .stop = call { stopAll(); return }
         record("request", call.toolName)
         switch call {
         case .stop:
@@ -85,16 +103,24 @@ final class RobotCoordinator {
     /// Stop always wins. Synchronous. Safe with nothing running.
     func stopAll() {
         deps.drive.stop()
-        lock.lock()
-        let victim = active
-        let hadPending = pending != nil
-        active = nil
-        pending = nil
-        lock.unlock()
-        victim?.monitor?.cancel()
-        victim?.cancel()
-        record("stop", "cancelled \(victim?.label ?? "nothing")\(hadPending ? ", dropped pending" : "")")
-        publish(.idle)
+        synchronized {
+            let victim = active
+            let hadPending = pending != nil
+            pending = nil
+            cancel(victim)
+            record("stop", "cancelled \(victim?.label ?? "nothing")\(hadPending ? ", dropped pending" : "")")
+            publish(.idle)
+        }
+    }
+
+    /// Cancellation revokes the worker, but the slot stays occupied until it actually returns.
+    /// Adapters must check task cancellation before side effects and after every suspension.
+    private func cancel(_ req: Request?) {
+        guard let req, !req.cancelled else { return }
+        req.cancelled = true
+        req.monitor?.cancel()
+        req.worker?.cancel()
+        if req.started { req.cancel() }
     }
 
     // MARK: - Internals
@@ -114,27 +140,52 @@ final class RobotCoordinator {
     }
 
     private func submit(_ req: Request) async throws {
-        lock.lock()
-        if active == nil {
-            active = req
-            lock.unlock()
-            try await runActive(req)
-        } else if pending == nil {
-            pending = req
-            let current = active?.label ?? "a task"
-            lock.unlock()
-            record("queued", "\(req.label) behind \(current)")
-            deps.speaker.say("I'm busy with \(current). I'll do that next.")
-        } else {
-            let current = active?.label ?? "a task"
-            lock.unlock()
-            record("refused", "\(req.label): busy with \(current) and one already waiting")
-            deps.speaker.say("I'm busy and already have something waiting. Say stop first.")
+        try await withTaskCancellationHandler {
+            let worker: Task<Void, Error>? = try synchronized {
+                try Task.checkCancellation()
+                if active == nil {
+                    return start(req)
+                } else if active?.cancelled == true {
+                    record("refused", "\(req.label): previous task still stopping")
+                    deps.speaker.say("I'm still stopping. Please try again once I've stopped.")
+                } else if pending == nil {
+                    pending = req
+                    let current = active?.label ?? "a task"
+                    record("queued", "\(req.label) behind \(current)")
+                    deps.speaker.say("I'm busy with \(current). I'll do that next.")
+                } else {
+                    record("refused", "\(req.label): pending slot full")
+                    deps.speaker.say("I'm busy and already have something waiting. Say stop first.")
+                }
+                return nil
+            }
+            guard let worker else { return }
+            try await worker.value
+        } onCancel: {
+            self.synchronized {
+                guard self.active === req else { return }
+                self.deps.drive.stop()
+                self.pending = nil
+                self.cancel(req)
+                self.publish(.idle)
+            }
         }
     }
 
+    /// Reserve and create the owned task in the same transition. Called with the lock held.
+    private func start(_ req: Request) -> Task<Void, Error> {
+        active = req
+        let worker = Task { try await self.runActive(req) }
+        req.worker = worker
+        return worker
+    }
+
     private func markWaypoint(_ name: String) {
-        lock.lock(); let busy = active; lock.unlock()
+        synchronized { markWaypointLocked(name) }
+    }
+
+    private func markWaypointLocked(_ name: String) {
+        let busy = active
         if let busy {
             record("refused", "mark \(name): busy with \(busy.label)")
             deps.speaker.say("I'm moving right now. Stop me first, then I can save this spot.")
@@ -156,70 +207,73 @@ final class RobotCoordinator {
     }
 
     private func runActive(_ req: Request) async throws {
-        publish(CoordinatorStatus(state: state(for: req.kind), task: req.label))
-        record("start", req.label)
-
-        guard deps.pose.tracking() == .normal else {
-            finishBlocked(req, reason: CoordinatorConfig.rescanReason, speak: "I can't start, I need a rescan.")
-            return
+        let canRun = synchronized { () -> Bool in
+            guard active === req else { return false }
+            guard !req.cancelled, !Task.isCancelled else { active = nil; return false }
+            guard deps.pose.tracking() == .normal else {
+                req.cancelled = true
+                pending = nil
+                publish(CoordinatorStatus(state: .blocked, task: CoordinatorConfig.rescanReason))
+                deps.speaker.say("I can't start, I need a rescan.")
+                active = nil
+                return false
+            }
+            publish(CoordinatorStatus(state: state(for: req.kind), task: req.label))
+            // A re-entrant status callback can STOP before the runner has even been called.
+            guard !req.cancelled, !Task.isCancelled else { active = nil; return false }
+            record("start", req.label)
+            req.started = true
+            req.monitor = Task { [weak self] in await self?.watchTracking(req) }
+            return true
         }
-        req.monitor = Task { [weak self] in await self?.watchTracking(req) }
-
+        guard canRun else { return }
         let outcome: Result<CoordinatorTaskResult, Error>
-        do { outcome = .success(try await req.run()) } catch { outcome = .failure(error) }
-        req.monitor?.cancel()
+        do {
+            try Task.checkCancellation()
+            outcome = .success(try await req.run())
+        } catch { outcome = .failure(error) }
 
-        // Stopped or tracking-lost while running: that path already released the slot and published.
-        lock.lock()
-        guard active === req else { lock.unlock(); record("late-return", req.label); return }
-        active = nil
-        let next = pending
-        pending = nil
-        lock.unlock()
-
-        switch outcome {
-        case .success(.completed(let summary)):
-            record("done", "\(req.label)\(summary.map { ": \($0)" } ?? "")")
-            publish(.idle)
-            startPending(next)
-        case .success(.cancelled):
-            record("cancelled", req.label)
-            publish(.idle)
-            startPending(next)
-        case .success(.blocked(let reason)):
-            record("blocked", "\(req.label): \(reason)")
-            publish(CoordinatorStatus(state: .blocked, task: reason))
-            deps.speaker.say("I'm stuck: \(reason).")
-            startPending(next)
-        case .failure(let error):
-            record("error", "\(req.label): \(error)")
-            publish(CoordinatorStatus(state: .error, task: "\(req.label) failed"))
-            deps.speaker.say("Something went wrong with \(req.label).")
-            startPending(next)
-            throw error
+        let error: Error? = synchronized {
+            req.monitor?.cancel()
+            guard active === req else { return nil }
+            if req.cancelled {
+                active = nil
+                record("late-return", req.label)
+                return nil
+            }
+            // No successor can start while the old task or its final STOP is unwinding.
+            deps.drive.stop()
+            var thrown: Error?
+            switch outcome {
+            case .success(.completed(let summary)):
+                record("done", "\(req.label)\(summary.map { ": \($0)" } ?? "")")
+                publish(.idle)
+            case .success(.cancelled):
+                pending = nil
+                record("cancelled", req.label)
+                publish(.idle)
+            case .success(.blocked(let reason)):
+                pending = nil
+                record("blocked", "\(req.label): \(reason)")
+                publish(CoordinatorStatus(state: .blocked, task: reason))
+                deps.speaker.say("I'm stuck: \(reason).")
+            case .failure(let error):
+                pending = nil
+                record("error", "\(req.label): \(error)")
+                publish(CoordinatorStatus(state: .error, task: "\(req.label) failed"))
+                deps.speaker.say("Something went wrong with \(req.label).")
+                thrown = error
+            }
+            active = nil
+            // STOP from a completion callback clears pending before this reservation.
+            if let next = pending, !req.cancelled {
+                pending = nil
+                let worker = start(next)
+                Task { _ = try? await worker.value } // queued errors are published by runActive
+            }
+            return thrown
         }
-    }
-
-    private func finishBlocked(_ req: Request, reason: String, speak: String) {
-        lock.lock()
-        guard active === req else { lock.unlock(); return }
-        active = nil
-        let next = pending
-        pending = nil
-        lock.unlock()
-        record("blocked", "\(req.label): \(reason)")
-        publish(CoordinatorStatus(state: .blocked, task: reason))
-        deps.speaker.say(speak)
-        startPending(next)
-    }
-
-    private func startPending(_ next: Request?) {
-        guard let next else { return }
-        lock.lock()
-        guard active == nil else { lock.unlock(); return }
-        active = next
-        lock.unlock()
-        Task { [weak self] in try? await self?.runActive(next) }
+        if let error { throw error }
     }
 
     private func watchTracking(_ req: Request) async {
@@ -238,24 +292,23 @@ final class RobotCoordinator {
     }
 
     private func trackingLost(_ req: Request) {
-        deps.drive.stop()
-        lock.lock()
-        guard active === req else { lock.unlock(); return }
-        active = nil
-        pending = nil   // motion is unsafe without tracking; do not auto-start queued work
-        lock.unlock()
-        req.cancel()
-        record("tracking-lost", "cancelled \(req.label)")
-        publish(CoordinatorStatus(state: .blocked, task: CoordinatorConfig.rescanReason))
-        deps.speaker.say("I lost track of where I am. I need a rescan.")
+        synchronized {
+            // A cancelled old monitor must never brake or overwrite a successor's status.
+            guard active === req, !req.cancelled else { return }
+            deps.drive.stop()
+            pending = nil
+            cancel(req)
+            record("tracking-lost", "cancelled \(req.label)")
+            publish(CoordinatorStatus(state: .blocked, task: CoordinatorConfig.rescanReason))
+            deps.speaker.say("I lost track of where I am. I need a rescan.")
+        }
     }
 
+    /// Called only within a lifecycle transition; callback and stored status share the same order.
     private func publish(_ s: CoordinatorStatus) {
-        lock.lock()
         let changed = _status != s
         _status = s
-        lock.unlock()
-        if changed { onChange(s) }
+        if changed { _onChange(s) }
     }
 
     private func record(_ event: String, _ detail: String) {

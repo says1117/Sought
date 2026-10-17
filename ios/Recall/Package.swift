@@ -41,6 +41,7 @@ let package = Package(
         .target(name: "UICore", dependencies: ["PlannerCore", "SpeechCore"], path: "Sources/UI",
                 sources: ["FindBarViewModel.swift", "ToolExecuting.swift"]),
         .target(name: "CoordinatorCore", dependencies: ["PlannerCore"], path: "Sources/Coordinator",
+                exclude: ["RobotCoordinator+ToolExecuting.swift"],
                 sources: ["CoordinatorProtocols.swift", "CoordinatorTypes.swift", "RobotCoordinator.swift"]),
         .testTarget(name: "CoordinatorTests", dependencies: ["CoordinatorCore", "PlannerCore"], path: "Tests/CoordinatorTests"),
         .testTarget(name: "SpeechTests", dependencies: ["SpeechCore"], path: "Tests/SpeechTests"),

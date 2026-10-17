@@ -15,7 +15,7 @@ final class RobotCoordinatorTests: XCTestCase {
         try await t.value
         XCTAssertEqual(r.states.seen, [CoordinatorStatus(state: .finding, task: "find: blue backpack"), .idle])
         XCTAssertEqual(r.coordinator.status.state.heartbeatValue, "idle")
-        XCTAssertEqual(r.drive.stops, 0)
+        XCTAssertEqual(r.drive.stops, 1)
         XCTAssertEqual(r.coordinator.trace.map(\.event), ["request", "start", "done"])
     }
 
@@ -63,8 +63,8 @@ final class RobotCoordinatorTests: XCTestCase {
             XCTAssertEqual(r.drive.stops, 1, call.toolName)
             XCTAssertEqual(runner(r).cancels, 1, call.toolName)
             XCTAssertEqual(r.coordinator.status, .idle, call.toolName)
-            XCTAssertFalse(r.coordinator.isBusy)
             try await t.value
+            XCTAssertFalse(r.coordinator.isBusy)
             XCTAssertEqual(r.coordinator.status, .idle)
         }
     }
@@ -222,4 +222,91 @@ final class RobotCoordinatorTests: XCTestCase {
         XCTAssertEqual(CoordinatorState.comingToUser.heartbeatValue, "coming_to_user")
         XCTAssertEqual(CoordinatorState.exploring.heartbeatValue, "exploring")
     }
+    func testStopFromStartCallbackPreventsRunnerInvocation() async throws {
+        let r = CoordRig()
+        r.explorer.onStart = { _ in r.explorer.finish(.completed(summary: nil)) }
+        r.coordinator.onChange = { status in
+            if status.state == .exploring { r.coordinator.stopAll() }
+        }
+        try await r.coordinator.execute(.explore(maxMinutes: nil))
+        XCTAssertEqual(r.explorer.started, [])
+        XCTAssertEqual(r.coordinator.status, .idle)
+        XCTAssertFalse(r.coordinator.isBusy)
+        XCTAssertEqual(r.drive.stops, 1)
+    }
+
+    func testStopFromCompletionCallbackCannotResurrectPending() async throws {
+        let r = CoordRig()
+        let first = await r.launch(.explore(maxMinutes: nil))
+        try await r.coordinator.execute(.findObject(description: "keys"))
+        r.coordinator.onChange = { status in
+            if status == .idle { r.coordinator.stopAll() }
+        }
+        r.explorer.finish(.completed(summary: nil))
+        try await first.value
+        await coordSettle()
+        XCTAssertEqual(r.finder.started, [])
+        XCTAssertFalse(r.coordinator.hasPending)
+        XCTAssertEqual(r.coordinator.status, .idle)
+    }
+
+    func testStopRetainsOwnershipUntilUncooperativeRunnerReturns() async throws {
+        let r = CoordRig()
+        r.explorer.finishOnCancel = false
+        let first = await r.launch(.explore(maxMinutes: nil))
+        r.coordinator.stopAll()
+        XCTAssertEqual(r.coordinator.status, .idle)
+        XCTAssertTrue(r.coordinator.isBusy, "cancel is a request, not proof of termination")
+        try await r.coordinator.execute(.comeToMe)
+        XCTAssertEqual(r.comer.started, [])
+        XCTAssertFalse(r.coordinator.hasPending)
+        r.explorer.finish(.completed(summary: "late success"))
+        try await first.value
+        XCTAssertEqual(r.coordinator.status, .idle)
+        XCTAssertFalse(r.coordinator.isBusy)
+        let next = await r.launch(.comeToMe)
+        XCTAssertEqual(r.comer.started, ["come"])
+        r.comer.finish(.completed(summary: nil))
+        try await next.value
+    }
+
+    func testCallerCancellationBrakesAndCancelsOwnedRunner() async throws {
+        let r = CoordRig()
+        let first = await r.launch(.findObject(description: "keys"))
+        try await r.coordinator.execute(.comeToMe)
+        first.cancel()
+        try await first.value
+        XCTAssertEqual(r.drive.stops, 1)
+        XCTAssertEqual(r.finder.cancels, 1)
+        XCTAssertEqual(r.comer.started, [])
+        XCTAssertEqual(r.coordinator.status, .idle)
+        XCTAssertFalse(r.coordinator.hasPending)
+    }
+
+    func testReportedFailureBrakesAndDropsPending() async throws {
+        let r = CoordRig()
+        let first = await r.launch(.explore(maxMinutes: nil))
+        try await r.coordinator.execute(.findObject(description: "keys"))
+        r.explorer.finish(.blocked(reason: "guard stopped"))
+        try await first.value
+        await coordSettle()
+        XCTAssertEqual(r.drive.stops, 1)
+        XCTAssertEqual(r.finder.started, [])
+        XCTAssertFalse(r.coordinator.hasPending)
+        XCTAssertEqual(r.coordinator.status.state, .blocked)
+    }
+
+    func testThrownFailureBrakesAndDropsPending() async throws {
+        let r = CoordRig()
+        let first = await r.launch(.explore(maxMinutes: nil))
+        try await r.coordinator.execute(.findObject(description: "keys"))
+        r.explorer.fail(CoordTestFailure())
+        do { try await first.value; XCTFail("expected throw") } catch { XCTAssertTrue(error is CoordTestFailure) }
+        await coordSettle()
+        XCTAssertEqual(r.drive.stops, 1)
+        XCTAssertEqual(r.finder.started, [])
+        XCTAssertFalse(r.coordinator.hasPending)
+        XCTAssertEqual(r.coordinator.status.state, .error)
+    }
+
 }
