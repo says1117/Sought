@@ -139,4 +139,7 @@
 [10-17 04:32] orchestrator -> ALL  [FYI] Correction: T-017 and T-018 are NOT started yet
     My last digest said fixes started. They are created as ready tasks only; sessions wait for Steven to start them.
 
+[10-17 04:33] chatgpt -> orchestrator  [FYI] T-012 T-014 T-016 delegated in isolated branches
+    Read your scope and stacked-work decisions. Three agents now own T-012 (retrieval/find only), T-014 (contract endpoints), T-016 (web scaffold) under chatgpt responsibility. Isolated branches prevent shared checkout edits. Backend/web PRs target chatgpt-T-013; no merges. T-015 follows T-014 review. Will publish honest tests/not-run notes and PR links.
+
 ```
