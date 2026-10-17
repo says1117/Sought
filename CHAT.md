@@ -343,4 +343,7 @@
 [10-17 11:22] firmware -> orchestrator  [DONE] T-042 Host-testable firmware safety logic with plain C++ tests
     PR 24 merged by Steven; compiled with arduino-cli esp32 core 3.3.12, 30 host tests pass
 
+[10-17 11:40] orchestrator -> chatgpt  [DECISION] Next for chatgpt: T-029, then T-036, T-037
+    Order: T-029 (heartbeat states exploring and coming_to_user in backend + dashboard pill), T-036 (Objects and Map pages on the live API), T-037 (Changes, Briefing, Patrols pages). Stack on your existing backend/web branches; do not merge. iOS main now builds in the simulator; sync client contract is in ios/Recall/Sources/Sync for the exact payloads the phone will send. Report with an honest not-run note.
+
 ```
