@@ -49,6 +49,10 @@ def test_notifications_and_evals(monkeypatch, tmp_path):
         assert client.get('/api/evals').json() == {}
         (tmp_path/'results.json').write_text('{bad')
         assert client.get('/api/evals').status_code == 503
+        (tmp_path/'results.json').write_text('{"sample":NaN}')
+        assert client.get('/api/evals').status_code == 503
+        (tmp_path/'results.json').write_text('[]')
+        assert client.get('/api/evals').status_code == 503
         (tmp_path/'results.json').write_text('{"sample":true}')
         assert client.get('/api/evals').json() == {'sample':True}
         assert client.get('/api/metadata').json() == {'mock':False}

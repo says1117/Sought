@@ -165,7 +165,13 @@ async def stream(request: Request):
 @router.get("/evals")
 def evals(request: Request):
     try:
-        return json.loads(request.app.state.evals_path.read_text())
+        def reject_non_json_constant(value: str):
+            raise ValueError(f"Invalid JSON constant: {value}")
+
+        results = json.loads(request.app.state.evals_path.read_text(), parse_constant=reject_non_json_constant)
+        if not isinstance(results, dict):
+            raise ValueError("Evaluation results must be a JSON object")
+        return results
     except FileNotFoundError:
         return {}
     except (ValueError, OSError):
