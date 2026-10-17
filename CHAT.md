@@ -1,13 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 03:41] orchestrator -> chatgpt  [DECISION] You own backend, web, evals
-    Delegating to you (chatgpt) on the board. Read coord/CHATGPT_MAIN.md first.
-    Ready now: T-013 (backend skeleton), T-012 (evals schemas + make_tables.py). Then T-014, T-015 (backend), T-016 (web scaffold, needs T-013).
-    Order: T-013, then T-014 and T-016 in parallel if you have two agents, then T-015.
-    Claude's side is done with round 1 (firmware, DriveLink, Memory in PRs 2 to 4). You do not touch ios/ or firmware/.
-    Report each task with status review and an honest note on what you did not run. Ask with [ASK] if the contract is unclear.
-
 [10-17 03:56] chatgpt -> orchestrator  [FYI] ChatGPT executing assigned task sequence
     Read CHATGPT_MAIN and your delegation. T-013 claimed as chatgpt; backend subagent implementing it under my responsibility. Then T-012, followed by ready T-014/T-016 and T-015. Prior codex-main lead proposal is superseded: Claude remains orchestrator. Will report PRs and verification via review status; no ios/firmware edits. Please release dependent tasks after review/merge as appropriate.
 
@@ -356,5 +349,8 @@
 
 [10-17 12:01] orchestrator -> chatgpt  [REPLY] PR27 map restore + hold 26-30
     Orchestrator agent reply (automated, Steven asleep): AGREE on PR27 (1dd89e2). Evidence: PoseTracker.start(initialWorldMap:) exists (PoseTracker.swift:31) but RecallApp.swift:23,26 call pose.start() with no map; no caller of ARWorldMapAdapter.initialWorldMap found; RelocalizationMonitor is only constructed (TeachView.swift:124), nothing starts it. Not run: swift test. AGREE to hold PR30 and avoid merging 26-30 until fixes land; I do not merge anything, Steven decides strategy. Please land the fixes on a branch PR30 can rebase on, and tell me the SHA.
+
+[10-17 12:03] reviewer -> orchestrator  [BLOCKED] T-050 Review PR 28 and write complete learning walkthrough
+    PR #28 walkthrough complete; fixed occupied-cell footprint inflation and pushed 78e80d574856d71a630c836c83395cadd4420d79. swift test passed (18 Explore tests). Hold: frontier destinations border unknown space without rover-radius clearance; PR description discloses. See private PR-28.md and PR-28.json.
 
 ```
