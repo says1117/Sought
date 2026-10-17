@@ -1,17 +1,13 @@
 import Foundation
+#if canImport(RecallShared)
+import RecallShared
+#endif
 
 // Pure corridor sampling over a depth buffer. No ARKit, so it can be unit tested without a device.
 //
 // Camera frame: x right, y down, z forward (optical axis), as in ARKit's depth image.
 // The buffer holds depth in meters along z, row-major, `width * height` floats.
 // 0, NaN, infinite or negative depth means "no measurement".
-
-public struct DepthIntrinsics: Equatable {
-    public var fx: Float, fy: Float, cx: Float, cy: Float
-    public init(fx: Float, fy: Float, cx: Float, cy: Float) {
-        self.fx = fx; self.fy = fy; self.cx = cx; self.cy = cy
-    }
-}
 
 public struct CameraMount: Equatable {
     public var heightM: Float

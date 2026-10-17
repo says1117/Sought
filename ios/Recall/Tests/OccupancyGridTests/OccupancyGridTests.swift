@@ -1,4 +1,7 @@
 import XCTest
+#if canImport(RecallShared)
+import RecallShared
+#endif
 import Foundation
 import simd
 #if canImport(OccupancyGridCore)

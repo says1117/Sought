@@ -1,4 +1,5 @@
 import XCTest
+import Foundation
 #if canImport(ComeToMeCore)
 @testable import ComeToMeCore
 #endif
@@ -179,7 +180,7 @@ extension ApproachAction { var isMotion: Bool { if case .rotate = self { return 
 
 // MARK: runner against a simulated user and rover
 
-final class SimWorld: RangingSource, ApproachMotion {
+final class ApproachSimWorld: RangingSource, ApproachMotion {
     var rover = Pose2D(x: 0, z: 0, yawDeg: 0)
     var user = (x: 0.0, z: -4.0)         // 4 m ahead (yaw 0 faces -z)
     var time = 0.0
@@ -221,12 +222,12 @@ final class FakeDetector: PersonDetector {
 }
 
 final class ComeToMeRunnerTests: XCTestCase {
-    func makeRunner(_ w: SimWorld, detector: PersonDetector? = nil, _ log: @escaping (CompanionState, Double?, String?) -> Void = { _, _, _ in }) -> ComeToMeRunner {
+    func makeRunner(_ w: ApproachSimWorld, detector: PersonDetector? = nil, _ log: @escaping (CompanionState, Double?, String?) -> Void = { _, _, _ in }) -> ComeToMeRunner {
         ComeToMeRunner(ranging: w, motion: w, detector: detector, clock: { w.now() }, sleep: { _ in w.tick(0.1); await Task.yield() }, onStatus: log)
     }
 
     func testDrivesFromFourMetersAndStopsAtOneMeter() async {
-        let w = SimWorld(); w.user = (0.5, -4)
+        let w = ApproachSimWorld(); w.user = (0.5, -4)
         var states: [CompanionState] = []
         let phase = await makeRunner(w) { s, _, _ in states.append(s) }.run()
         XCTAssertEqual(phase, .arrived(confirmed: false))
@@ -238,13 +239,13 @@ final class ComeToMeRunnerTests: XCTestCase {
     }
 
     func testGradientSearchFindsUserWithoutDirection() async {
-        let w = SimWorld(); w.hasDirection = false; w.user = (-3, -1)
+        let w = ApproachSimWorld(); w.hasDirection = false; w.user = (-3, -1)
         let phase = await makeRunner(w).run()
         XCTAssertEqual(phase, .arrived(confirmed: false))
     }
 
     func testUWBDropoutStopsAndFails() async {
-        let w = SimWorld()
+        let w = ApproachSimWorld()
         var last: (CompanionState, String?)?
         let r = makeRunner(w) { s, _, why in last = (s, why) }
         Task { while w.rover.z > -1.0 { await Task.yield() }; w.uwbAlive = false }
@@ -255,7 +256,7 @@ final class ComeToMeRunnerTests: XCTestCase {
     }
 
     func testCancelStops() async {
-        let w = SimWorld()
+        let w = ApproachSimWorld()
         let r = makeRunner(w)
         Task { while w.driveCalls < 2 { await Task.yield() }; r.cancel() }
         let phase = await r.run()
@@ -263,7 +264,7 @@ final class ComeToMeRunnerTests: XCTestCase {
     }
 
     func testVisionConfirmedArrival() async {
-        let w = SimWorld(); let det = FakeDetector(); det.result = PersonObservation(bearingDeg: 0, distanceM: nil)
+        let w = ApproachSimWorld(); let det = FakeDetector(); det.result = PersonObservation(bearingDeg: 0, distanceM: nil)
         let phase = await makeRunner(w, detector: det).run()
         XCTAssertEqual(phase, .arrived(confirmed: true))
     }

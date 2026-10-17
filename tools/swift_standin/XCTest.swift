@@ -1,7 +1,7 @@
 // Minimal XCTest stand-in for machines with only Command Line Tools (no Xcode, no XCTest.framework).
 // Supports the subset used by ios/Recall/Tests: XCTestCase, setUp, sync/async/throwing tests, XCTAssert*.
 // It is NOT XCTest; passing here is evidence, not a substitute for running the suite in Xcode.
-import Foundation
+@_exported import Foundation
 
 public var __failures = 0
 
@@ -33,4 +33,28 @@ public func XCTAssertNil(_ e: @autoclosure () throws -> Any?, _ m: @autoclosure 
 }
 public func XCTAssertNotNil(_ e: @autoclosure () throws -> Any?, _ m: @autoclosure () -> String = "", file: StaticString = #filePath, line: UInt = #line) {
     do { if try e() == nil { __fail("expected non-nil \(m())", file, line) } } catch { __fail("threw \(error)", file, line) }
+}
+
+public func XCTAssertNotEqual<T: Equatable>(_ a: @autoclosure () throws -> T, _ b: @autoclosure () throws -> T, _ m: @autoclosure () -> String = "", file: StaticString = #filePath, line: UInt = #line) {
+    do { let x = try a(), y = try b(); if x == y { __fail("\(x) == \(y) \(m())", file, line) } } catch { __fail("threw \(error)", file, line) }
+}
+public func XCTAssertGreaterThan<T: Comparable>(_ a: @autoclosure () throws -> T, _ b: @autoclosure () throws -> T, _ m: @autoclosure () -> String = "", file: StaticString = #filePath, line: UInt = #line) {
+    do { let x = try a(), y = try b(); if !(x > y) { __fail("\(x) <= \(y) \(m())", file, line) } } catch { __fail("threw \(error)", file, line) }
+}
+public func XCTAssertGreaterThanOrEqual<T: Comparable>(_ a: @autoclosure () throws -> T, _ b: @autoclosure () throws -> T, _ m: @autoclosure () -> String = "", file: StaticString = #filePath, line: UInt = #line) {
+    do { let x = try a(), y = try b(); if !(x >= y) { __fail("\(x) < \(y) \(m())", file, line) } } catch { __fail("threw \(error)", file, line) }
+}
+public func XCTAssertLessThan<T: Comparable>(_ a: @autoclosure () throws -> T, _ b: @autoclosure () throws -> T, _ m: @autoclosure () -> String = "", file: StaticString = #filePath, line: UInt = #line) {
+    do { let x = try a(), y = try b(); if !(x < y) { __fail("\(x) >= \(y) \(m())", file, line) } } catch { __fail("threw \(error)", file, line) }
+}
+public func XCTAssertLessThanOrEqual<T: Comparable>(_ a: @autoclosure () throws -> T, _ b: @autoclosure () throws -> T, _ m: @autoclosure () -> String = "", file: StaticString = #filePath, line: UInt = #line) {
+    do { let x = try a(), y = try b(); if !(x <= y) { __fail("\(x) > \(y) \(m())", file, line) } } catch { __fail("threw \(error)", file, line) }
+}
+public func XCTAssertThrowsError<T>(_ e: @autoclosure () throws -> T, _ m: @autoclosure () -> String = "", file: StaticString = #filePath, line: UInt = #line, _ handler: (Error) -> Void = { _ in }) {
+    do { _ = try e(); __fail("expected throw \(m())", file, line) } catch { handler(error) }
+}
+public struct XCTSkipError: Error {}
+public func XCTUnwrap<T>(_ e: @autoclosure () throws -> T?, _ m: @autoclosure () -> String = "", file: StaticString = #filePath, line: UInt = #line) throws -> T {
+    guard let v = try e() else { __fail("XCTUnwrap nil \(m())", file, line); throw XCTSkipError() }
+    return v
 }

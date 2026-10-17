@@ -3,7 +3,9 @@ import Foundation
 import PoseCore
 #endif
 #if canImport(ControllerCore)
-import ControllerCore
+// Controller types are internal to ControllerCore; @testable works for debug SwiftPM builds (`swift test`).
+// In the Xcode app target everything is one module and this import is skipped.
+@testable import ControllerCore
 #endif
 
 // Executes ApproachPlanner actions. Protocol-based so the loop is tested with fakes; the real adapters

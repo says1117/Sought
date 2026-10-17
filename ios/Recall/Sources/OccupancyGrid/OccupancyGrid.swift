@@ -1,5 +1,8 @@
 import Foundation
 import simd
+#if canImport(RecallShared)
+import RecallShared
+#endif
 
 /// Cell state exported to the map snapshot. Raw values are the contract encoding (docs/03_CONTRACTS.md 2.7).
 public enum CellState: UInt8 {
@@ -7,20 +10,6 @@ public enum CellState: UInt8 {
     case unknown = 1
     case occupiedLow = 2
     case occupiedHigh = 3
-}
-
-/// Pinhole intrinsics in depth-image pixels (u right, v down).
-public struct DepthIntrinsics: Equatable {
-    public var fx: Float, fy: Float, cx: Float, cy: Float
-    public init(fx: Float, fy: Float, cx: Float, cy: Float) {
-        self.fx = fx; self.fy = fy; self.cx = cx; self.cy = cy
-    }
-
-    /// Scale intrinsics captured at `from` resolution to the depth buffer resolution.
-    public func scaled(fromWidth: Int, fromHeight: Int, toWidth: Int, toHeight: Int) -> DepthIntrinsics {
-        let sx = Float(toWidth) / Float(fromWidth), sy = Float(toHeight) / Float(fromHeight)
-        return DepthIntrinsics(fx: fx * sx, fy: fy * sy, cx: cx * sx, cy: cy * sy)
-    }
 }
 
 /// One depth frame. `depth` is row-major meters along the optical axis (ARKit sceneDepth, ~256x192).

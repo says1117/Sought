@@ -1,0 +1,8 @@
+// Committed defaults so the project builds with no secrets. Empty values mean "unconfigured"
+// (planner falls back to keywords, sync stays off). Copy Secrets.xcconfig.example to
+// Secrets.xcconfig (gitignored) and fill it in to override these.
+GEMINI_API_KEY =
+GEMINI_MODEL = gemini-flash-latest
+BACKEND_BASE_URL =
+RECALL_TOKEN =
+#include? "Secrets.xcconfig"

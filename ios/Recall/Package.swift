@@ -1,7 +1,7 @@
 // swift-tools-version:5.9
 import PackageDescription
 
-// Lets the pure DriveLink, Pose and Controller logic be unit tested without Xcode: `swift test` in ios/Recall.
+// Pure-logic modules (no ARKit/SwiftUI/CoreBluetooth) so they unit test with `swift test` in ios/Recall.
 let package = Package(
     name: "RecallCore",
     platforms: [.iOS(.v17), .macOS(.v13)],
@@ -12,17 +12,35 @@ let package = Package(
         .target(name: "DriveLinkCore", path: "Sources/DriveLink",
                 sources: ["DriveLinkProtocol.swift"]),
         .target(name: "PoseCore", path: "Sources/Pose", sources: ["PoseMath.swift"]),
-        .target(name: "ObstacleGuardCore", path: "Sources/ObstacleGuard",
+        .target(name: "RecallShared", path: "Sources/Shared"),
+        .target(name: "ObstacleGuardCore", dependencies: ["RecallShared"], path: "Sources/ObstacleGuard",
                 sources: ["GuardConfig.swift", "CorridorSampler.swift", "ObstacleGuardLogic.swift"]),
         .target(name: "ControllerCore", dependencies: ["PoseCore"], path: "Sources/Controller",
                 sources: ["ControllerMath.swift", "Controller.swift"]),
         .target(name: "SelfTestCore", dependencies: ["PoseCore"], path: "Sources/SelfTest",
                 sources: ["SelfTestTypes.swift", "SelfTestMetrics.swift", "SelfTestSteps.swift", "SelfTestEngine.swift"]),
+        .target(name: "OccupancyGridCore", dependencies: ["RecallShared"], path: "Sources/OccupancyGrid",
+                exclude: ["README.md"]),
+        .target(name: "PlannerCore", path: "Sources/Planner",
+                sources: ["PlannerTypes.swift", "KeywordPlanner.swift", "GeminiPlanner.swift", "FallbackPlanner.swift"]),
+        .target(name: "Retrieval", dependencies: ["Memory"], path: "Sources/Retrieval",
+                sources: ["Retriever.swift", "TextEncoder.swift"]),
+        .target(name: "FindExecutor", dependencies: ["Memory", "Retrieval"], path: "Sources/FindExecutor",
+                sources: ["FindExecutor.swift", "FindTrace.swift", "Protocols.swift"]),
+        .target(name: "SyncCore", path: "Sources/Sync", exclude: ["README.md"]),
+        .target(name: "ComeToMeCore", dependencies: ["PoseCore", "ControllerCore"], path: "Sources/ComeToMe",
+                sources: ["CompanionMessages.swift", "ApproachPlanner.swift", "ComeToMeRunner.swift", "RangeSample.swift"]),
         .testTarget(name: "DriveLinkTests", dependencies: ["DriveLinkCore"], path: "Tests/DriveLinkTests"),
         .testTarget(name: "PoseTests", dependencies: ["PoseCore"], path: "Tests/PoseTests"),
-        .testTarget(name: "ObstacleGuardTests", dependencies: ["ObstacleGuardCore"], path: "Tests/ObstacleGuardTests"),
+        .testTarget(name: "ObstacleGuardTests", dependencies: ["ObstacleGuardCore", "RecallShared"], path: "Tests/ObstacleGuardTests"),
         .testTarget(name: "ControllerTests", dependencies: ["ControllerCore", "PoseCore"], path: "Tests/ControllerTests"),
         .testTarget(name: "SelfTestTests", dependencies: ["SelfTestCore", "PoseCore"], path: "Tests/SelfTestTests"),
-        .testTarget(name: "MotionIntegrationTests", dependencies: ["ControllerCore", "ObstacleGuardCore", "PoseCore"], path: "Tests/MotionIntegrationTests"),
+        .testTarget(name: "MotionIntegrationTests", dependencies: ["ControllerCore", "ObstacleGuardCore", "PoseCore", "RecallShared"], path: "Tests/MotionIntegrationTests"),
+        .testTarget(name: "OccupancyGridTests", dependencies: ["OccupancyGridCore", "RecallShared"], path: "Tests/OccupancyGridTests"),
+        .testTarget(name: "PlannerTests", dependencies: ["PlannerCore"], path: "Tests/PlannerTests"),
+        .testTarget(name: "RetrievalTests", dependencies: ["Retrieval", "Memory"], path: "Tests/RetrievalTests"),
+        .testTarget(name: "FindExecutorTests", dependencies: ["FindExecutor", "Retrieval", "Memory"], path: "Tests/FindExecutorTests"),
+        .testTarget(name: "SyncTests", dependencies: ["SyncCore"], path: "Tests/SyncTests", exclude: ["Fixtures"]),
+        .testTarget(name: "ComeToMeTests", dependencies: ["ComeToMeCore", "ControllerCore", "PoseCore"], path: "Tests/ComeToMeTests"),
     ]
 )
