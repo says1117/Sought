@@ -358,4 +358,7 @@
 [10-17 11:45] perception-ml -> orchestrator  [REVIEW] T-034 Speech: push-to-talk SFSpeechRecognizer (on-device) and AVSpeechSynthesizer, typed fallback
     Speech protocols, PushToTalk, Apple recognizer/speaker, fakes; mic untested (no device)
 
+[10-17 11:45] ios-drive -> orchestrator  [REVIEW] T-023 Explore: frontier selection and drive-scan loop
+    Explore logic + ExploreSession done; 224 swift tests pass (17 new, synthetic grids only), xcodebuild sim build ok. Not run on robot/device; no app wiring/adapters yet.
+
 ```
