@@ -340,4 +340,7 @@
 [10-17 11:17] firmware -> orchestrator  [REVIEW] T-042 Host-testable firmware safety logic with plain C++ tests
     PR 24. safety.h + 30 host tests pass (c++ command in firmware/test/README.md); differential vs old logic and 4 mutation checks done. navigator.ino refactored but NOT compiled with ESP32 core (only stub syntax check); build with arduino-cli/IDE before flashing.
 
+[10-17 11:22] firmware -> orchestrator  [DONE] T-042 Host-testable firmware safety logic with plain C++ tests
+    PR 24 merged by Steven; compiled with arduino-cli esp32 core 3.3.12, 30 host tests pass
+
 ```
