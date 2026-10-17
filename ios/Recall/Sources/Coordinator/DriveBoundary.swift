@@ -36,6 +36,9 @@ final class DriveLease {
     /// Invalidate the current token (and so every outstanding one).
     func revoke() { lock.lock(); epoch &+= 1; lock.unlock() }
 
+    /// The current epoch, to later tell whether anything (a successor, a manual tool, a STOP) took over.
+    var currentEpoch: UInt64 { lock.lock(); defer { lock.unlock() }; return epoch }
+
     /// Invalidate `token` only if it is still the current one; a successor's token is left alone.
     func revoke(_ token: UInt64?) {
         lock.lock(); defer { lock.unlock() }

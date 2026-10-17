@@ -219,4 +219,32 @@ final class CoordDriveBoundaryTests: XCTestCase {
         q.sync {}
         XCTAssertEqual(probe.onQueue, [true, true])
     }
+
+    // PR 33 re-review finding 3: an old task's drain timer must not brake a manual owner that took over.
+    func testDrainTimeoutDoesNotBrakeAManualOwner() async throws {
+        let r = CoordLeaseRig()
+        let running = await r.launch(.findObject(description: "keys"))   // uncooperative: ignores cancel()
+        r.coordinator.beginManualControl("drive")
+        let stopsAfterBegin = r.recorder.stops
+        XCTAssertEqual(r.recorder.drives, [50])
+        // The manual tool is now driving; the old task's timer fires.
+        await r.clock.advance(by: 3.2)
+        XCTAssertEqual(r.recorder.stops, stopsAfterBegin, "drain timeout must not send STOP while manual holds the link")
+        XCTAssertNotEqual(r.recorder.events.last, .some(.drive(50, 50)))
+        XCTAssertTrue(r.coordinator.trace.contains { $0.event == "drain-timeout" }, "bookkeeping still finishes")
+        XCTAssertFalse(r.coordinator.isBusy, "slot released")
+        r.finder.release()
+        _ = try? await running.value
+    }
+
+    func testDrainTimeoutStillBrakesWhenNobodyTookOver() async throws {
+        let r = CoordLeaseRig()
+        let running = await r.launch(.findObject(description: "keys"))
+        r.coordinator.stopAll()
+        let stopsAfterStop = r.recorder.stops
+        await r.clock.advance(by: 3.2)
+        XCTAssertGreaterThan(r.recorder.stops, stopsAfterStop, "no new owner: the timeout brakes as before")
+        r.finder.release()
+        _ = try? await running.value
+    }
 }

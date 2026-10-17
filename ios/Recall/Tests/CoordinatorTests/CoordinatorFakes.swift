@@ -145,10 +145,10 @@ struct CoordRig {
         func append(_ status: CoordinatorStatus) { lock.lock(); statuses.append(status); lock.unlock() }
     }
 
-    init() {
+    init(frame: CoordinatorFrameValidity = TrustedFrame()) {
         let e = explorer, f = finder, c = comer, n = navigator, w = waypoints, d = drive, s = speaker, k = clock, p = pose
         coordinator = RobotCoordinator(dependencies: CoordinatorDependencies(
-            explorer: e, finder: f, comer: c, navigator: n, waypoints: w, drive: d, speaker: s, clock: k, pose: p),
+            explorer: e, finder: f, comer: c, navigator: n, waypoints: w, drive: d, speaker: s, clock: k, pose: p, frame: frame),
             // These tests exercise sequencing for every task type, so all features are on here.
             config: CoordinatorConfig(features: RecallFeatureFlags(exploreEnabled: true, comeToMeEnabled: true)))
         let log = StateLog()

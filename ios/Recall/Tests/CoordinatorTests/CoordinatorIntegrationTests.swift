@@ -89,7 +89,7 @@ struct CoordIntegrationRig {
     let coordinator: RobotCoordinator
 
     init(encoders: EncoderProvider, features: RecallFeatureFlags = RecallFeatureFlags(),
-         unreachableTarget: Bool = false) throws {
+         unreachableTarget: Bool = false, frame: CoordinatorFrameValidity = TrustedFrame()) throws {
         tracks = try TrackStore(path: ":memory:")
         waypoints = try WaypointStore(path: ":memory:")
         try tracks.upsert(Track(id: "obj_1", position: SIMD3(0, 0, unreachableTarget ? -500 : -2),
@@ -100,6 +100,7 @@ struct CoordIntegrationRig {
             poses: robot, drive: robot, guardState: { .clear }, waypointStore: waypoints, trackStore: tracks,
             encoders: encoders, speaker: speaker, clock: clock)
         wiring.features = features
+        wiring.frame = frame
         wiring.controllerClock = { ticks.tick() }
         wiring.controllerSleep = { _ in try? await Task.sleep(nanoseconds: unreachableTarget ? 2_000_000 : 20_000) }
         coordinator = wiring.makeCoordinator()
@@ -159,6 +160,30 @@ final class CoordinatorIntegrationTests: XCTestCase {
         XCTAssertLessThan(abs(rig.robot.position.z + 1.2), 0.5, "stopped about 0.8 m short of the object at z=-2")
         XCTAssertTrue(rig.speaker.said.contains { $0.hasPrefix("Found blue backpack") }, "\(rig.speaker.said)")
         XCTAssertEqual(rig.coordinator.status, .idle)
+    }
+
+    // Real adapters with a real gate: stored targets are refused until the saved map is recognised.
+    func testStoredWaypointAndFindRefusedUntilRelocalizedThenAllowed() async throws {
+        let gate = WorldFrameGate(now: { Date().addingTimeInterval(3600) })   // this frame began after the stored rows
+        let rig = try CoordIntegrationRig(encoders: CoordIntegrationRig.working(), frame: gate)
+        gate.sessionStarted(loadedSavedMap: true)
+        try await rig.coordinator.execute(.goToWaypoint(name: "kitchen"))
+        try await rig.coordinator.execute(.findObject(description: "blue backpack"))
+        XCTAssertEqual(rig.robot.movingCommands, 0, "no motion toward stored coordinates")
+        XCTAssertEqual(rig.speaker.said.filter { $0 == CoordinatorConfig.notRecognisedSpoken }.count, 2, "\(rig.speaker.said)")
+
+        gate.update(tracking: .normal, mapping: .mapped)
+        try await rig.coordinator.execute(.goToWaypoint(name: "kitchen"))
+        XCTAssertGreaterThan(rig.robot.movingCommands, 0)
+    }
+
+    func testWaypointMarkedThisSessionIsAllowedWithoutRelocalization() async throws {
+        let gate = WorldFrameGate(now: { Date().addingTimeInterval(-5) })
+        let rig = try CoordIntegrationRig(encoders: CoordIntegrationRig.working(), frame: gate)
+        gate.sessionStarted(loadedSavedMap: false)
+        // "kitchen" was inserted by the rig just now, i.e. after this frame started.
+        try await rig.coordinator.execute(.goToWaypoint(name: "kitchen"))
+        XCTAssertGreaterThan(rig.robot.movingCommands, 0)
     }
 
     func testModelsMissingRefusesFindButGoToWaypointWorks() async throws {
@@ -333,7 +358,7 @@ final class CoordinatorIntegrationTests: XCTestCase {
     func testWaypointAdapterAndPoseAdapter() throws {
         let robot = CoordSimRobot()
         let store = try WaypointStore(path: ":memory:")
-        let wp = StoreWaypointsAdapter(store: store, poses: robot)
+        let wp = StoreWaypointsAdapter(store: store, poses: robot, frame: TrustedFrame())
         XCTAssertNil(wp.lookup("desk"))
         XCTAssertEqual(try wp.markHere(name: "desk").name, "desk")
         XCTAssertEqual(wp.lookup("DESK")?.name, "desk")

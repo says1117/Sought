@@ -47,7 +47,7 @@ let package = Package(
                 exclude: ["RobotCoordinator+ToolExecuting.swift"],
                 sources: ["CoordinatorProtocols.swift", "CoordinatorTypes.swift", "RobotCoordinator.swift", "FeatureFlags.swift",
                           "EncoderProvider.swift", "TrackStore.swift", "MemoryIngestor.swift", "CoordinatorAdapters.swift",
-                          "CoordinatorHeartbeat.swift", "PerceptionScheduler.swift", "DriveBoundary.swift"]),
+                          "CoordinatorHeartbeat.swift", "PerceptionScheduler.swift", "DriveBoundary.swift", "WorldFrameGate.swift"]),
         .testTarget(name: "CoordinatorTests", dependencies: ["CoordinatorCore", "PlannerCore", "Memory", "Retrieval", "FindExecutor", "PoseCore", "ControllerCore", "ObstacleGuardCore", "PerceptionCore", "SyncCore", "TeachCore"], path: "Tests/CoordinatorTests"),
         .testTarget(name: "SpeechTests", dependencies: ["SpeechCore"], path: "Tests/SpeechTests"),
         .testTarget(name: "UITests", dependencies: ["UICore", "PlannerCore", "SpeechCore"], path: "Tests/UITests"),

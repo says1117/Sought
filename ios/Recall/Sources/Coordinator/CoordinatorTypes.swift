@@ -37,4 +37,5 @@ struct CoordinatorConfig {
     var drainTimeoutS: TimeInterval = 3.0
     var features = RecallFeatureFlags()
     static let rescanReason = "need a rescan"
+    static let notRecognisedSpoken = "I have not recognised this room yet, please rescan."
 }

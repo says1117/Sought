@@ -31,6 +31,8 @@ final class RobotCoordinator {
         var cancelled = false
         var started = false
         var token: UInt64?
+        /// Lease epoch right after this request was cancelled; the drain timer may brake only if it is unchanged.
+        var cancelEpoch: UInt64?
         var drainWatch: Task<Void, Never>?
         var result: Result<Void, Error>?
         var waiters: [CheckedContinuation<Void, Error>] = []
@@ -103,6 +105,11 @@ final class RobotCoordinator {
                 deps.speaker.say("I don't know a place called \(name).")
                 return
             }
+            guard wp.inCurrentFrame || deps.frame.relocalized else {
+                record("refused", "go to \(wp.name): saved map not relocalized")
+                deps.speaker.say(CoordinatorConfig.notRecognisedSpoken)
+                return
+            }
             try await submit(makeRequest(.goToWaypoint, "go to: \(wp.name)", { [deps] in try await deps.navigator.goTo(wp) },
                                          { [deps] in deps.navigator.cancel() }))
         case .checkRoute, .startPatrol, .whatChanged:
@@ -136,6 +143,7 @@ final class RobotCoordinator {
         req.worker?.cancel()
         if req.started {
             req.cancel()
+            req.cancelEpoch = deps.lease.currentEpoch
             let limit = config.drainTimeoutS
             req.drainWatch = Task { [weak self] in
                 do { try await self?.deps.clock.sleep(seconds: limit) } catch { return }
@@ -150,7 +158,8 @@ final class RobotCoordinator {
     private func forceComplete(_ req: Request) {
         synchronized {
             guard active === req, req.cancelled else { return }
-            deps.drive.stop()
+            // Brake only if nothing took over the link since cancellation; a manual tool or successor owns it now.
+            if !deps.lease.manualHeld, req.cancelEpoch == deps.lease.currentEpoch { deps.drive.stop() }
             active = nil
             pending = nil
             record("drain-timeout", "\(req.label) did not return within \(config.drainTimeoutS) s; released")

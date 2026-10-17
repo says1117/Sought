@@ -52,20 +52,22 @@ final class StoreWaypointsAdapter: CoordinatorWaypoints {
     private let store: WaypointStore
     private let poses: PoseSource
     let isPersistent: Bool
-    init(store: WaypointStore, poses: PoseSource, isPersistent: Bool = true) {
-        self.store = store; self.poses = poses; self.isPersistent = isPersistent
+    private let frame: CoordinatorFrameValidity
+    init(store: WaypointStore, poses: PoseSource, isPersistent: Bool = true, frame: CoordinatorFrameValidity) {
+        self.store = store; self.poses = poses; self.isPersistent = isPersistent; self.frame = frame
     }
 
     func lookup(_ name: String) -> CoordinatorWaypoint? {
         guard let w = try? store.waypoint(named: name) else { return nil }
-        return CoordinatorWaypoint(name: w.name, x: w.x, z: w.z, yawDeg: w.yawDeg)
+        return CoordinatorWaypoint(name: w.name, x: w.x, z: w.z, yawDeg: w.yawDeg,
+                                   inCurrentFrame: frame.isInCurrentFrame(createdAt: w.createdAt))
     }
 
     func markHere(name: String) throws -> CoordinatorWaypoint {
         let s = poses.latest()
         guard s.tracking == .normal, let pose = s.pose else { throw MarkError.noPose }
         let w = try store.addWaypoint(name: name, pose: pose)
-        return CoordinatorWaypoint(name: w.name, x: w.x, z: w.z, yawDeg: w.yawDeg)
+        return CoordinatorWaypoint(name: w.name, x: w.x, z: w.z, yawDeg: w.yawDeg, inCurrentFrame: true)
     }
 }
 
@@ -88,8 +90,9 @@ final class ControllerNavigator: CoordinatorNavigating {
     init(controller: Controller, stopDistance: Double = 0.3) { self.controller = controller; self.stopDistance = stopDistance }
 
     func goTo(_ waypoint: CoordinatorWaypoint) async throws -> CoordinatorTaskResult {
+        let epoch = controller.stopEpoch   // a cancel() from here on cancels this run even if it lands before the loop starts
         try Task.checkCancellation()
-        let status = await controller.goTo(x: waypoint.x, z: waypoint.z, stopDistance: stopDistance)
+        let status = await controller.goTo(x: waypoint.x, z: waypoint.z, stopDistance: stopDistance, since: epoch)
         return ControllerResultMapper.result(status)
     }
     func cancel() { controller.stop() }
@@ -140,11 +143,13 @@ final class FindRunnerAdapter: CoordinatorFinding {
     private let speaker: CoordinatorSpeaking
     private let config: FindConfig
     private let stopMotion: () -> Void
+    private let frame: CoordinatorFrameValidity
 
     init(tracks: TrackProviding, encoders: EncoderProvider, driver: ApproachDriver, speaker: CoordinatorSpeaking,
-         config: FindConfig = FindConfig(), stopMotion: @escaping () -> Void) {
+         config: FindConfig = FindConfig(), frame: CoordinatorFrameValidity = TrustedFrame(),
+         stopMotion: @escaping () -> Void) {
         self.tracks = tracks; self.encoders = encoders; self.driver = driver; self.speaker = speaker
-        self.config = config; self.stopMotion = stopMotion
+        self.config = config; self.stopMotion = stopMotion; self.frame = frame
     }
 
     func find(description: String) async throws -> CoordinatorTaskResult {
@@ -154,6 +159,9 @@ final class FindRunnerAdapter: CoordinatorFinding {
             return .refused(spoken: set.unavailableMessage ?? ModelsMissingEncoderProvider.spoken)
         }
         let known = try tracks.allTracks()
+        // Remembered positions come from storage, in the frame of an earlier session. Do not drive to them
+        // until ARKit has recognised the saved map again.
+        if !known.isEmpty && !frame.relocalized { return .refused(spoken: CoordinatorConfig.notRecognisedSpoken) }
         let executor = FindExecutor(retriever: Retriever(encoder: set.text), driver: driver, images: set.images, config: config)
         let result = await executor.find(phrase: description, tracks: known)
         if Task.isCancelled || result.outcome == .aborted { return .cancelled }
@@ -207,6 +215,8 @@ struct CoordinatorWiring {
     var config = CoordinatorConfig()
     /// False when the waypoint store fell back to memory; marks are then confirmed as temporary.
     var waypointsPersistent = true
+    /// Which stored coordinates are valid in the current ARKit frame.
+    var frame: CoordinatorFrameValidity = WorldFrameGate()
 
     /// `drive` must be a serialized sink (see `SerialDriveSink`) and `poses` a snapshot reader
     /// (see `PoseSnapshotBox`): the coordinator and Controller run off the main thread.
@@ -215,7 +225,7 @@ struct CoordinatorWiring {
         let controller = Controller(poses: poses, sink: LeasedDriveSink(base: drive, lease: lease), guardState: guardState,
                                     clock: controllerClock, sleep: controllerSleep)
         let driver = ControllerApproachDriver(controller: controller, poses: poses)
-        let finder = FindRunnerAdapter(tracks: trackStore, encoders: encoders, driver: driver, speaker: speaker,
+        let finder = FindRunnerAdapter(tracks: trackStore, encoders: encoders, driver: driver, speaker: speaker, frame: frame,
                                        stopMotion: { controller.stop() })
         var cfg = config
         cfg.features = features
@@ -223,9 +233,9 @@ struct CoordinatorWiring {
             dependencies: CoordinatorDependencies(
                 explorer: UnwiredExplorer(), finder: finder, comer: UnwiredComeToMe(),
                 navigator: ControllerNavigator(controller: controller),
-                waypoints: StoreWaypointsAdapter(store: waypointStore, poses: poses, isPersistent: waypointsPersistent),
+                waypoints: StoreWaypointsAdapter(store: waypointStore, poses: poses, isPersistent: waypointsPersistent, frame: frame),
                 drive: DriveStopAdapter(sink: drive), speaker: speaker, clock: clock,
-                pose: ControllerPoseAdapter(source: poses), lease: lease),
+                pose: ControllerPoseAdapter(source: poses), lease: lease, frame: frame),
             config: cfg)
     }
 }

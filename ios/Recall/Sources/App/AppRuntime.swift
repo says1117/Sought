@@ -26,8 +26,10 @@ final class AppRuntime: ObservableObject {
 
     private let waypointStore: WaypointStore
     private let cache = SensorCache()
+    private let frameGate = WorldFrameGate()
     private let poseBox = PoseSnapshotBox()
     private var poseSubscription: AnyCancellable?
+    private var mappingSubscription: AnyCancellable?
     private var storageWarningSpoken = false
     private let heartbeatSource = CoordinatorHeartbeatSource()
     private var heartbeat: HeartbeatPublisher?
@@ -62,7 +64,7 @@ final class AppRuntime: ObservableObject {
             poses: poseBox, drive: SerialDriveSink(target: link, queue: .main, isOnQueue: { Thread.isMainThread }),
             guardState: { cache.guardState() }, waypointStore: waypoints, trackStore: tracks,
             encoders: encoders, speaker: SpeakerAdapter(speaker: speaker), features: features,
-            waypointsPersistent: waypointsPersistent)
+            waypointsPersistent: waypointsPersistent, frame: frameGate)
         let coordinator = wiring.makeCoordinator()
         self.coordinator = coordinator
         self.storageWarning = warning
@@ -76,6 +78,11 @@ final class AppRuntime: ObservableObject {
         let box = poseBox
         poseSubscription = Publishers.CombineLatest(pose.$pose, pose.$tracking)
             .sink { box.update(pose: $0, tracking: $1) }
+        // Persisted targets are only valid after ARKit recognises the saved map again in this session.
+        let gate = frameGate
+        pose.onSessionStart = { gate.sessionStarted(loadedSavedMap: $0) }
+        mappingSubscription = Publishers.CombineLatest(pose.$tracking, pose.$mapping)
+            .sink { gate.update(tracking: $0, mapping: $1) }
 
         let hb = heartbeatSource
         coordinator.onChange = { [weak self] status in
