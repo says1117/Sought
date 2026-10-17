@@ -20,5 +20,6 @@ let package = Package(
         .testTarget(name: "ObstacleGuardTests", dependencies: ["ObstacleGuardCore"], path: "Tests/ObstacleGuardTests"),
         .testTarget(name: "ControllerTests", dependencies: ["ControllerCore", "PoseCore"], path: "Tests/ControllerTests"),
         .testTarget(name: "SelfTestTests", dependencies: ["SelfTestCore", "PoseCore"], path: "Tests/SelfTestTests"),
+        .testTarget(name: "MotionIntegrationTests", dependencies: ["ControllerCore", "ObstacleGuardCore", "PoseCore"], path: "Tests/MotionIntegrationTests"),
     ]
 )

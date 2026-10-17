@@ -65,5 +65,5 @@ The report prints a PASS / FAIL / NO DATA / NOT RUN table. "NO DATA" means the l
 
 ## Known build risks (nothing here has been compiled in Xcode)
 
-- `GuardState` is declared twice in the app module: `Controller/ControllerMath.swift` and `ObstacleGuard/ObstacleGuardLogic.swift` (PR 14 merge). The SwiftPM modules keep them apart, but the Xcode app target and `RecallTests` compile both sources into one module and will fail with a redeclaration error. SelfTest does not use either name (`SelfTestGuardLevel`).
+- The PR14 review renamed the obstacle detour state to `ObstacleGuardState` to avoid the controller's input enum. The pure sources are checked together, but an actual Xcode app build is still required.
 - `SelfTestRunner.swift` and `SelfTestView.swift` need ARKit, CoreBluetooth and a device.

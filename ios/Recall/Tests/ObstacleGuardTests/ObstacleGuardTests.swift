@@ -81,6 +81,14 @@ final class ObstacleGuardTests: XCTestCase {
     func testSamplesNearerThanLidarMinRangeAreDropped() {
         let r = sample(render(boxes: [Box(frontM: 0.1, halfWidthM: 0.3, heightM: 0.3)]))
         XCTAssertNil(r.minDistanceM)  // sonar must cover this range
+        XCTAssertTrue(r.isBlind())
+        XCTAssertEqual(ObstacleLogic.evaluate(corridor: r, sonar: noSonar).level, .slow)
+    }
+
+    func testInvalidIntrinsicsAndOverflowingDimensionsAreBlind() {
+        let invalid = DepthIntrinsics(fx: .infinity, fy: 45, cx: 32, cy: 24)
+        XCTAssertTrue(CorridorSampler.sample(depth: render(), width: w, height: h, intrinsics: invalid).isBlind())
+        XCTAssertTrue(CorridorSampler.sample(depth: [], width: Int.max, height: 2, intrinsics: k).isBlind())
     }
 
     func testBadInputsDoNotCrash() {

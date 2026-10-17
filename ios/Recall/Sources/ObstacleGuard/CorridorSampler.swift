@@ -64,7 +64,9 @@ public enum CorridorSampler {
                               corridor: Corridor = Corridor(),
                               minObstacleSamples: Int = GuardConfig.minObstacleSamples,
                               stride step: Int = 1) -> CorridorResult {
-        guard width > 0, height > 0, depth.count >= width * height, k.fx > 0, k.fy > 0, step > 0 else {
+        guard width > 0, height > 0, height <= depth.count / width,
+              k.fx.isFinite, k.fy.isFinite, k.cx.isFinite, k.cy.isFinite,
+              k.fx > 0, k.fy > 0, step > 0 else {
             return CorridorResult(minDistanceM: nil, obstacleSamples: 0, validSamples: 0, totalSamples: 0)
         }
         let pitch = mount.pitchDownDeg * .pi / 180
@@ -81,7 +83,7 @@ public enum CorridorSampler {
             while u < width {
                 total += 1
                 let d = depth[v * width + u]
-                if d.isFinite && d > 0 {
+                if d.isFinite && d >= corridor.lidarMinRangeM && d > 0 {
                     valid += 1
                     if d >= corridor.lidarMinRangeM {
                         // Back-project, then undo mount roll and pitch to get a level frame.

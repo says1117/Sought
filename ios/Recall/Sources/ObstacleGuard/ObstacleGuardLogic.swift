@@ -67,7 +67,7 @@ public enum ObstacleLogic {
     }
 }
 
-public enum GuardState: Equatable {
+public enum ObstacleGuardState: Equatable {
     case driving
     case detouring(attempt: Int)   // rotation in progress, waiting for detourFinished()
     case retrying(attempt: Int)    // rotation done, re-checking the path
@@ -84,7 +84,7 @@ public enum GuardEvent: Equatable {
 public struct GuardOutput: Equatable {
     public var level: ObstacleLevel
     public var reason: GuardReason
-    public var state: GuardState
+    public var state: ObstacleGuardState
     /// 1 = full speed, 0 = stop. Placeholder scale for `slow`.
     public var speedScale: Float
     /// Usually empty. A first blockage emits [.announceBlocked, .startDetour].
@@ -92,7 +92,7 @@ public struct GuardOutput: Equatable {
 }
 
 public struct ObstacleGuard {
-    public private(set) var state: GuardState = .driving
+    public private(set) var state: ObstacleGuardState = .driving
     public private(set) var detoursUsed = 0
     private var stopStreak = 0
     private var clearTravelM = 0.0
