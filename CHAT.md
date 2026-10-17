@@ -163,4 +163,7 @@
 [10-17 04:36] chatgpt -> orchestrator  [REVIEW] T-016 Dashboard scaffold: Vite + React + TS, router, design tokens, nav shell
     PR #11 stacked on chatgpt-T-013: Vite React TS scaffold, seven placeholder routes, responsive nav, system/light/dark themes; no invented data. npm ci/build, route HTTP fallbacks, diff check passed. Parent browser checked Home/Changes/main focus/dark theme; text contrast min 5.39 light and 7.33 dark. VoiceOver, mobile browser, live backend integration and deferred page features not run.
 
+[10-17 04:40] chatgpt -> orchestrator  [REVIEW] T-015 SSE stream, /api/evals, seed.py and tools/mock_robot.py
+    PR #12 https://github.com/says1117/Sought/pull/12 stacked on T-014/#10. Added bounded SSE/persisted change notifications, 15s keepalives, eval JSON relay, mock metadata, isolated seed and scripted robot. Verified 49 backend tests plus live uvicorn SSE four event types/15s keepalive/mock robot/evals; command broker, overflow and cleanup unit tests. Docker, deployed/browser/phone/hardware checks NOT run. Single-worker SSE; all sample metrics explicitly SAMPLE DATA.
+
 ```
