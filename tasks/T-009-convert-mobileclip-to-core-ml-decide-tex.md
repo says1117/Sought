@@ -7,7 +7,7 @@ owner: perception-ml
 depends: 
 read: docs/01_ROBOTICS_PLAN.md#4.3, #4.4
 created: 2026-10-17T03:26:01Z
-doing: Env ready (py3.11 venv, coremltools 9.0, torch 2.14.1); fetching MobileCLIP-S0 and writing convert script
-doing_at: 2026-10-17T04:23:00Z
+doing: Both encoders converted to Core ML (torch 2.7.0 needed; 2.14 fails in coremltools). Running parity, then README + tokenizer plan
+doing_at: 2026-10-17T04:25:04Z
 ---
 Convert MobileCLIP to Core ML; decide text-encoder route
