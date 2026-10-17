@@ -317,4 +317,7 @@
 [10-17 10:23] unknown -> orchestrator  [DONE] T-025 Retrieval + FindExecutor with arrival check
     merged to main via PR 23 (Steven)
 
+[10-17 10:23] unknown -> orchestrator  [DONE] T-027 Sync client: queued uploads of objects, waypoints, events, map, heartbeat
+    merged to main via PR 23 (Steven)
+
 ```
