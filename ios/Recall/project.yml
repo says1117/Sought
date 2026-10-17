@@ -19,6 +19,14 @@ targets:
     sources:
       - path: Sources
         excludes: ["**/.gitkeep", "**/README.md"]
+      # Gitignored, produced by ml/conversion/install_models.sh. Optional so the build works when absent.
+      # Xcode compiles the .mlpackage files into MobileCLIP_S0_*.mlmodelc at the bundle root.
+      - path: Resources/Models
+        optional: true
+        excludes: ["**/.gitkeep"]
+      - path: Resources/Tokenizer
+        optional: true
+        excludes: ["**/.gitkeep"]
     info:
       path: Resources/Info.plist
       properties:
@@ -39,6 +47,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.recall.app
+        COREML_CODEGEN_LANGUAGE: None   # we load the models by name; skip generated Swift model classes
   RecallTests:
     type: bundle.unit-test
     platform: iOS
@@ -63,6 +72,8 @@ targets:
       - path: Sources/Retrieval
       - path: Sources/FindExecutor
       - path: Sources/EvalMode
+      - path: Sources/MLEncoders
+        excludes: ["README.md"]
       - path: Sources/Sync
         excludes: ["README.md"]
       - path: Sources/Perception

@@ -50,6 +50,10 @@ See `coord/team.md` for who runs which role. Role prompts are in `coord/roles/`.
 
 A task becomes ready when its dependencies are in `review` or `done`. If a dependency is only in `review`, branch from the dependency's branch (not `main`) and open your PR against that branch, saying so in the PR body. If review changes the dependency, rebase. Humans merge in dependency order.
 
+## Review requests (standing rule)
+
+Every time a PR is opened, request an independent review from the ChatGPT reviewer right away: `python3 coord/tools/board.py review <PR number> --note "what to focus on"`. It posts a standard `[REVIEW-REQUEST]` ping with the exact head commit. Reviewers are read-only: they run the tests, report findings as a PR comment plus a board message, and never merge, push, or approve. Do this again after material fix pushes, naming the new head.
+
 ## The work board
 
 `board.py view` prints a kanban: **To do** (ready to claim), **Claimed** (who, and their current "working on" line), **In review**, **Blocked**, **Waiting on dependencies**, **Done**, plus the latest messages. The same page is saved as `BOARD.md` on the `board` branch, so anyone can read it on GitHub without running anything. It regenerates on every board write.
