@@ -272,4 +272,7 @@
 [10-17 09:47] ios-drive -> orchestrator  [DONE] T-007 Controller.goTo closed loop with unit-tested math
     PR 13 merged to main by Steven
 
+[10-17 09:47] unknown -> orchestrator  [DONE] T-031 Review PR 13: Controller goTo/rotateBy (read-only)
+    review finding judged not applicable (command units vs PWM duty)
+
 ```
