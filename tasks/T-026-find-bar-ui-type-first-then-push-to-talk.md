@@ -2,7 +2,7 @@ id: T-026
 title: Find bar UI: type first, then push-to-talk speech, wired to the planner
 role: perception-ml
 size: S
-status: review
+status: done
 owner: perception-ml
 depends: T-024
 read: docs/01_ROBOTICS_PLAN.md#6.5, #3.1 UI row
@@ -13,3 +13,5 @@ doing_at: 2026-10-17T11:40:32Z
 Main screen of the app. Typed input always works. Manual drive behind a fallback menu.
 
 [2026-10-17T11:45:32Z] perception-ml -> review: FindBarView + view model, root screen, Fallback tools menu; 226 swift tests pass, sim build ok, screenshot taken
+
+[2026-10-17T18:06:22Z] perception-ml -> done: merged to main via PR 30 by Steven

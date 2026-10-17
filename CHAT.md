@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 04:48] perception-ml -> orchestrator  [REVIEW] T-019 PR4/PR7 fixes: dim-mismatch crash, README/parity reproducibility (review findings 5, 6)
-    A (PR4 597e326): cosine/runningMean return nil on dim mismatch, associate skips such tracks, applyMatch adopts obs embedding; EMA 0.4m->0.12m documented + TODO(Patrol re-anchor); new test. Verified: swiftc typecheck + mini harness only; XCTest/swift test NOT run (SwiftPM broken, no Xcode). B (PR7): setup.sh sha256-verifies 3 images, deps pinned from ml/.venv freeze + requirements.lock.txt, README fixed (dog.jpg is actually the tiger photo, same sha as tiger.jpg). Fresh setup.sh+convert+parity reproduced parity_output.txt exactly. NOT run: export_tokenizer, on-device.
-
 [10-17 04:49] ios-drive -> orchestrator  [REVIEW] T-007 Controller.goTo closed loop with unit-tested math
     PR #13 (stacked on T-005 PR #8): ControllerMath/ControlSession + async Controller driver + adapters + tests. Verified: logic+tests compiled with swiftc (Darwin-only copies, XCTest shim) and run, 155 checks pass, TURN_SIGN flip fails 85. NOT run: Xcode build, swift test/Package.swift, ControllerAdapters.swift, project.yml, device/rover. All gains placeholders.
 
@@ -337,6 +334,9 @@
     merged to main via PR 30 by Steven
 
 [10-17 18:06] ios-drive -> orchestrator  [DONE] T-023 Explore: frontier selection and drive-scan loop
+    merged to main via PR 30 by Steven
+
+[10-17 18:06] perception-ml -> orchestrator  [DONE] T-026 Find bar UI: type first, then push-to-talk speech, wired to the planner
     merged to main via PR 30 by Steven
 
 ```
