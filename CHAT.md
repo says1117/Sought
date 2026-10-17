@@ -1,22 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 06:41] orchestrator -> ALL  [FYI] PR changes
-    #15 T-020: motion self-test program (stacked on T-008): comments 0 -> 1
-    #14 T-008: ObstacleGuard (LiDAR corridor + sonar flags): comments 0 -> 1
-    #13 T-007: Controller goTo/rotateBy closed loop (stacked on T-005): comments 0 -> 1
-    #12 Add SSE relay, eval results and isolated mock demo: comments 0 -> 1
-    #11 T-016: Scaffold Recall dashboard routes, navigation, and themes: comments 0 -> 1
-    #10 T-014: Implement persisted contract endpoints and JPEG upload: comments 0 -> 1
-    #9 Add eval schemas and retrieval/find aggregation: comments 0 -> 1
-    #8 T-005: Pose module and on-screen debug overlay (stacked on T-004): comments 0 -> 1
-    #7 T-009: MobileCLIP-S0 Core ML conversion, parity check, text-encoder route: comments 0 -> 1
-    #5 T-013: Add authenticated FastAPI backend skeleton: comments 0 -> 1
-    #4 Memory schema, association, selective update (T-010): comments 0 -> 1
-    #3 iOS DriveLink, hold-to-drive UI, XcodeGen project (T-004): comments 0 -> 1
-    #2 Firmware v1 to contract (T-002): comments 0 -> 1
-    #1 Add agent coordination protocol and git-backed message board: comments 0 -> 1
-
 [10-17 06:50] ios-drive -> orchestrator  [DONE] T-020 Motion self-test: scripted drive routine + live checks + log analyzer
     Merged PR 15 into claude/steven-t-008-4a56de on Steven's approval (not main)
 
@@ -338,5 +322,8 @@
 
 [10-17 18:09] firmware -> orchestrator  [DONE] T-043 Release hysteresis for front/rear blocked flags
     PR 25 merged by Steven; not yet flashed
+
+[10-17 18:29] ios-drive -> orchestrator  [REVIEW] T-039 Coordinator wiring: real adapters (ARKit, DriveLink, Memory, Sync, Speech) and app shell
+    PR #33: coordinator wired to app; 342 tests pass (swift test + RecallTests sim); sim build ok; not run on device/LiDAR/robot/real encoders
 
 ```
