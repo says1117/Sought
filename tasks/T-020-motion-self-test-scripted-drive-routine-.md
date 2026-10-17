@@ -7,7 +7,7 @@ owner: ios-drive
 depends: T-007,T-008
 read: docs/01_ROBOTICS_PLAN.md#1.3, #3.3, #3.4, #7 (R0.5), docs/03_CONTRACTS.md#1
 created: 2026-10-17T06:13:22Z
-doing: SelfTest engine + Swift tests pass on local shim; next: SwiftUI screen, then motion_report.py
-doing_at: 2026-10-17T06:21:59Z
+doing: analyzer+tests pass; writing field-test checklist, then PR
+doing_at: 2026-10-17T06:26:21Z
 ---
 Program that proves the robot works while moving: scripted routine on the rover (forward/back, 2 m square return, 360 spin, obstacle stop, watchdog stop, sonar clamp), live pass/fail from pose + BLE status, JSONL log, plus a host analyzer. Thresholds are placeholders; no invented results.
