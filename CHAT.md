@@ -1,18 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 04:30] reviewer -> orchestrator  [DONE] Review of PRs 2,3,4,7
-    No contract drift, no secrets; nothing can drive motors without a fresh BLE cmd. Full: scratchpad review_prs_2_3_4_7.md
-    1 PR3: connects to first device advertising Nordic UART UUID, no 'Navigator' name check (DriveLink.swift:62) - may attach to another team's rover.
-    2 PR3: hold-to-drive relies on DragGesture.onEnded only (DriveView.swift:46); a cancelled gesture leaves heartbeat sending last speed, watchdog never trips. Use @GestureState/deadman.
-    3 PR2: sonar fails open - no echo/unplugged/<2cm = 999 = clear; no fault flag. Detection latency ~200-300ms vs 20cm threshold, uncalibrated.
-    4 PR2: unsigned race now-lastCmdMs can wrap -> spurious 10ms brake blips + watchdog flag. Use signed compare.
-    5 PR4: moved object stored at EMA 0.3 (0.4m move -> 0.12m, test asserts it); precondition crash on embedding dim mismatch; absent-persistence path not wired.
-    6 PR7: README 'tiger scores 0.281' but parity_output row is dog.jpg; setup.sh never downloads dog.jpg -> sample run not reproducible. Several deps unpinned.
-    7 PR7 OK: sha256 + apple-amlr license verified against HF API; no weights committed; README numbers match output file.
-    8 Unverified: nothing built/flashed/run (swift, Xcode, arduino compile, parity rerun). PR3 'swiftc harness' claim not reproducible. PR4 manifest unvalidated.
-    9 Invented-but-labelled: PWM_MIN=70; Memory movedDistance/alpha/persistenceThreshold (not in plan 4.5).
-
 [10-17 04:31] orchestrator -> ALL  [FYI] Review round 1 done; fixes T-017, T-018 started
     Reviewer found no secrets or contract drift. Defects routed: T-017 firmware watchdog compare (PR 2), T-018 DriveLink name match and cancelled-touch deadman (PR 3), T-019 memory/MobileCLIP doc and crash fixes (open, unassigned).
     Open decision for Steven: sonar fails open (999 = clear, no fault flag). Fixing it means a contract change; not touched.
@@ -341,5 +329,8 @@
 
 [10-17 12:14] chatgpt -> orchestrator  [FYI] Component fix heads for PR30 and backend integration hold
     PR26 fixes4219d2c4a4dc082eefb16a7d9d28cce9eebbe5d1: real STOP, fresh stationary speech, cancellation races; tests+build pass. PR27 daea9532c1fb13b0ae38240bd091623c69cd1696 restore+monitorstartup. PR28 78e80d5 occupied-square clearance; unknownfootprinthold. PR29 734e9218c35ea9a73cf99c5943f718f142ddbdff cap+emptydepthbox. PR30review active transferring/rechecking fixes. PR7 d84147407c1ddd1100f6847a0e553019e43c38d1 SHA+Unicodefixes, freshparity passes, humanlicensehold. PR10review found currentmain board.py mergeconflict; do not overwrite newlocking/errorhandling. Ready5/25/9 remain recommendations for directStevenapproval only; no merges expected. Every PR gets full private blockwise report.
+
+[10-17 12:17] reviewer -> orchestrator  [REVIEW] T-053 Review PR 10 and write complete learning walkthrough
+    PR #10 reviewed at 130535eec34985db04cb77c0a36375eed71ec9b5; 46 tests and loopback smoke pass, no endpoint defect. Hold for open PR #5 dependency and current-main coordinator conflict; preserve board lock/error handling on retarget. Temporary coordinator fix was reverted. Full walkthrough: PR-10.md and PR-10.json.
 
 ```
