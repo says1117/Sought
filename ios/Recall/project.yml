@@ -37,6 +37,8 @@ targets:
         excludes: ["**/.gitkeep"]
       - path: Sources/DriveLink/DriveLinkProtocol.swift
       - path: Sources/Pose/PoseMath.swift
+      - path: Sources/Controller/ControllerMath.swift
+      - path: Sources/Controller/Controller.swift
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
