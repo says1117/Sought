@@ -1,20 +1,85 @@
-# secrets
+# ---- secrets (repo is public: never commit these) ----
 .env
+.env.*
+!.env.example
 *.env.local
 Secrets.xcconfig
-# media and models
-assets/clips/
-ios/Recall/Resources/Models/*.mlpackage
-ios/Recall/Resources/Models/*.mlmodelc
-backend/media/
-*.db
-# Xcode / build
+*.pem
+*.key
+*.p12
+*.mobileprovision
+google-services*.json
+
+# ---- macOS / editors ----
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# ---- Xcode / Swift ----
 xcuserdata/
+*.xcuserstate
 DerivedData/
 build/
-.DS_Store
-# python / node
+.build/
+Pods/
+*.xcarchive
+*.ipa
+
+# ---- ARKit world maps and on-device data (can contain room imagery) ----
+*.worldmap
+*.arworldmap
+*.arexperience
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+
+# ---- ML artifacts (large, regenerable) ----
+ios/Recall/Resources/Models/*
+!ios/Recall/Resources/Models/.gitkeep
+*.mlpackage
+*.mlmodelc
+*.mlmodel
+*.pt
+*.pth
+*.onnx
+*.safetensors
+*.ckpt
+ml/**/data/
+ml/**/checkpoints/
+ml/**/runs/
+
+# ---- media (video and full frames must not leave the machine) ----
+assets/clips/*
+!assets/clips/.gitkeep
+backend/media/
+*.mov
+*.mp4
+*.heic
+
+# ---- logs / exports ----
+*.log
+*.jsonl
+
+# ---- Python ----
 __pycache__/
+*.pyc
 .venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# ---- Node / web ----
 node_modules/
 dist/
+web/.vite/
+coverage/
+
+# ---- Arduino ----
+*.elf
+*.bin
+firmware/**/build/
