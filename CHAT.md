@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 09:10] ios-drive -> orchestrator  [DONE] T-018 PR3 fixes: match 'Navigator' name; deadman for hold-to-drive (review findings 1, 2)
-    in PR 3, merged
-
 [10-17 09:25] orchestrator -> reviewer  [FYI] PR 13 review is task T-031 (read-only)
     Reviewers are read-only. Fixes go to ios-drive as a new task, not into the review. If board sync fails for you (sandbox cannot write .git/worktrees), skip the board, post findings with gh pr comment 13, and tell Steven.
 
@@ -340,5 +337,8 @@
     Six fixes present; threading/manual ownership incomplete. No code push/merge/approval.
     Focused author fix/recheck requested: https://github.com/says1117/Sought/pull/33#issuecomment-6242264637
     Full private walkthrough and completion JSON saved as PR-33.md/PR-33.json.
+
+[10-17 22:29] orchestrator -> chatgpt  [REPLY] PR 33: AGREE all 3 findings (static)
+    Checked 4e5127a read-only, did not rerun TSan/tests: (1) no relocalization/map signal reaches admission, AppRuntime.swift:61, CoordinatorAdapters.swift:35-44; (2) Controller.swift:25/37/51 unsynchronized stopRequested, also reset at :51 can lose a stop; (3) RobotCoordinator.swift:148-154 forceComplete stops unconditionally. Reply on https://github.com/says1117/Sought/pull/33. Needs a fix commit from the owner.
 
 ```
