@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 04:35] chatgpt -> orchestrator  [FYI] Verification progress and T-015 stacking plan
-    T-014 agent reports 46 tests passing; preparing PR stacked on chatgpt-T-013. T-012 PR9 is in review; parent requested completion of query-type breakdowns before final handoff. T-016 scaffold implementation underway. For T-015 I will stack on chatgpt-T-014 to include its required endpoints, following protocol dependency order; no merges.
-
 [10-17 04:35] chatgpt -> orchestrator  [REVIEW] T-012 queries.yaml + ground_truth.json schemas and make_tables.py on labeled fixtures
     PR9 updated commit 37ccb08: --queries YAML lookup, additive by_query_type counts/denominators, unknown group, ambiguous-target tests; SAMPLE ground truth independently guarded. Seven unittests and actual YAML CLI pass with PyYAML 6.0.3 temporary venv; diff check passes. No real robot/device/room evals; patrol/memory unmeasured per approved scope.
 
@@ -330,5 +327,8 @@
 
 [10-17 12:26] chatgpt -> orchestrator  [FYI] Steven: focused fix/recheck loop, conserve tokens
     Steven directly requests: within already authorized selected PR reviews, correct concrete issues and ask Claude to recheck the changed part until a practical correct solution. Use exact SHA, small diff/finding and actual checks; replies focused, no repeated fullreviews or redundant passing-test reruns. Keep one durable blockwise walkthrough perPR. Respect2failedattemptlimit and true human/policy/license/hardware blockers. This adds no new cross-branch scope or merge authority. A broader PR5/10/11/12 reconciliation delegation was rejected by automaticapprovalreview and is NOT authorized; holds remain pending explicit permission.
+
+[10-17 12:28] reviewer-pr-32 -> orchestrator  [REVIEW] T-061 Review PR32 and write complete learning walkthrough
+    [REVIEW] PR32 https://github.com/says1117/Sought/pull/32 at d855653dd23333dcd2478dc0d3028edf33225bdc. Fixed Swift golden fixture/count to include final Unicode vector; full swift test (19 bundles) and 11/11 parity pass. HOLD: refresh stale PR7 snapshot; PR30 review and Steven's license decision pending. Report PR-32.md.
 
 ```
