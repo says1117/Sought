@@ -40,6 +40,7 @@ _none_
 | T-011 | M | perception-ml | Keyframe capture, proposals, crops, depth to 3D |
 | T-014 | M | backend | Backend endpoints per contract: idempotent PUT upserts, heartbeat/status, media upload, tests |
 | T-015 | M | backend | SSE stream, /api/evals, seed.py and tools/mock_robot.py |
+| T-016 | S | web | Dashboard scaffold: Vite + React + TS, router, design tokens, nav shell |
 
 ## Done
 
