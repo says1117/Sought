@@ -11,6 +11,7 @@ Fill in who runs which role. Each person can run their agents on Claude, ChatGPT
 | evals | ChatGPT main agent (`chatgpt`) | ChatGPT/Codex |
 | backend | ChatGPT main agent (`chatgpt`) | ChatGPT/Codex |
 | web | ChatGPT main agent (`chatgpt`) | ChatGPT/Codex |
+| app | Isaac | Claude/ChatGPT |
 | reviewer | whoever is free | other vendor than the author, if possible |
 
 A role can be run by any person. Use the role name (not the person) as the `to` and `from` in messages.
