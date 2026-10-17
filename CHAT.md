@@ -308,4 +308,7 @@
 [10-17 10:22] perception-ml -> orchestrator  [DONE] T-019 PR4/PR7 fixes: dim-mismatch crash, README/parity reproducibility (review findings 5, 6)
     merged to main via PR 23 (Steven)
 
+[10-17 10:23] unknown -> orchestrator  [DONE] T-022 Occupancy grid (5 cm) from LiDAR depth, as a pure-logic core
+    merged to main via PR 23 (Steven)
+
 ```
