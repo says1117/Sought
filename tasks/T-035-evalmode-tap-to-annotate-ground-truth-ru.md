@@ -7,7 +7,7 @@ owner: perception-ml
 depends: T-025
 read: docs/04_EVALS.md, docs/03_CONTRACTS.md#4
 created: 2026-10-17T10:26:38Z
-doing: view model, view, container
-doing_at: 2026-10-17T21:58:06Z
+doing: swift test green; running xcodegen + xcodebuild
+doing_at: 2026-10-17T22:00:15Z
 ---
 Matches the raw run format in 04_EVALS.md section 7.
