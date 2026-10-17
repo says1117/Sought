@@ -24,7 +24,8 @@ let package = Package(
         .target(name: "PlannerCore", path: "Sources/Planner",
                 sources: ["PlannerTypes.swift", "KeywordPlanner.swift", "GeminiPlanner.swift", "FallbackPlanner.swift"]),
         .target(name: "Retrieval", dependencies: ["Memory"], path: "Sources/Retrieval",
-                sources: ["Retriever.swift", "TextEncoder.swift"]),
+                sources: ["Retriever.swift", "TextEncoder.swift", "CLIPTokenizer.swift"]),
+        .target(name: "MLEncoders", dependencies: ["Retrieval", "FindExecutor", "PerceptionCore", "Memory"], path: "Sources/MLEncoders", exclude: ["README.md"]),
         .target(name: "FindExecutor", dependencies: ["Memory", "Retrieval"], path: "Sources/FindExecutor",
                 sources: ["FindExecutor.swift", "FindTrace.swift", "Protocols.swift"]),
         .target(name: "SyncCore", path: "Sources/Sync", exclude: ["README.md"]),
@@ -54,6 +55,7 @@ let package = Package(
         .testTarget(name: "FindExecutorTests", dependencies: ["FindExecutor", "Retrieval", "Memory"], path: "Tests/FindExecutorTests"),
         .testTarget(name: "SyncTests", dependencies: ["SyncCore"], path: "Tests/SyncTests", exclude: ["Fixtures"]),
         .testTarget(name: "ComeToMeTests", dependencies: ["ComeToMeCore", "ControllerCore", "PoseCore"], path: "Tests/ComeToMeTests"),
+        .testTarget(name: "MLEncodersTests", dependencies: ["MLEncoders", "Retrieval", "FindExecutor", "PerceptionCore", "Memory"], path: "Tests/MLEncodersTests", exclude: ["Fixtures"]),
             .testTarget(name: "ExploreTests", dependencies: ["ExploreCore", "OccupancyGridCore", "PoseCore"], path: "Tests/ExploreTests"),
     ]
 )
