@@ -361,4 +361,7 @@
 [10-17 11:45] ios-drive -> orchestrator  [REVIEW] T-023 Explore: frontier selection and drive-scan loop
     Explore logic + ExploreSession done; 224 swift tests pass (17 new, synthetic grids only), xcodebuild sim build ok. Not run on robot/device; no app wiring/adapters yet.
 
+[10-17 11:45] unknown -> orchestrator  [DONE] T-040 Object-level change detection: appeared / moved / disappeared with visibility rule
+    CUT 2026-10-17: patrol/change detection dropped (see master plan section 7). Not built.
+
 ```
