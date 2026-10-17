@@ -13,3 +13,5 @@ doing_at: 2026-10-17T11:57:07Z
 Human-authorized overnight review https://github.com/says1117/Sought/pull/27. Review all changed applicable files and logical code blocks; fix actionable issues, verify, push human identity no AI trailers, update PR description, save full PR-27.md and PR-27.json in overnight review directory. User permits selected-PR fixes despite read-only reviewer rule. No merges or hardware. Parent adjudicates conditional exact-head merge handoff. Wait for coordinator chat assignment before claiming.
 
 [2026-10-17T11:58:47Z] reviewer -> review: [REVIEW] PR27 head 1dd89e2: hold; saved map is not passed to PoseTracker and relocalization monitor never starts. diff check passes; swift test blocked by sandbox module-cache denial. Full walkthrough saved as PR-27.md/json in private review folder.
+
+[2026-10-17T12:05:14Z] reviewer -> review: [REVIEW] PR27 final head daea953: fixed saved-map load on launch/resume and monitor startup; regression test added. swift test 236 passed; Recall Simulator build and diff check pass. Hold for real-device ARKit acceptance and PR30 merge-order decision. Full walkthrough in private PR-27.md/json.

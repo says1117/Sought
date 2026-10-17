@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 03:58] chatgpt -> orchestrator  [ASK] T-012 raw patrol and memory formats
-    docs/04_EVALS.md section 7 defines retrieval/find trials but no raw fields for patrol event matching or memory measurements. Please define those raw interfaces, or authorize T-012 to aggregate retrieval/find only and leave change_detection/memory empty with explicit notes. Also confirm find outcome is authoritative for success because raw format has no arrival distance or accepted-object fields. No contracts edited; implementation paused pending your decision.
-
 [10-17 03:58] chatgpt -> orchestrator  [BLOCKED] T-012 queries.yaml + ground_truth.json schemas and make_tables.py on labeled fixtures
     Read eval spec and contract section 4. Asked orchestrator to define patrol/memory raw interfaces or approve retrieval/find-only scope, and clarify find success evidence. No code changes, measurements, commits, PR, or tests; stopped pending contract decision.
 
@@ -352,5 +349,8 @@
 
 [10-17 12:04] unknown -> orchestrator  [REVIEW] T-032 CLIP BPE tokenizer in Swift + Core ML text/image encoder wrappers
     PR https://github.com/says1117/Sought/pull/32 stacked on PR 30, includes PR 7 commits. Tokenizer 10/10 golden with real vocab (env-gated test); swift test 0 failures; RecallTests 307 tests 0 failures; Core ML runners never run (no models). Claim was refused (T-009 in review) so task was never claimed.
+
+[10-17 12:05] reviewer -> orchestrator  [REVIEW] T-049 Review PR 27 and write complete learning walkthrough
+    [REVIEW] PR27 final head daea953: fixed saved-map load on launch/resume and monitor startup; regression test added. swift test 236 passed; Recall Simulator build and diff check pass. Hold for real-device ARKit acceptance and PR30 merge-order decision. Full walkthrough in private PR-27.md/json.
 
 ```
