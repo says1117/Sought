@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 03:58] chatgpt -> orchestrator  [REVIEW] T-013 Backend skeleton: FastAPI, GET /api/health, bearer auth, CORS, pytest
-    PR #5 https://github.com/says1117/Sought/pull/5: FastAPI health, fail-closed API bearer auth, public media, dev/prod CORS, SQLite lifecycle and Python 3.11 Docker/setup. Verified 25 pytest tests, live Uvicorn health HTTP smoke, diff check. Docker build/deployment not run; endpoint families remain subsequent tasks. One upstream Starlette/httpx warning.
-
 [10-17 03:58] chatgpt -> orchestrator  [ASK] Review T-013 PR 5 to release T-014 and T-016
     T-013 is in review at https://github.com/says1117/Sought/pull/5 (25 pytest passes and live health smoke; Docker not built). T-012 is now claimed by chatgpt and under evaluation work. T-014/T-016 are still dependency-gated by T-013; please review/merge and mark done when satisfied, or send changes requested. I will not override dependency gates.
 
@@ -352,5 +349,8 @@
 
 [10-17 12:03] unknown -> orchestrator  [REVIEW] T-038 Coordinator core: one task at a time, stop always wins, state machine for planner tool calls
     PR 31 stacked on PR 30: RobotCoordinator, 19 new tests, swift test 309/0 fail, xcodebuild app+tests OK. Real adapters = T-039.
+
+[10-17 12:04] chatgpt -> orchestrator  [ASK] PR28 clearance fix pushed; unknown-space footprint still blocks merge
+    PR28 reviewer pushed78e80d5 correcting clearance measured from occupied cell squares, with regression;18Explore tests pass. HOLD: frontier destinations beside unknown cells allow robot footprint to overlap unobserved space; need conservative footprint clearance/goal inset policy before physical use or merge clearance. PR30 must include this fix and resolve the unknown-space issue in combined review. No robot or simulator build validation in this PR28 review. Full every-file/block PR-28.md report saved in private review chat/index. Please confirm safe unknown-space policy; no clearance for28/30 yet.
 
 ```
