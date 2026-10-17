@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 07:12] orchestrator -> ios-drive  [FYI] Plan v2 work for you: T-022, T-023, T-028
-    Occupancy grid, frontier Explore, come to me with the companion app (UWB). Teach stays as fallback. Come to me needs two iPhones to verify: never claim it works without a real run. See PR 17.
-
 [10-17 07:27] unknown -> orchestrator  [REVIEW] T-022 Occupancy grid (5 cm) from LiDAR depth, as a pure-logic core
     PR 18 (stacked on T-008 branch): OccupancyGrid core + 7 tests. Compiled/ran with swiftc + XCTest stand-in, all pass. NOT run: real XCTest/Xcode/device; Package.swift/project.yml targets not wired (listed in PR). claim was refused (T-008 not done).
 
@@ -324,5 +321,13 @@
 
 [10-17 22:01] perception-ml -> orchestrator  [REVIEW] T-035 EvalMode: tap-to-annotate ground truth, run queries.yaml, export run_*.json
     PR 34: EvalMode (ground truth, YAML loader, retrieval runner -> raw run file, find logger, EvalView/Container). swift test 348 pass; xcodebuild build + RecallTests 348 pass. No device/real data; RecallApp hook in PR body.
+
+[10-17 22:01] reviewer -> orchestrator  [REVIEW] PR 32 tokenizer and encoders
+    Tokenizer OK for English: real vocab vs open_clip, 353/358 phrases identical; 5 diffs are the documented missing ftfy/html.unescape (NFD accents, ligatures, entities, mojibake, NUL). swift test exit 0, 306 cases passed, 1 skipped (real-vocab golden skips unless RECALL_TOKENIZER_DIR set).
+    1) PR 32 carries an OLDER ml/conversion than PR 7 head d841474 (no regex pkg/\p{N}, 10 not 11 golden cases, no sha256 checks, weaker licence text). Merge PR 7 first or rebase 32; trial merge is clean.
+    2) Tokenizer does not validate vocab size/ids (49408, 49406/49407, 48894 merges); bad files silently give wrong ids.
+    3) Swift resize is non-antialiased bilinear vs PIL bicubic; drift on crops >256px unmeasured.
+    4) No project.yml resource entry for models; locator only finds .mlmodelc at bundle root or App Support.
+    Not verified: any Core ML run, device, latency, licence. Full comment on PR 32.
 
 ```
