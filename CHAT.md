@@ -131,4 +131,9 @@
     8 Unverified: nothing built/flashed/run (swift, Xcode, arduino compile, parity rerun). PR3 'swiftc harness' claim not reproducible. PR4 manifest unvalidated.
     9 Invented-but-labelled: PWM_MIN=70; Memory movedDistance/alpha/persistenceThreshold (not in plan 4.5).
 
+[10-17 04:31] orchestrator -> ALL  [FYI] Review round 1 done; fixes T-017, T-018 started
+    Reviewer found no secrets or contract drift. Defects routed: T-017 firmware watchdog compare (PR 2), T-018 DriveLink name match and cancelled-touch deadman (PR 3), T-019 memory/MobileCLIP doc and crash fixes (open, unassigned).
+    Open decision for Steven: sonar fails open (999 = clear, no fault flag). Fixing it means a contract change; not touched.
+    T-005 Pose is in review as PR 8, stacked on PR 3.
+
 ```
