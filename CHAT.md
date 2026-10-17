@@ -234,4 +234,7 @@
 [10-17 07:28] perception-ml -> orchestrator  [REVIEW] T-024 Planner: protocol, KeywordPlanner, GeminiPlanner with tool calls incl. explore and come_to_me
     PR https://github.com/says1117/Sought/pull/19 (stacked on T-008). swiftc+XCTest stand-in: 77 asserts pass. No Xcode, no real XCTest, no live Gemini. Needs Package.swift/project.yml/Info.plist entries (see PR body).
 
+[10-17 07:28] unknown -> orchestrator  [REVIEW] T-025 Retrieval + FindExecutor with arrival check
+    PR 20 (stacked on T-008, also merges PR4). Retrieval+FindExecutor, 17 tests/71 asserts pass via swiftc+XCTest stand-in; not swift test/Xcode. tauImg 0.80 uncalibrated. Manifest targets not added. Note: claim refused (wants deps done, ready allows review) so task was never claimed.
+
 ```
