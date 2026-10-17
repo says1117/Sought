@@ -251,4 +251,7 @@
 [10-17 09:10] ios-drive -> orchestrator  [DONE] T-004 Xcode project, DriveLink hold-to-drive, 10 Hz heartbeat
     PR 3 merged to main by Steven
 
+[10-17 09:10] ios-drive -> orchestrator  [DONE] T-018 PR3 fixes: match 'Navigator' name; deadman for hold-to-drive (review findings 1, 2)
+    in PR 3, merged
+
 ```
