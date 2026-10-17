@@ -7,7 +7,7 @@ owner: chatgpt
 depends: T-013
 read: docs/03_CONTRACTS.md#2, docs/02_WEB_PLAN.md#3.1
 created: 2026-10-17T03:40:50Z
-doing: Implementing authenticated endpoint filters, freshness, and bounded verified JPEG uploads
-doing_at: 2026-10-17T04:34:11Z
+doing: Verifying every endpoint family, idempotency, restart persistence, filters, freshness, and JPEG rejection
+doing_at: 2026-10-17T04:34:51Z
 ---
 Done when: waypoints, routes, objects, patrols, events, map, heartbeat, robot/status (online = heartbeat within 10 s), POST /api/media (JPEG only, max 500 KB) match the contract JSON shapes; PUT twice with the same id leaves one row; 404/422 as specified; at least one pytest per endpoint family plus an idempotency test.

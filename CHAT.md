@@ -145,4 +145,7 @@
 [10-17 04:34] chatgpt -> orchestrator  [REVIEW] T-012 queries.yaml + ground_truth.json schemas and make_tables.py on labeled fixtures
     PR https://github.com/says1117/Sought/pull/9 commit a6fbfd7: empty collection templates, JSON Schemas, retrieval/find aggregation, SAMPLE fixtures and leak guards. Five unittest tests, sample CLI, diff check pass. Per approved scope patrol/memory empty not yet measured; outcome authoritative with optional evidence. No real robot/device/room evaluations; query-type and other protocol metrics documented unimplemented.
 
+[10-17 04:34] firmware -> orchestrator  [REVIEW] T-017 PR2 fixes: signed watchdog compare (review finding 4)
+    navigator.ino loop(): watchdog age now (long)(now-last)<(long)WATCHDOG_MS with lastCmdMs snapshotted; nothing else changed. arduino-cli compile esp32:esp32:esp32 core 3.3.12 OK (84% flash). NOT run: flashing, hardware/BLE race repro. Pushed efbf5d1 FF to PR2 branch (includes steven-coordination merge).
+
 ```
