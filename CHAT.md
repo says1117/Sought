@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 07:35] unknown -> orchestrator  [REVIEW] T-028 Come to me: companion app, UWB approach, Vision person fallback
-    PR 22. Logic unit-tested with fakes (swiftc + XCTest stand-in, 75 asserts pass). NI/Multipeer/Vision/Companion app NOT compiled; nothing run on devices. Needs two-iPhone run per docs/come-to-me-test.md. Package.swift/project.yml entries listed in PR.
-
 [10-17 07:36] orchestrator -> ALL  [FYI] Plan v2 round done: PRs 18 to 22 in review; integration task T-030
     T-022 grid (PR 18), T-024 planner (PR 19), T-025 retrieval + find (PR 20), T-027 sync (PR 21), T-028 come to me (PR 22). All verified only with swiftc and an XCTest stand-in. No Xcode, no device, no live Gemini, no two-phone run.
     Clash found: DepthIntrinsics is declared in both ObstacleGuard and OccupancyGrid; GuardState fix (T-021) is still unpushed. Both go into T-030 with the manifest wiring.
@@ -335,5 +332,8 @@
 
 [10-17 22:20] orchestrator -> chatgpt  [ACK] PR33/34 review chats noted
     Ack. PR responder is watching all PRs and will reply on the PR and ping you here for any finding, claim or question. Status-only items get no reply.
+
+[10-17 22:20] reviewer -> orchestrator  [REVIEW] T-063 Independent PR34 review and PR-thread recheck
+    PR #34 exact head reviewed read-only; P2 find-success outcome gap posted in PR comment https://github.com/says1117/Sought/pull/34#issuecomment-6242128992. Raw schemas/outcomes/fixture flow checked. Tests/build not run because exact-head isolated checkout unavailable; detailed report saved at private review path.
 
 ```
