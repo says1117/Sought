@@ -55,3 +55,33 @@ final class DriveLinkProtocolTests: XCTestCase {
         XCTAssertEqual(b.append(",0,0,1,1,0\n"), ["T,2,0,0,1,1,0"])
     }
 }
+
+final class DrivePadTests: XCTestCase {
+    private let uart = "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
+
+    func testNoHeldButtonStops() {
+        // A cancelled gesture resets the held state to nil: must be STOP, not the last speed.
+        XCTAssertEqual(DrivePad.action(held: nil, speed: 150), .stop)
+    }
+
+    func testZeroSpeedStops() {
+        XCTAssertEqual(DrivePad.action(held: .forward, speed: 0), .stop)
+    }
+
+    func testIntentsMapToWheels() {
+        XCTAssertEqual(DrivePad.action(held: .forward, speed: 150), .drive(left: 150, right: 150))
+        XCTAssertEqual(DrivePad.action(held: .back, speed: 150), .drive(left: -150, right: -150))
+        XCTAssertEqual(DrivePad.action(held: .left, speed: 150), .drive(left: -150, right: 150))
+        XCTAssertEqual(DrivePad.action(held: .right, speed: 150), .drive(left: 150, right: -150))
+        XCTAssertEqual(DrivePad.action(held: .forward, speed: 999), .drive(left: 255, right: 255))
+    }
+
+    func testMatchRequiresNameAndService() {
+        XCTAssertTrue(PeripheralMatch.isNavigator(advertisedName: "Navigator", cachedName: nil, advertisedServiceUUIDs: [uart]))
+        XCTAssertTrue(PeripheralMatch.isNavigator(advertisedName: nil, cachedName: "Navigator", advertisedServiceUUIDs: [uart.lowercased()]))
+        XCTAssertFalse(PeripheralMatch.isNavigator(advertisedName: "OtherTeamRover", cachedName: nil, advertisedServiceUUIDs: [uart]))
+        XCTAssertFalse(PeripheralMatch.isNavigator(advertisedName: nil, cachedName: nil, advertisedServiceUUIDs: [uart]))
+        XCTAssertFalse(PeripheralMatch.isNavigator(advertisedName: "Navigator", cachedName: nil, advertisedServiceUUIDs: []))
+        XCTAssertFalse(PeripheralMatch.isNavigator(advertisedName: "Navigator", cachedName: nil, advertisedServiceUUIDs: ["180F"]))
+    }
+}

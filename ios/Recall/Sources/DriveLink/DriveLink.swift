@@ -61,6 +61,10 @@ final class DriveLink: NSObject, ObservableObject, CBCentralManagerDelegate, CBP
 
     func centralManager(_ c: CBCentralManager, didDiscover p: CBPeripheral,
                         advertisementData: [String: Any], rssi: NSNumber) {
+        let uuids = (advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID])?.map { $0.uuidString } ?? []
+        guard PeripheralMatch.isNavigator(advertisedName: advertisementData[CBAdvertisementDataLocalNameKey] as? String,
+                                          cachedName: p.name,
+                                          advertisedServiceUUIDs: uuids) else { return }
         peripheral = p
         p.delegate = self
         c.stopScan()
