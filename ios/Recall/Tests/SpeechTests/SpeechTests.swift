@@ -20,6 +20,21 @@ final class PushToTalkTests: XCTestCase {
         XCTAssertEqual(t.state, .idle)
     }
 
+    func testAbortDuringAuthorizationPreventsRecognizerStart() async {
+        let r = FakeRecognizer(); r.holdAuthorization = true
+        let t = PushToTalk(recognizer: r, isStationary: { true })
+        let begin = Task { try await t.begin() }
+        for _ in 0..<100 where !r.isAwaitingAuthorization { await Task.yield() }
+        XCTAssertTrue(r.isAwaitingAuthorization)
+        XCTAssertEqual(t.state, .authorizing)
+        t.abort()
+        r.resolveAuthorization(true)
+        do { try await begin.value; XCTFail("cancelled startup should not begin listening") }
+        catch { XCTAssertEqual(error as? SpeechError, .cancelled) }
+        XCTAssertEqual(t.state, .idle)
+        XCTAssertEqual(r.started, 0)
+    }
+
     func testListenThenEndReturnsTranscript() async throws {
         let r = FakeRecognizer()
         let t = PushToTalk(recognizer: r, isStationary: { true })

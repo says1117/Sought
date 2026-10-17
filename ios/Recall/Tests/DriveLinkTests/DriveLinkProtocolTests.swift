@@ -42,6 +42,16 @@ final class DriveLinkProtocolTests: XCTestCase {
         XCTAssertEqual(s?.flags, [.watchdogStopped, .frontBlocked, .rearBlocked, .bleConnected])
     }
 
+    func testStationaryRequiresConnectedFreshZeroWheelTelemetry() {
+        let stopped = RobotStatus(uptimeMs: 10, left: 0, right: 0, frontCm: 50, rearCm: 50, flags: [.bleConnected])
+        XCTAssertTrue(StationaryStatus.isStationary(status: stopped, connected: true, receivedAt: 9.9, now: 10))
+        XCTAssertFalse(StationaryStatus.isStationary(status: nil, connected: true, receivedAt: 9.9, now: 10))
+        XCTAssertFalse(StationaryStatus.isStationary(status: stopped, connected: false, receivedAt: 9.9, now: 10))
+        XCTAssertFalse(StationaryStatus.isStationary(status: stopped, connected: true, receivedAt: 9.0, now: 10))
+        let moving = RobotStatus(uptimeMs: 10, left: 1, right: 0, frontCm: 50, rearCm: 50, flags: [.bleConnected])
+        XCTAssertFalse(StationaryStatus.isStationary(status: moving, connected: true, receivedAt: 9.9, now: 10))
+    }
+
     func testParseRejectsBadLines() {
         for bad in ["", "PONG", "T,1,2,3", "T,1,2,3,4,5,6,7", "X,1,2,3,4,5,6", "T,a,0,0,1,1,0", "T,1,0,0,,1,0", "T,1,0,0,-5,1,0"] {
             XCTAssertNil(RobotStatus.parse(bad), bad)

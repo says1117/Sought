@@ -6,10 +6,12 @@ enum SpeechError: Error, Equatable {
     case notAuthorized
     case unavailable
     case notStationary
+    case cancelled
     case recognitionFailed(String)
 }
 
 /// Push-to-talk recognizer. `start` begins listening; `stop` ends it and delivers the final transcript.
+@MainActor
 protocol SpeechRecognizing: AnyObject {
     /// Ask for mic + speech permission. Returns true when both are granted.
     func requestAuthorization() async -> Bool
@@ -24,6 +26,7 @@ protocol SpeechRecognizing: AnyObject {
 }
 
 /// Speaks short confirmations.
+@MainActor
 protocol Speaking: AnyObject {
     func speak(_ text: String)
     func stopSpeaking()
@@ -35,12 +38,15 @@ typealias StationaryProvider = () -> Bool
 /// Push-to-talk state machine. Refuses to listen unless the robot is stationary, and aborts if it moves.
 @MainActor
 final class PushToTalk {
-    enum State: Equatable { case idle, listening, finishing }
+    enum State: Equatable { case idle, authorizing, listening, finishing }
 
     private(set) var state: State = .idle
     private(set) var partial = ""
+    var onAbort: (() -> Void)?
     private let recognizer: SpeechRecognizing
     private let isStationary: StationaryProvider
+    private var stationaryMonitor: Task<Void, Never>?
+    private var generation = 0
 
     init(recognizer: SpeechRecognizing, isStationary: @escaping StationaryProvider) {
         self.recognizer = recognizer
@@ -49,37 +55,75 @@ final class PushToTalk {
 
     func begin(onPartial: @escaping (String) -> Void = { _ in }) async throws {
         guard state == .idle else { return }
-        guard isStationary() else { throw SpeechError.notStationary }
-        guard await recognizer.requestAuthorization() else { throw SpeechError.notAuthorized }
-        guard isStationary() else { throw SpeechError.notStationary }
+        let currentGeneration = generation
+        guard isStationary() else { state = .idle; throw SpeechError.notStationary }
+        state = .authorizing
+        guard await recognizer.requestAuthorization() else {
+            guard generation == currentGeneration else { throw SpeechError.cancelled }
+            state = .idle
+            throw SpeechError.notAuthorized
+        }
+        guard generation == currentGeneration, state == .authorizing else { throw SpeechError.cancelled }
+        guard isStationary() else { state = .idle; throw SpeechError.notStationary }
         partial = ""
-        try recognizer.start { [weak self] text in
-            Task { @MainActor in
-                guard let self, self.state == .listening else { return }
-                self.partial = text
-                onPartial(text)
+        do {
+            try recognizer.start { [weak self] text in
+                Task { @MainActor in
+                    guard let self, self.state == .listening else { return }
+                    self.partial = text
+                    onPartial(text)
+                }
             }
+        } catch {
+            recognizer.cancel()
+            state = .idle
+            throw error
+        }
+        guard generation == currentGeneration, state == .authorizing else {
+            recognizer.cancel()
+            throw SpeechError.cancelled
         }
         state = .listening
+        stationaryMonitor = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 100_000_000)
+                guard !Task.isCancelled, let self else { return }
+                self.checkStationary()
+            }
+        }
     }
 
     /// Release the button: returns the final transcript.
     func end() async throws -> String {
         guard state == .listening else { return "" }
+        guard isStationary() else { abort(); throw SpeechError.notStationary }
         state = .finishing
-        defer { state = .idle }
-        return try await recognizer.finish()
+        defer {
+            stationaryMonitor?.cancel()
+            stationaryMonitor = nil
+            state = .idle
+        }
+        let transcript = try await recognizer.finish()
+        guard state == .finishing, isStationary() else {
+            recognizer.cancel()
+            throw SpeechError.notStationary
+        }
+        return transcript
     }
 
     /// Call when the robot starts moving or the app backgrounds.
     func abort() {
-        guard state != .idle else { return }
-        recognizer.cancel()
+        generation &+= 1
+        let wasActive = state != .idle
+        stationaryMonitor?.cancel()
+        stationaryMonitor = nil
+        if wasActive { recognizer.cancel() }
         state = .idle
+        if wasActive { onAbort?() }
     }
 
     /// Poll point for the UI: stop listening if the robot is no longer stationary.
     func checkStationary() {
-        if state == .listening && !isStationary() { abort() }
+        if (state == .listening || state == .finishing) && !isStationary() { abort() }
     }
 }
