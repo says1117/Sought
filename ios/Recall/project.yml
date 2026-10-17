@@ -64,6 +64,8 @@ targets:
       - path: Sources/FindExecutor
       - path: Sources/Sync
         excludes: ["README.md"]
+      - path: Sources/Perception
+        excludes: ["PerceptionAdapters.swift", "README.md"]
       - path: Sources/ComeToMe/CompanionMessages.swift
       - path: Sources/ComeToMe/ApproachPlanner.swift
       - path: Sources/ComeToMe/ComeToMeRunner.swift
