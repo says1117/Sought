@@ -83,26 +83,22 @@ def import_comments():
     issue = cfg.get("issue")
     if not issue:
         return
-    # --slurp wraps paginated responses as one JSON array, avoiding concatenated
-    # page documents that json.loads cannot parse once the issue has >1 page.
-    r = gh("api", f"repos/:owner/:repo/issues/{issue}/comments", "--paginate", "--slurp")
+    r = gh("api", f"repos/:owner/:repo/issues/{issue}/comments", "--paginate")
     if not r or r.returncode:
         return
     last, new = cfg.get("last_comment", 0), 0
-    pages = json.loads(r.stdout or "[]")
-    for page in pages:
-        for c in page:
-            if c["id"] <= last:
-                continue
-            last = max(last, c["id"])
-            text = c["body"].strip()
-            if MARKER in text or not text:
-                continue
-            m = re.match(r"@([\w-]+)\s*(.*)", text, re.S)
-            to, text = (m.group(1), m.group(2).strip() or text) if m else ("ALL", text)
-            subject, _, rest = text.partition("\n")
-            post_message(f"gh-{c['user']['login']}", to, subject[:80], rest.strip() or subject, mirror=False)
-            new += 1
+    for c in json.loads(r.stdout or "[]"):
+        if c["id"] <= last:
+            continue
+        last = max(last, c["id"])
+        text = c["body"].strip()
+        if MARKER in text or not text:
+            continue
+        m = re.match(r"@([\w-]+)\s*(.*)", text, re.S)
+        to, text = (m.group(1), m.group(2).strip() or text) if m else ("ALL", text)
+        subject, _, rest = text.partition("\n")
+        post_message(f"gh-{c['user']['login']}", to, subject[:80], rest.strip() or subject, mirror=False)
+        new += 1
     cfg["last_comment"] = last
     CONFIG.write_text(json.dumps(cfg))
     if new:
