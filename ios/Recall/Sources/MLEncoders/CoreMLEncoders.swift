@@ -50,7 +50,7 @@ public struct CoreMLTextEncoder: TextEncoder {
         self.tokenizer = tokenizer; self.runner = runner
     }
     public func encode(_ text: String) throws -> [Float] {
-        try EmbeddingMath.unit(try runner.run(tokens: tokenizer.encode(text)))
+        try EmbeddingMath.unit(try runner.run(tokens: tokenizer.isValidated ? tokenizer.encodeChecked(text) : tokenizer.encode(text)))
     }
 }
 

@@ -82,16 +82,115 @@ final class MLEncodersTests: XCTestCase {
         XCTAssertThrowsError(try CLIPTokenizer(vocab: ["a": 1], merges: []))
     }
 
-    func testLoadsFromDirectory() throws {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ml32-\(UUID().uuidString)")
+    /// Synthetic vocab with exactly the real sizes and special ids (not the real CLIP vocab).
+    private func ml32FullSizeFiles(dropMerges: Int = 0, vocabEntries: Int? = nil, swapSpecials: Bool = false,
+                                   dropByteSymbol: Bool = false) throws -> URL {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ml32full-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: dir) }
-        let vocab = ["c": 1, "a": 2, "t</w>": 3, "ca": 4, "cat</w>": 5, "<start_of_text>": 6, "<end_of_text>": 7]
+        var vocab: [String: Int] = [:]
+        var syms = Array(CLIPTokenizer.makeByteToUnicode().values.sorted())
+        if dropByteSymbol { syms.removeFirst() }
+        for s in syms { vocab[s] = vocab.count; vocab[s + "</w>"] = vocab.count }
+        let mergeCount = CLIPTokenizer.expectedMergeCount - dropMerges
+        var lines: [String] = []
+        for i in 0..<CLIPTokenizer.expectedMergeCount {
+            if i < mergeCount { lines.append("m \(i)") }
+            vocab["m\(i)"] = vocab.count
+        }
+        if dropByteSymbol { for _ in 0..<2 { vocab["pad-\(vocab.count)"] = vocab.count } }
+        vocab["<start_of_text>"] = swapSpecials ? 49_407 : 49_406
+        vocab["<end_of_text>"] = swapSpecials ? 49_406 : 49_407
+        if let n = vocab.count as Int?, let want = vocabEntries, want < n {
+            for k in vocab.keys.filter({ $0.hasPrefix("m") && $0.count > 1 }).prefix(n - want) { vocab[k] = nil }
+        }
         try JSONEncoder().encode(vocab).write(to: dir.appendingPathComponent("vocab.json"))
-        try "c a\nca t</w>\n".write(to: dir.appendingPathComponent("merges.txt"), atomically: true, encoding: .utf8)
+        try (lines.joined(separator: "\n") + "\n").write(to: dir.appendingPathComponent("merges.txt"), atomically: true, encoding: .utf8)
+        return dir
+    }
+
+    func testLoadsValidatedFullSizeFiles() throws {
+        let dir = try ml32FullSizeFiles()
+        defer { try? FileManager.default.removeItem(at: dir) }
         let t = try CLIPTokenizer(directory: dir)
-        XCTAssertEqual(Array(t.encode("cat").prefix(3)), [6, 5, 7])
-        XCTAssertThrowsError(try CLIPTokenizer(directory: dir.appendingPathComponent("nope")))
+        XCTAssertTrue(t.isValidated)
+        XCTAssertEqual(t.startID, 49_406); XCTAssertEqual(t.endID, 49_407)
+        XCTAssertEqual(t.encode("hi").count, 77)
+        XCTAssertEqual(try t.encodeChecked("hi").first, 49_406)
+        XCTAssertThrowsError(try CLIPTokenizer(directory: dir.appendingPathComponent("nope"))) {
+            guard case CLIPTokenizerError.fileMissing = $0 else { return XCTFail("\($0)") }
+        }
+    }
+
+    func testRealFilesAreValidated() throws {
+        func expect(_ dir: URL, _ check: (CLIPTokenizerError) -> Bool, _ label: String) throws {
+            defer { try? FileManager.default.removeItem(at: dir) }
+            XCTAssertThrowsError(try CLIPTokenizer(directory: dir), label) { e in
+                XCTAssertTrue((e as? CLIPTokenizerError).map(check) ?? false, "\(label): \(e)")
+            }
+        }
+        try expect(try ml32FullSizeFiles(dropMerges: 1), { if case .wrongMergeCount(48_894, 48_893) = $0 { return true }; return false }, "truncated merges")
+        try expect(try ml32FullSizeFiles(vocabEntries: 49_000), { if case .wrongVocabSize(49_408, 49_000) = $0 { return true }; return false }, "truncated vocab")
+        try expect(try ml32FullSizeFiles(swapSpecials: true), { if case .wrongSpecialTokenIDs = $0 { return true }; return false }, "swapped specials")
+        try expect(try ml32FullSizeFiles(dropByteSymbol: true), { if case .missingByteSymbol = $0 { return true }; return false }, "missing byte symbol")
+        // the hand-made 7-entry vocab is rejected by the file loader (it is only for init(vocab:merges:))
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ml32tiny-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try JSONEncoder().encode(["c": 1, "<start_of_text>": 2, "<end_of_text>": 3]).write(to: dir.appendingPathComponent("vocab.json"))
+        try "c a\n".write(to: dir.appendingPathComponent("merges.txt"), atomically: true, encoding: .utf8)
+        try expect(dir, { if case .wrongVocabSize = $0 { return true }; return false }, "tiny vocab from files")
+    }
+
+    func testMergeResultMissingFromVocabIsRejected() throws {
+        var vocab: [String: Int] = [:]
+        for s in CLIPTokenizer.makeByteToUnicode().values.sorted() { vocab[s] = vocab.count; vocab[s + "</w>"] = vocab.count }
+        var merges: [(String, String)] = []
+        for i in 0..<CLIPTokenizer.expectedMergeCount { merges.append(("m", "\(i)")); vocab["m\(i)"] = vocab.count }
+        vocab["<start_of_text>"] = 49_406; vocab["<end_of_text>"] = 49_407
+        XCTAssertNoThrow(try CLIPTokenizer.validate(vocab: vocab, merges: merges))
+        merges[5] = ("zz", "top")
+        XCTAssertThrowsError(try CLIPTokenizer.validate(vocab: vocab, merges: merges)) {
+            XCTAssertEqual($0 as? CLIPTokenizerError, .mergeResultNotInVocab("zztop"))
+        }
+    }
+
+    func testUnvalidatedTinyVocabStillWorksAndCheckedSurfacesDroppedSymbols() throws {
+        let t = try ml32TinyTokenizer()
+        XCTAssertFalse(t.isValidated)
+        XCTAssertEqual(Array(t.encode("cat").prefix(3)), [9, 8, 10])
+        // "z" is not in the tiny vocab: encode drops it silently, encodeChecked throws
+        XCTAssertEqual(Array(t.encode("z").prefix(2)), [9, 10])
+        XCTAssertThrowsError(try t.encodeChecked("z")) { guard case CLIPTokenizerError.unknownSymbol = $0 else { return XCTFail("\($0)") } }
+    }
+
+    // MARK: text cleanup (ftfy + html.unescape parity; expected strings checked against open_clip's tokenizer)
+    func testCleanupNFCComposesDecomposedAccents() {
+        XCTAssertEqual(CLIPTextCleaning.clean("e\u{0301}cole"), "\u{E9}cole")
+    }
+    func testCleanupExpandsLigatures() {
+        XCTAssertEqual(CLIPTextCleaning.clean("\u{FB01}sh \u{FB02}our \u{FB03}"), "fish flour ffi")
+        XCTAssertEqual(CLIPTextCleaning.clean("\u{FB05}"), "\u{17F}t")   // ftfy gives long-s + t
+        XCTAssertEqual(CLIPTextCleaning.clean("\u{0132}\u{0133}"), "IJij")
+    }
+    func testCleanupUnescapesHTMLTwice() {
+        XCTAssertEqual(CLIPTextCleaning.clean("&amp; &lt;b&gt;"), "& <b>")
+        XCTAssertEqual(CLIPTextCleaning.clean("&amp;amp; x"), "& x")           // two passes, like html.unescape x2
+        XCTAssertEqual(CLIPTextCleaning.clean("&#39;s &quot;hi&quot; &eacute; &#x41;"), "'s \"hi\" \u{E9} A")
+        XCTAssertEqual(CLIPTextCleaning.clean("AT&T & co"), "AT&T & co")          // stray ampersands stay
+    }
+    func testCleanupRemovesNULAndControls() {
+        XCTAssertEqual(CLIPTextCleaning.clean("a\u{0}b"), "ab")
+        XCTAssertEqual(CLIPTextCleaning.clean("a\u{1}b\u{7}c"), "abc")
+        XCTAssertEqual(CLIPTextCleaning.clean("a\tb\nc"), "a\tb\nc")
+    }
+    func testCleanupFixesMojibakeAndUncurlsQuotes() {
+        XCTAssertEqual(CLIPTextCleaning.clean("caf\u{C3}\u{A9}"), "caf\u{E9}")
+        XCTAssertEqual(CLIPTextCleaning.clean("caf\u{E9}"), "caf\u{E9}")       // a real é is left alone
+        XCTAssertEqual(CLIPTextCleaning.clean("it\u{2019}s \u{201C}q\u{201D}"), "it's \"q\"")
+        XCTAssertEqual(CLIPTextCleaning.clean("\u{FF21}\u{FF22}\u{FF43} \u{FF46}"), "ABc f")
+    }
+    func testCleanupReachesTokenizer() throws {
+        let t = try ml32TinyTokenizer()
+        XCTAssertEqual(t.encode("c&#97;t"), t.encode("cat"))
     }
 
     // MARK: golden parity with open_clip (PR 7 fixture)
@@ -116,6 +215,25 @@ final class MLEncodersTests: XCTestCase {
         }
         let t = try CLIPTokenizer(directory: URL(fileURLWithPath: dir))
         for (text, ids) in try golden() { XCTAssertEqual(t.encode(text), ids, "phrase: \(text)") }
+    }
+
+    /// Optional wider comparison: `extra_golden.json` next to the real vocab (same shape as the fixture,
+    /// generated locally from open_clip; see PR 32 notes). Prints the match count.
+    func testRealVocabMatchesExtraGoldenIfPresent() throws {
+        guard let dir = ProcessInfo.processInfo.environment["RECALL_TOKENIZER_DIR"] else {
+            throw XCTSkip("RECALL_TOKENIZER_DIR not set")
+        }
+        let url = URL(fileURLWithPath: dir).appendingPathComponent("extra_golden.json")
+        guard let data = try? Data(contentsOf: url) else { throw XCTSkip("no extra_golden.json in RECALL_TOKENIZER_DIR") }
+        let arr = try JSONSerialization.jsonObject(with: data) as! [[String: Any]]
+        let t = try CLIPTokenizer(directory: URL(fileURLWithPath: dir))
+        var bad: [String] = []
+        for e in arr {
+            let ids = (e["ids"] as! [Int]).map { Int32($0) }
+            if t.encode(e["text"] as! String) != ids { bad.append((e["text"] as! String).debugDescription) }
+        }
+        print("EXTRA-GOLDEN: \(arr.count - bad.count)/\(arr.count) match; mismatches: \(bad)")
+        XCTAssertTrue(bad.isEmpty, "mismatches: \(bad)")
     }
 
     // MARK: embeddings

@@ -24,7 +24,7 @@ let package = Package(
         .target(name: "PlannerCore", path: "Sources/Planner",
                 sources: ["PlannerTypes.swift", "KeywordPlanner.swift", "GeminiPlanner.swift", "FallbackPlanner.swift"]),
         .target(name: "Retrieval", dependencies: ["Memory"], path: "Sources/Retrieval",
-                sources: ["Retriever.swift", "TextEncoder.swift", "CLIPTokenizer.swift"]),
+                sources: ["Retriever.swift", "TextEncoder.swift", "CLIPTokenizer.swift", "CLIPTextCleaning.swift"]),
         .target(name: "MLEncoders", dependencies: ["Retrieval", "FindExecutor", "PerceptionCore", "Memory"], path: "Sources/MLEncoders", exclude: ["README.md"]),
         .target(name: "FindExecutor", dependencies: ["Memory", "Retrieval"], path: "Sources/FindExecutor",
                 sources: ["FindExecutor.swift", "FindTrace.swift", "Protocols.swift"]),
