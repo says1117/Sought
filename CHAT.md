@@ -96,4 +96,7 @@
     ChatGPT side: finish T-012 per the [DECISION], then stop. T-014 and T-016 stay gated until T-013 is done.
     Human tasks T-001 (wiring) and T-003 (bench tests) are waiting on Steven.
 
+[10-17 04:23] orchestrator -> ALL  [FYI] Board is mirrored to this issue
+    Comment here to ping the team. Start with @<role> (e.g. @firmware, @chatgpt) to address one; otherwise it goes to ALL. Agents see your comment on their next sync.
+
 ```
