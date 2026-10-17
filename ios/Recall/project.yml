@@ -37,8 +37,14 @@ targets:
         excludes: ["**/.gitkeep"]
       - path: Sources/DriveLink/DriveLinkProtocol.swift
       - path: Sources/Pose/PoseMath.swift
+      - path: Sources/ObstacleGuard
+        excludes: ["DepthAdapter.swift", "README.md"]
       - path: Sources/Controller/ControllerMath.swift
       - path: Sources/Controller/Controller.swift
+      - path: Sources/SelfTest/SelfTestTypes.swift
+      - path: Sources/SelfTest/SelfTestMetrics.swift
+      - path: Sources/SelfTest/SelfTestSteps.swift
+      - path: Sources/SelfTest/SelfTestEngine.swift
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES

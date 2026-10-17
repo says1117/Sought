@@ -4,7 +4,13 @@ import Foundation
 // Not compiled by the agent: no Xcode on the machine that wrote it.
 
 extension PoseTracker: PoseSource {
-    func latest() -> (pose: Pose2D?, tracking: TrackingKind) { (pose, tracking) }
+    func latest() -> (pose: Pose2D?, tracking: TrackingKind) {
+        guard let frame = session.currentFrame,
+              ProcessInfo.processInfo.systemUptime - frame.timestamp <= 1.0 else {
+            return (nil, .notAvailable)
+        }
+        return (pose, tracking)
+    }
 }
 
 // DriveLink.drive(left:right:) and stop() already match the protocol.
