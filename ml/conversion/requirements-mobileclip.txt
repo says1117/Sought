@@ -1,0 +1,3 @@
+# Apple's reference model code, pinned. Installed with --no-deps because its metadata asks for
+# torch>=2.8 although it runs fine on torch 2.7.0 (verified by the parity check).
+git+https://github.com/apple/ml-mobileclip.git@48faa0fea4b08d74188b3841771aca6ff2c92852
