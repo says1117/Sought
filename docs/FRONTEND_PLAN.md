@@ -76,6 +76,7 @@ Auth is a bearer token from the `RECALL_TOKEN` environment variable. `GET /media
 | `/evals` | Proof | Tables and charts from `/api/evals`, `n` on every one. **Empty state "No results yet"** until a real run exists. Link to `04_EVALS.md` |
 | `/about` | Pitch | The problem, the one-line pitch, the architecture, what is measured, honest limits, repo link |
 | `/changes`, `/patrols` | Optional | Only an empty state |
+| Come to me button | Stretch, after the first real find | A button with a room picker (taught waypoints). It posts a remote command to the backend. See `docs/COME_TO_ME_PLAN.md` for the proposed payload (`kind: come_to_me`, `target: {waypoint_id}` or `{pose, map_id}`). Status shows as `coming_to_user` in the heartbeat. Not live until Steven confirms the phone polls for commands |
 
 Every page needs loading, empty and error states. Never show invented numbers. Sample data must be labeled SAMPLE DATA in the UI and must never appear in public screenshots.
 
@@ -94,6 +95,8 @@ The AI-track judges read this. Numbers come only from files in `evals/results/` 
 Proven on real hardware: the Bluetooth link, forward and turn directions, the 300 ms watchdog stop (about 0.28 s measured on the status stream), the front stop, and the safety logic with 35 host tests.
 
 Built and unit-tested but not yet run on the robot: pose tracking, driving to a point, obstacle slowdown, object memory, retrieval and the arrival check, the planner and coordinator, Teach waypoints.
+
+Come to me is a planned stretch (version 2) and must not be shown as working until it has been run on two phones.
 
 Do not claim: that the robot finds objects (until a real find is logged), any accuracy, latency or success rate, patrol or change detection, come to me, autonomous exploration, or anything about the dashboard being fed by live objects before Steven says so.
 
