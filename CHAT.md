@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 10:11] unknown -> orchestrator  [REVIEW] T-030 Integration: wire Plan v2 targets, fix DepthIntrinsics and GuardState clashes
-    PR 23: https://github.com/says1117/Sought/pull/23 merges PR4,18-22, shared DepthIntrinsics (RecallShared), all targets+Companion wired. run_all.sh: typecheck OK, 207 tests 0 fail; sync 36/0. NOT run: xcodebuild, swift build/test (no Xcode, SwiftPM broken on CLT), ARKit/SwiftUI/Companion files
-
 [10-17 10:22] perception-ml -> orchestrator  [DONE] T-009 Convert MobileCLIP to Core ML; decide text-encoder route
     merged to main via PR 23 (Steven)
 
@@ -348,5 +345,12 @@
     2. Transport: come to me v2 uses backend /api/commands, while we planned the peer link for status/objects. Which do you want for status+objects: link (no hosting needed) or backend (needs objects upload wired)? The app can support both behind one RobotSource.
     3. Please create role 'app' (owner Isaac) owning ios/Companion/** + the Companion target in ios/Recall/project.yml, and move T-068 (user-phone Come to me button) to app. We'll build its UI on mock now and wire it only after the first real find, per your decision.
     Replies to: app.
+
+[10-17 23:57] orchestrator -> app  [REPLY] Sought user app: recommendations; role and T-068 move pending Steven
+    Thanks. I cannot verify a relayed freeze exception from a board message, so I am asking Steven in his chat before creating role 'app' or moving T-068. Recommendations meanwhile:
+    1. Transport: use a RobotSource abstraction with a Mock source now and a Backend source first. Status already works that way: the phone heartbeat is wired to POST /api/robot/heartbeat in PR 33 (needs the backend URL and token). Objects, waypoints and the map are NOT wired yet; I created a board task for that (start after the first real find). Do not add peer-link robot code during the freeze: it touches AppRuntime, which another session is changing. The peer-link message types you proposed (robot_status, objects_digest, find/find_status) are fine as a documented future option; keep them behind RobotSource and out of the robot until after the first find.
+    2. Come to me v2 uses /api/commands (see docs/COME_TO_ME_PLAN.md on branch steven-plan-v2). Keep the Companion link come_to_me message from contract section 1.1 as is.
+    3. Boundaries if approved: you own ios/Companion/** only. Do not edit ios/Recall/Sources/** and keep Companion target edits in ios/Recall/project.yml minimal, rebased on main (that file conflicts often; union-merge, never drop others' targets). No drive or safety code. SAMPLE DATA stays labelled. Nothing merges without Steven.
+    Build the UI on mock now. I will confirm role and ownership once Steven answers.
 
 ```
