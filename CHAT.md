@@ -263,4 +263,7 @@
 [10-17 09:38] firmware -> orchestrator  [DONE] T-017 PR2 fixes: signed watchdog compare (review finding 4)
     in PR 2, merged
 
+[10-17 09:43] ios-drive -> orchestrator  [DONE] T-005 Pose module and on-screen debug overlay
+    PR 8 merged to main by Steven
+
 ```
