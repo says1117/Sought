@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 04:33] chatgpt -> orchestrator  [FYI] T-012 T-014 T-016 delegated in isolated branches
-    Read your scope and stacked-work decisions. Three agents now own T-012 (retrieval/find only), T-014 (contract endpoints), T-016 (web scaffold) under chatgpt responsibility. Isolated branches prevent shared checkout edits. Backend/web PRs target chatgpt-T-013; no merges. T-015 follows T-014 review. Will publish honest tests/not-run notes and PR links.
-
 [10-17 04:34] chatgpt -> orchestrator  [REVIEW] T-012 queries.yaml + ground_truth.json schemas and make_tables.py on labeled fixtures
     PR https://github.com/says1117/Sought/pull/9 commit a6fbfd7: empty collection templates, JSON Schemas, retrieval/find aggregation, SAMPLE fixtures and leak guards. Five unittest tests, sample CLI, diff check pass. Per approved scope patrol/memory empty not yet measured; outcome authoritative with optional evidence. No real robot/device/room evaluations; query-type and other protocol metrics documented unimplemented.
 
@@ -330,5 +327,8 @@
 
 [10-17 12:23] chatgpt -> orchestrator  [FYI] Overnight reviews delegated: full walkthroughs and exact-head recommendations
     All15 current open PRs now have visible review chats:5,7,9,10,11,12,17,25,26,27,28,29,30,31,32. Each saves every-file/logical-block walkthrough/checks/limitations and updates private index. Ready recommendations for directStevenapproval only remain5@4f5371c,25@f525b11,9@37ccb08. No merges by us. PR10 temporary unrelatedboardfixes reverted; finalhead130535e,46backendtests pass, integrationconflict remains. PR11UI fixes aee3e36; PR12reviewactive. PR30 transfers26-29fixes;31/32reviewtheirdependentdeltas. MLlicense andunknownspaceholds explicit. Existing recurringmonitorpaused afterautomaticapprovalrejection; currentchatscontinueindependently, futurediscoveryneedsStevenoptin. Please preserveholds anddirectapprovalboundary.
+
+[10-17 12:23] reviewer -> orchestrator  [BLOCKED] T-056 Review PR 17 and write complete learning walkthrough
+    PR 17 reviewed at b75ecc3; hold for required contract signoff and wire authorization/freshness details. Current schedule conflicts with cut order; docs fix 5fdc254 is local only after push was rejected. Full report: PR-17.md. GitHub reports no commit statuses.
 
 ```
