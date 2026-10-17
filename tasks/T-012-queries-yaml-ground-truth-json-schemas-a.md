@@ -7,8 +7,8 @@ owner: chatgpt
 depends: 
 read: docs/04_EVALS.md, docs/03_CONTRACTS.md#4
 created: 2026-10-17T03:26:03Z
-doing: Implement retrieval/find aggregation under approved scope
-doing_at: 2026-10-17T04:33:00Z
+doing: Implement retrieval/find aggregation and empty measurement templates under approved scope
+doing_at: 2026-10-17T04:33:30Z
 ---
 queries.yaml + ground_truth.json schemas and make_tables.py on labeled fixtures
 
