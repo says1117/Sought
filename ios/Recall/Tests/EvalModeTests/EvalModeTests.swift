@@ -282,7 +282,7 @@ final class EvalModeTests: XCTestCase {
         XCTAssertEqual(t1.arrivalDistM, 0.4)
 
         XCTAssertEqual(logger.record(trace: try evalTestTrace(outcome: "success", found: "trk_3", ranked: ranked),
-                                     queryID: "q2", targets: ["SAMPLE_bag_a"]).outcome, .wrongObject)
+                                     queryID: "q2", targets: ["SAMPLE_bag_a"], arrivalDistM: 0.2).outcome, .wrongObject)
         XCTAssertEqual(logger.record(trace: try evalTestTrace(outcome: "not_found", found: nil, ranked: ranked),
                                      queryID: "q3", targets: ["SAMPLE_bag_a"]).outcome, .notFound)
         XCTAssertEqual(logger.record(trace: try evalTestTrace(outcome: "aborted", found: nil, ranked: ranked),
@@ -295,6 +295,66 @@ final class EvalModeTests: XCTestCase {
         let obj = try XCTUnwrap(JSONSerialization.jsonObject(with: run.jsonData()) as? [String: Any])
         XCTAssertEqual(obj["kind"] as? String, "find")
         XCTAssertThrowsError(try logger.makeRun(variant: "clip_full_proposals", commit: "c", phoneHeight: "h", tauImg: 0.8, textFraction: 0.9))
+    }
+
+    private func strict(_ outcome: String = "success", found: String?, targets: [String], dist: Double?) throws -> EvalTrial {
+        let logger = EvalFindTrialLogger(truth: EvalTestFixtures.truth)
+        let ranked = [("trk_1", 0.9, 1.1, -2.0), ("trk_3", 0.5, 0.05, 0.0)]
+        return logger.record(trace: try evalTestTrace(outcome: outcome, found: found, ranked: ranked),
+                             queryID: "q", targets: targets, arrivalDistM: dist)
+    }
+
+    func testFindStrictSuccess() throws {
+        let t = try strict(found: "trk_1", targets: ["SAMPLE_bag_a"], dist: 0.3)
+        XCTAssertEqual(t.outcome, .success)
+    }
+
+    func testFindArrivalTooFarIsNotSuccess() throws {
+        let t = try strict(found: "trk_1", targets: ["SAMPLE_bag_a"], dist: 0.61)
+        XCTAssertEqual(t.outcome, .notFound)
+        XCTAssertTrue(t.notes.contains("arrival"))
+    }
+
+    func testFindExactBoundaryIsSuccess() throws {
+        XCTAssertEqual(try strict(found: "trk_1", targets: ["SAMPLE_bag_a"], dist: 0.6).outcome, .success)
+    }
+
+    func testFindDistanceMissingIsAborted() throws {
+        let t = try strict(found: "trk_1", targets: ["SAMPLE_bag_a"], dist: nil)
+        XCTAssertEqual(t.outcome, .aborted)
+        XCTAssertTrue(t.notes.contains("unevaluable"))
+        XCTAssertEqual(try strict(found: "trk_1", targets: ["SAMPLE_bag_a"], dist: .nan).outcome, .aborted)
+        XCTAssertEqual(try strict(found: "trk_1", targets: ["SAMPLE_bag_a"], dist: -0.1).outcome, .aborted)
+    }
+
+    func testFindAcceptedNilOnSuccessIsAborted() throws {
+        let t = try strict(found: nil, targets: ["SAMPLE_bag_a"], dist: 0.2)
+        XCTAssertEqual(t.outcome, .aborted)
+        XCTAssertTrue(t.notes.contains("no accepted track"))
+    }
+
+    func testFindWrongObjectIsFalseAccept() throws {
+        let t = try strict(found: "trk_3", targets: ["SAMPLE_bag_a"], dist: nil)
+        XCTAssertEqual(t.outcome, .wrongObject)
+        XCTAssertTrue(t.notes.contains("false accept"))
+    }
+
+    func testFindAmbiguousTargetEitherIdAccepted() throws {
+        let both = ["SAMPLE_bag_a", "SAMPLE_bag_b"]
+        XCTAssertEqual(try strict(found: "trk_1", targets: both, dist: 0.5).outcome, .success)
+        // trk_3 resolves to the mug, which is not one of the two valid bags.
+        XCTAssertEqual(try strict(found: "trk_3", targets: both, dist: 0.5).outcome, .wrongObject)
+    }
+
+    func testFindMissingGroundTruthIsAborted() throws {
+        XCTAssertEqual(try strict(found: "trk_1", targets: ["ghost"], dist: 0.2).outcome, .aborted)
+        XCTAssertEqual(try strict(found: "trk_1", targets: [], dist: 0.2).outcome, .aborted)
+    }
+
+    func testFindTraceNotFoundAndAbortedPassThrough() throws {
+        XCTAssertEqual(try strict("not_found", found: nil, targets: ["SAMPLE_bag_a"], dist: nil).outcome, .notFound)
+        XCTAssertEqual(try strict("aborted", found: nil, targets: ["SAMPLE_bag_a"], dist: nil).outcome, .aborted)
+        XCTAssertEqual(try strict("weird", found: "trk_1", targets: ["SAMPLE_bag_a"], dist: 0.1).outcome, .aborted)
     }
 
     func testFindLoggerRecordsAttemptDetail() throws {
