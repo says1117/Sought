@@ -55,6 +55,10 @@ volatile int cmdL = 0, cmdR = 0;           // last command from the phone
 volatile unsigned long lastCmdMs = 0;
 volatile bool cmdValid = false;            // false at boot, after STOP, after disconnect
 volatile bool pongPending = false;
+portMUX_TYPE commandMux = portMUX_INITIALIZER_UNLOCKED;
+char rxBuffer[24];
+size_t rxLength = 0;
+bool rxOverflow = false;
 
 int appliedL = 0, appliedR = 0;            // speeds actually applied (-255..255)
 
@@ -149,11 +153,23 @@ void sonarTick(unsigned long now) {
 
 // ---------------------------------------------------------------- BLE
 class ServerCb : public BLEServerCallbacks {
-  void onConnect(BLEServer*) override { connected = true; }
+  void onConnect(BLEServer*) override {
+    portENTER_CRITICAL(&commandMux);
+    cmdL = cmdR = 0;
+    cmdValid = false;
+    pongPending = false;
+    rxLength = 0; rxOverflow = false;
+    connected = true;
+    portEXIT_CRITICAL(&commandMux);
+  }
   void onDisconnect(BLEServer*) override {
+    portENTER_CRITICAL(&commandMux);
     connected = false;
     cmdValid = false;                      // loop() brakes within one tick
     cmdL = cmdR = 0;
+    pongPending = false;
+    rxLength = 0; rxOverflow = false;
+    portEXIT_CRITICAL(&commandMux);
     BLEDevice::startAdvertising();
   }
 };
@@ -187,21 +203,23 @@ void handleLine(const char* line) {
 
 class RxCb : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic* c) override {
-    static char buf[24];
-    static size_t len = 0;
-    static bool overflow = false;
     String v = c->getValue();
+    portENTER_CRITICAL(&commandMux);
+    if (!connected) { portEXIT_CRITICAL(&commandMux); return; }
     for (size_t i = 0; i < v.length(); i++) {
       char ch = v[i];
       if (ch == '\n' || ch == '\r') {
-        if (!overflow && len > 0) { buf[len] = '\0'; handleLine(buf); }
-        len = 0; overflow = false;
-      } else if (len < sizeof(buf) - 1) {
-        buf[len++] = ch;
+        if (!rxOverflow && rxLength > 0) { rxBuffer[rxLength] = '\0'; handleLine(rxBuffer); }
+        rxLength = 0; rxOverflow = false;
+      } else if (ch < 32 || ch > 126) {
+        rxOverflow = true;
+      } else if (rxLength < sizeof(rxBuffer) - 1) {
+        rxBuffer[rxLength++] = ch;
       } else {
-        overflow = true;
+        rxOverflow = true;
       }
     }
+    portEXIT_CRITICAL(&commandMux);
   }
 };
 
@@ -226,8 +244,12 @@ void setupBle() {
 }
 
 void notifyText(const char* s) {
-  txChar->setValue((uint8_t*)s, strlen(s));
-  txChar->notify();
+  size_t length = strlen(s);
+  for (size_t offset = 0; offset < length; offset += 20) {
+    size_t count = min((size_t)20, length - offset);
+    txChar->setValue((uint8_t*)s + offset, count);
+    txChar->notify();
+  }
 }
 
 // ---------------------------------------------------------------- setup / loop
@@ -269,15 +291,21 @@ void loop() {
 
   // lastCmdMs is written from the BLE task and can be newer than `now`; compare as
   // signed so that reads as age <= 0 (fresh) instead of wrapping to a huge age.
+  portENTER_CRITICAL(&commandMux);
   unsigned long last = lastCmdMs;
-  bool fresh = cmdValid && connected && (long)(now - last) < (long)WATCHDOG_MS;
+  bool valid = cmdValid, connectedNow = connected;
+  int requestedL = cmdL, requestedR = cmdR;
+  bool sendPong = pongPending;
+  pongPending = false;
+  portEXIT_CRITICAL(&commandMux);
+  bool fresh = valid && connectedNow && (long)(now - last) < (long)WATCHDOG_MS;
 
   if (!fresh) {
     // Watchdog / STOP / disconnect: brake and zero immediately, no ramp.
     appliedL = appliedR = 0;
     applyMotors(0, 0);
   } else {
-    int l = cmdL, r = cmdR;
+    int l = requestedL, r = requestedR;
     int linear = (l + r) / 2, angular = (r - l) / 2;
     int safeLinear = linear;
     if (frontBlocked) safeLinear = min(safeLinear, 0);
@@ -287,17 +315,23 @@ void loop() {
     int tr = constrain(safeLinear + angular, -255, 255);
     if (clamped) { appliedL = tl; appliedR = tr; }   // obstacle stops are immediate, not ramped
     else { appliedL = slew(appliedL, tl); appliedR = slew(appliedR, tr); }
+    int appliedSum = appliedL + appliedR;
+    if ((frontBlocked && appliedSum > 0) || (rearBlocked && appliedSum < 0)) {
+      int appliedAngular = (appliedR - appliedL) / 2;
+      appliedL = -appliedAngular;
+      appliedR = appliedAngular;
+    }
     applyMotors(appliedL, appliedR);
   }
 
   // LED: solid when commands are fresh, slow blink when connected and idle, fast blink when advertising
   if (fresh)          digitalWrite(PIN_LED, HIGH);
-  else if (connected) digitalWrite(PIN_LED, (now / 500) % 2);
+  else if (connectedNow) digitalWrite(PIN_LED, (now / 500) % 2);
   else                digitalWrite(PIN_LED, (now / 150) % 2);
 
-  if (connected && pongPending) { pongPending = false; notifyText("PONG\n"); }
+  if (connectedNow && sendPong) { notifyText("PONG\n"); }
 
-  if (connected && now - lastStatus >= STATUS_MS) {
+  if (connectedNow && now - lastStatus >= STATUS_MS) {
     lastStatus = now;
     int flags = (fresh ? 0 : FLAG_WATCHDOG) | (frontBlocked ? FLAG_FRONT : 0) |
                 (rearBlocked ? FLAG_REAR : 0) | FLAG_CONNECTED;
@@ -308,7 +342,7 @@ void loop() {
 
   if (now - lastDebug >= DEBUG_MS) {
     lastDebug = now;
-    Serial.printf("conn=%d fresh=%d cmd=%d,%d applied=%d,%d front=%d rear=%d\n", (int)connected, (int)fresh,
-                  (int)cmdL, (int)cmdR, appliedL, appliedR, front, rear);
+    Serial.printf("conn=%d fresh=%d cmd=%d,%d applied=%d,%d front=%d rear=%d\n", (int)connectedNow, (int)fresh,
+                  requestedL, requestedR, appliedL, appliedR, front, rear);
   }
 }
