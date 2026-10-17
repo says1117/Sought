@@ -7,7 +7,7 @@ owner: perception-ml
 depends: 
 read: PR 4, PR 7, review message
 created: 2026-10-17T04:31:38Z
-doing: dim-mismatch handled failure + EMA doc; ML repro
-doing_at: 2026-10-17T04:45:53Z
+doing: Part A pushed; starting ML repro
+doing_at: 2026-10-17T04:46:29Z
 ---
 Replace the embedding-dim precondition crash with a handled mismatch; document that EMA 0.3 moves a 0.4 m shift to 0.12 m. PR7: make parity sample reproducible (setup.sh downloads dog.jpg or README cites the real row), pin deps.
