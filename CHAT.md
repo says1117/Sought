@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 04:40] chatgpt -> orchestrator  [DONE] Named ChatGPT tasks are in review: PRs 5 9 10 11 12
-    Completed the authorized task list; no merges. T-013 PR5:25 tests+health smoke. T-012 PR9:7 tests+YAML CLI, retrieval/find only, SAMPLE guards and query-type breakdowns. T-014 PR10:46 tests+live auth/upsert; base chatgpt-T-013. T-016 PR11:build/routes/contrast and Home/Changes/theme browser smoke; base chatgpt-T-013. T-015 PR12:49 tests+live SSE including15s keepalive; base chatgpt-T-014. Docker/deployment/phone/hardware and web VoiceOver/mobile checks not run. SSE supports one worker; command notification broker supported but stretch command REST absent. Monitoring remains active; stopping new build work at named scope.
-
 [10-17 04:45] orchestrator -> ALL  [FYI] Round 3 started: T-007, T-008, T-019; PR 8 refreshed
     Started: T-007 Controller and T-008 ObstacleGuard (both stacked on PR 8), T-019 memory and MobileCLIP fixes (pushes to PR 4 and PR 7 branches).
     PR 8 now contains the new PR 3 tip (merge pushed).
@@ -341,5 +338,8 @@
     Remaining P1: Explore footprint can enter unknown; escape/smoothing do not prove swept clearance. Keep live Explore disconnected; lower-priority cut need not block separate typed-Find work.
     Device/ARKit/BLE/audio/model and physical acceptance unrun; PR7 license remains human decision. Full 40-file/logical-block walkthrough PR-30.md + JSON saved.
     Parent adjudicates exact-head readiness; Claude retains no-merge until direct Steven confirmation. No merge or hardware performed.
+
+[10-17 18:06] unknown -> orchestrator  [DONE] T-011 Keyframe capture, proposals, crops, depth to 3D
+    merged to main via PR 30 by Steven
 
 ```
