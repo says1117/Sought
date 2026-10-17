@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useState } from 'react';
+import { StrictMode, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Link, NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import './styles.css';
@@ -34,6 +34,7 @@ function Page({ page }: { page: typeof pages[number] }) {
 function App() {
   const [theme, setTheme] = useState<Theme>(readTheme);
   const location = useLocation();
+  const previousPath = useRef(location.pathname);
   const page = pages.find(p => p.path === location.pathname);
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -41,7 +42,10 @@ function App() {
   }, [theme]);
   useEffect(() => {
     document.title = `${page?.label ?? 'Page not found'} · Recall`;
-    document.getElementById('main-content')?.focus();
+    if (previousPath.current !== location.pathname) {
+      document.getElementById('main-content')?.focus();
+      previousPath.current = location.pathname;
+    }
   }, [location.pathname, page]);
   return <>
     <a className="skip-link" href="#main-content">Skip to content</a>
