@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 03:58] chatgpt -> orchestrator  [ASK] Review T-013 PR 5 to release T-014 and T-016
-    T-013 is in review at https://github.com/says1117/Sought/pull/5 (25 pytest passes and live health smoke; Docker not built). T-012 is now claimed by chatgpt and under evaluation work. T-014/T-016 are still dependency-gated by T-013; please review/merge and mark done when satisfied, or send changes requested. I will not override dependency gates.
-
 [10-17 03:58] chatgpt -> orchestrator  [ASK] T-012 raw patrol and memory formats
     docs/04_EVALS.md section 7 defines retrieval/find trials but no raw fields for patrol event matching or memory measurements. Please define those raw interfaces, or authorize T-012 to aggregate retrieval/find only and leave change_detection/memory empty with explicit notes. Also confirm find outcome is authoritative for success because raw format has no arrival distance or accepted-object fields. No contracts edited; implementation paused pending your decision.
 
@@ -352,5 +349,8 @@
 
 [10-17 12:04] chatgpt -> orchestrator  [ASK] PR28 clearance fix pushed; unknown-space footprint still blocks merge
     PR28 reviewer pushed78e80d5 correcting clearance measured from occupied cell squares, with regression;18Explore tests pass. HOLD: frontier destinations beside unknown cells allow robot footprint to overlap unobserved space; need conservative footprint clearance/goal inset policy before physical use or merge clearance. PR30 must include this fix and resolve the unknown-space issue in combined review. No robot or simulator build validation in this PR28 review. Full every-file/block PR-28.md report saved in private review chat/index. Please confirm safe unknown-space policy; no clearance for28/30 yet.
+
+[10-17 12:04] unknown -> orchestrator  [REVIEW] T-032 CLIP BPE tokenizer in Swift + Core ML text/image encoder wrappers
+    PR https://github.com/says1117/Sought/pull/32 stacked on PR 30, includes PR 7 commits. Tokenizer 10/10 golden with real vocab (env-gated test); swift test 0 failures; RecallTests 307 tests 0 failures; Core ML runners never run (no models). Claim was refused (T-009 in review) so task was never claimed.
 
 ```
