@@ -368,6 +368,19 @@ final class SelfTestEngineTests: XCTestCase {
         XCTAssertTrue(e.results.first!.reason.contains("never stopped"), e.results.first!.reason)
     }
 
+    func testObstacleStepStopsWhenGuardFeedDisappearsDuringApproach() {
+        let world = SimWorld()
+        let engine = engine([.obstacle])
+        let trace = runEngine(engine, world, beforeTick: { world, elapsed in
+            if elapsed > 1 { world.guardFeed = false }
+        })
+        XCTAssertTrue(trace.commands.contains { if case .drive = $0 { return true }; return false })
+        XCTAssertEqual(trace.commands.last, .stop)
+        XCTAssertFalse(engine.results.first!.pass)
+        XCTAssertTrue(engine.results.first!.reason.contains("feed lost"))
+        XCTAssertLessThan(trace.seconds, 2)
+    }
+
     func testObstacleStepStopsBeforeContact() {
         let w = SimWorld()
         let e = engine([.obstacle])

@@ -131,9 +131,15 @@ def analyze_wheels_off(log, th):
     if not b:
         return c
     worst = None
-    for ps in log.ev("phase_start", "wheels_off"):
+    starts = log.ev("phase_start", "wheels_off")
+    for phase in ("forward", "back", "spin_left", "spin_right"):
+        matches = [event for event in starts if event.get("phase") == phase]
+        if len(matches) != 1:
+            c.add(f"{phase} phase records", None, "==", 1)
+    for ps in starts:
         pe = next((e for e in log.ev("phase_end", "wheels_off") if e.get("phase") == ps.get("phase") and e["t"] >= ps["t"]), None)
         if not pe:
+            c.add(f"{ps.get('phase')} phase end", None, "==", 1)
             continue
         win = log.status_in(ps["t"] + th["wheel_settle_s"], pe["t"] + 0.05)
         name = ps["phase"]
@@ -158,13 +164,16 @@ def analyze_watchdog(log, th):
     sus, res = log.first("watchdog_suspend", "watchdog"), log.first("watchdog_resume", "watchdog")
     if not sus:
         return c
-    after = [s for s in log.status if s["t"] >= sus["t"]]
+    end = log.step_end("watchdog")
+    silent_end = (res or end or {}).get("t", sus["t"])
+    after = [s for s in log.status if sus["t"] <= s["t"] < silent_end]
     stop = next((s for s in after if s["left"] == 0 and s["right"] == 0), None)
     flag = next((s for s in after if s["flags"] & 1), None)
     c.add("motors read 0 after commands stop", None if not stop else round(stop["t"] - sus["t"], 3), "<=", th["watchdog_stop_limit_s"], "s")
     c.add("watchdog flag (1) set", None if not after else (1 if flag else 0), "==", 1)
     if res:
-        back = next((s for s in log.status if s["t"] >= res["t"] and (s["left"] or s["right"]) and not s["flags"] & 1), None)
+        back = next((s for s in log.status if res["t"] <= s["t"] <= (end or {}).get("t", res["t"])
+                     and (s["left"] or s["right"]) and not s["flags"] & 1), None)
         c.add("motors resume after next command", None if not back else round(back["t"] - res["t"], 3), "<=", th["watchdog_resume_limit_s"], "s")
     else:
         c.add("motors resume after next command", None, "<=", th["watchdog_resume_limit_s"], "s")
@@ -279,6 +288,7 @@ def analyze(records, th, source="", bad_lines=0):
     steps["incidents"] = {"status": inc.overall() if log.events else "not_run", "checks": inc.items, "metrics": inc.metrics, "app_verdict": None}
     aborts = [e.get("reason") for e in log.ev("abort")]
     halted = [e.get("reason") for e in log.ev("run_halted")]
+    incomplete_steps = [name for name in STEPS if log.step_end(name) is None]
     manual = [{"step": e.get("step"), "key": e.get("key"), "value": e.get("value")} for e in log.ev("manual_measurement")]
     statuses = [v["status"] for k, v in steps.items() if v["status"] != "not_run"]
     if not statuses:
@@ -287,7 +297,7 @@ def analyze(records, th, source="", bad_lines=0):
         overall = "fail"
     elif "no_data" in statuses:
         overall = "no_data"
-    elif any(steps[n]["status"] == "not_run" for n in STEPS):
+    elif bad_lines or incomplete_steps or any(steps[n]["status"] == "not_run" for n in STEPS):
         overall = "incomplete"      # a partial run is never reported as an overall pass
     else:
         overall = "pass"

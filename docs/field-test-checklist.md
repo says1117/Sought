@@ -39,8 +39,8 @@ Between floor steps the app asks you to put the rover back on its start mark and
 
 ## After the run
 
-1. Tap **Export log (JSONL)** and send it to the laptop (AirDrop, Files).
-2. Optional but recommended: tape-measure the rover from its start mark after steps 2 and 3 and enter it in the app (logged as `manual_measurement`, shown in the report as human-measured).
+1. Optional but recommended: tape-measure the rover from its start mark immediately after steps 2 and 3, before repositioning it. Save those readings and enter them in the app after the run (logged as `manual_measurement`, shown in the report as human-measured).
+2. Tap **Export log (JSONL)** after entering measurements and send it to the laptop (AirDrop, Files).
 3. Run:
 
 ```bash

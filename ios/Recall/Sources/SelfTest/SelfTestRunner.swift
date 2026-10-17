@@ -4,14 +4,14 @@ import SwiftUI
 // App-only glue: connects SelfTestEngine to DriveLink, PoseTracker and ObstacleGuard, writes the JSONL log.
 // NOT compiled or run by the author: no Xcode on the machine that wrote it. Real iPhone + rover only.
 
-/// Appends one JSON object per line to a file in Documents. Flushes every line so a crash or abort loses nothing.
+/// Appends JSONL records, including manual measurements entered after the run ends.
 final class SelfTestLogFile {
     let url: URL
     private var handle: FileHandle?
     private(set) var lineCount = 0
 
-    init?(runId: String) {
-        guard let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return nil }
+    init?(runId: String, directory: URL? = nil) {
+        guard let dir = directory ?? FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return nil }
         url = dir.appendingPathComponent("selftest_\(runId).jsonl")
         guard FileManager.default.createFile(atPath: url.path, contents: nil),
               let h = try? FileHandle(forWritingTo: url) else { return nil }
@@ -19,11 +19,19 @@ final class SelfTestLogFile {
     }
 
     func write(_ records: [LogRecord]) {
+        if handle == nil {
+            handle = try? FileHandle(forWritingTo: url)
+            do { try handle?.seekToEnd() } catch { close(); return }
+        }
         for r in records {
             guard let line = SelfTestLog.line(r), let d = (line + "\n").data(using: .utf8) else { continue }
-            try? handle?.write(contentsOf: d)
-            lineCount += 1
+            do {
+                guard let handle else { return }
+                try handle.write(contentsOf: d)
+                lineCount += 1
+            } catch { close(); return }
         }
+        close()
     }
 
     func close() { try? handle?.close(); handle = nil }
@@ -107,7 +115,9 @@ final class SelfTestRunner: ObservableObject {
     private func tick() {
         guard isActive else { return }
         let now = ProcessInfo.processInfo.systemUptime
-        let input = SelfTestInput(now: now, pose: tracker.pose, tracking: tracker.tracking, statuses: buffer,
+        let frameFresh = tracker.session.currentFrame.map { now - $0.timestamp <= 1.0 } ?? false
+        let input = SelfTestInput(now: now, pose: frameFresh ? tracker.pose : nil,
+                                  tracking: frameFresh ? tracker.tracking : .notAvailable, statuses: buffer,
                                   bleConnected: link.isConnected, guardLevel: guardLevel(), confirm: confirmNext)
         buffer = []; confirmNext = false
         apply(engine.tick(input))
@@ -144,8 +154,9 @@ final class SelfTestRunner: ObservableObject {
 
     /// LiDAR corridor + sonar through ObstacleGuard's decision logic. nil when there is no depth frame source.
     private func guardLevel() -> SelfTestGuardLevel? {
-        guard let frame = tracker.session.currentFrame else { return nil }
-        let corridor = DepthAdapter.corridorResult(from: frame)
+        guard let frame = tracker.session.currentFrame,
+              ProcessInfo.processInfo.systemUptime - frame.timestamp <= 1.0,
+              let corridor = DepthAdapter.corridorResult(from: frame), !corridor.isBlind() else { return nil }
         let sonar = link.robot.map { SonarSample(frontCm: $0.frontCm, rearCm: $0.rearCm, flags: $0.flags.rawValue) }
         switch ObstacleLogic.evaluate(corridor: corridor, sonar: sonar).level {
         case .clear: return .clear

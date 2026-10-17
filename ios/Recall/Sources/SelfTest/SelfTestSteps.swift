@@ -546,6 +546,10 @@ final class ObstacleStep: PoseStepBase {
 
     /// Forward while the guard says clear or slow; stop on guard stop, sonar flag 2, or front under the firmware limit.
     private func approachCommand(_ c: StepContext, _ out: inout StepTick) -> SelfTestCommand {
+        guard c.guardLevel != nil else {
+            out.done = StepResult(id: id, pass: false, reason: "ObstacleGuard feed lost during approach", metrics: collect())
+            return .stop
+        }
         let p = cfg.testPwm
         let front = latest?.frontDistanceCm
         let sonarStop = latest?.frontBlocked == true || (front.map { $0 <= cfg.firmwareFrontStopCm } ?? false)

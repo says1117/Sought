@@ -171,6 +171,36 @@ class StepTests(unittest.TestCase):
         s = Synth(); wheels_off(s, hz=2.5)
         self.assertEqual(check(run(s), "wheels_off", "status rate")["status"], "fail")
 
+    def test_missing_wheel_phase_cannot_pass(self):
+        synthetic = Synth()
+        wheels_off(synthetic)
+        synthetic.r = [record for record in synthetic.r if record.get("phase") != "spin_right"]
+        self.assertEqual(run(synthetic)["steps"]["wheels_off"]["status"], "no_data")
+
+    def test_later_steps_cannot_supply_watchdog_evidence(self):
+        synthetic = Synth()
+        watchdog(synthetic, 0, resume=False)
+        synthetic.r = [record for record in synthetic.r if record.get("type") != "status"
+                       or record.get("left") != 0]
+        synthetic.status(20, 0, 0, flags=9)
+        synthetic.status(21, 110, 110)
+        result = run(synthetic)
+        self.assertEqual(check(result, "watchdog", "read 0")["status"], "no_data")
+        self.assertEqual(check(result, "watchdog", "resume")["status"], "no_data")
+
+    def test_corrupt_or_unfinished_full_run_cannot_pass(self):
+        synthetic = Synth()
+        end = wheels_off(synthetic)
+        watchdog(synthetic, end + 1)
+        forward_back(synthetic, 50)
+        square(synthetic, 70)
+        spin(synthetic, 120)
+        obstacle(synthetic, 140)
+        self.assertEqual(run(synthetic, bad_lines=1)["overall"], "incomplete")
+        synthetic.r = [record for record in synthetic.r
+                       if not (record.get("step") == "spin" and record.get("name") == "step_end")]
+        self.assertEqual(run(synthetic)["overall"], "incomplete")
+
     def test_wheels_off_no_status_is_no_data_not_pass(self):
         s = Synth()
         s.ev(0, "wheels_off", "phase_start", phase="forward", left=110, right=110)
