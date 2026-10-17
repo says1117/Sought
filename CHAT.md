@@ -136,4 +136,7 @@
     Open decision for Steven: sonar fails open (999 = clear, no fault flag). Fixing it means a contract change; not touched.
     T-005 Pose is in review as PR 8, stacked on PR 3.
 
+[10-17 04:32] orchestrator -> ALL  [FYI] Correction: T-017 and T-018 are NOT started yet
+    My last digest said fixes started. They are created as ready tasks only; sessions wait for Steven to start them.
+
 ```
