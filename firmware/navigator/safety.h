@@ -28,6 +28,10 @@ const unsigned long SONAR_TIMEOUT_US = 25000;
 const int FRONT_STOP_CM = 20;
 const int REAR_STOP_CM  = 15;
 const int NO_ECHO_CM    = 999;
+// Release hysteresis: a blocked flag engages on ONE close reading but releases only after this many
+// CONSECUTIVE clear readings. A "reading" is one fresh sonar measurement for that sensor (about
+// every 100 ms per sensor), not a 10 ms loop tick, so release takes about 300 ms.
+const int CLEAR_READINGS_TO_RELEASE = 3;
 
 // Status flags
 const int FLAG_WATCHDOG = 1, FLAG_FRONT = 2, FLAG_REAR = 4, FLAG_CONNECTED = 8;
@@ -47,6 +51,28 @@ inline bool commandFresh(bool valid, bool connected, uint32_t now, uint32_t last
 
 inline bool frontBlocked(int frontCm) { return frontCm < FRONT_STOP_CM; }
 inline bool rearBlocked(int rearCm)   { return rearCm < REAR_STOP_CM; }
+
+// Latched blocked state for one sensor. Feed it once per loop tick with `newMeasurement` true only on
+// ticks where the sensor published a fresh reading (see sonarTick in navigator.ino); ticks without a
+// new reading change nothing. 999 (no echo) counts as a clear reading, same as before (fail-open).
+struct BlockLatch {
+  bool blocked = false;
+  int clearCount = 0;
+};
+
+inline bool updateBlock(BlockLatch& b, bool newMeasurement, int cm, int stopCm) {
+  if (!newMeasurement) return b.blocked;
+  if (cm < stopCm) {                       // close: engage immediately, restart the clear count
+    b.blocked = true;
+    b.clearCount = 0;
+  } else if (b.blocked && ++b.clearCount >= CLEAR_READINGS_TO_RELEASE) {
+    b.blocked = false;
+    b.clearCount = 0;
+  }
+  return b.blocked;
+}
+inline bool updateFrontBlock(BlockLatch& b, bool newMeasurement, int cm) { return updateBlock(b, newMeasurement, cm, FRONT_STOP_CM); }
+inline bool updateRearBlock(BlockLatch& b, bool newMeasurement, int cm)  { return updateBlock(b, newMeasurement, cm, REAR_STOP_CM); }
 
 inline int statusFlags(bool fresh, bool front, bool rear) {
   return (fresh ? 0 : FLAG_WATCHDOG) | (front ? FLAG_FRONT : 0) | (rear ? FLAG_REAR : 0) | FLAG_CONNECTED;

@@ -32,6 +32,8 @@ struct Sim {
   // loop state
   int appliedL = 0, appliedR = 0;
   int front = nav_NO_ECHO(), rear = nav_NO_ECHO();
+  nav::BlockLatch frontLatch, rearLatch;
+  bool frontNew = false, rearNew = false;   // set by feedFront/feedRear = sonarTick publishing a reading
   uint32_t now = 0;
   // last tick outputs
   bool fresh = false; int flags = 0;
@@ -56,9 +58,12 @@ struct Sim {
     for (char ch : bytes)
       if (nav::rxFeed(rx, sizeof(rx), rxLen, rxOver, ch)) handleLine(rx);
   }
+  void feedFront(int cm) { front = cm; frontNew = true; }
+  void feedRear(int cm)  { rear = cm;  rearNew = true; }
   void tick() {                            // one pass of loop(): advance 10 ms, then run it
     now += LOOP_MS;
-    bool fr = nav::frontBlocked(front), re = nav::rearBlocked(rear);
+    bool fr = nav::updateFrontBlock(frontLatch, frontNew, front), re = nav::updateRearBlock(rearLatch, rearNew, rear);
+    frontNew = rearNew = false;
     fresh = nav::commandFresh(cmdValid, connected, now, lastCmdMs);
     nav::computeApplied(fresh, cmdL, cmdR, fr, re, appliedL, appliedR);
     left  = nav::sideDrive(appliedL, LEFT_SIGN, LEFT_TRIM);
@@ -364,7 +369,7 @@ TEST(scenario_front_obstacle_appears_mid_ramp_forward_output_never_positive) {
       Sim s; s.onConnect();
       char cmd[32]; snprintf(cmd, sizeof cmd, "%d,%d\n", req, req);
       for (int i = 0; i < rampTicks; i++) { s.write(cmd); s.tick(); }
-      s.front = 12;                          // obstacle appears at an arbitrary point of the ramp
+      s.feedFront(12);                       // obstacle appears at an arbitrary point of the ramp
       for (int i = 0; i < 40; i++) {
         s.write(cmd); s.tick();              // phone keeps asking for full forward
         CHECK(s.appliedL + s.appliedR <= 0);
@@ -372,8 +377,10 @@ TEST(scenario_front_obstacle_appears_mid_ramp_forward_output_never_positive) {
         CHECK(s.flags & FLAG_FRONT);
         if (s.appliedL + s.appliedR > 0) return;
       }
-      s.front = 200;                         // obstacle leaves: driving resumes with a ramp
+      for (int i = 0; i < 2; i++) { s.feedFront(200); s.write(cmd); s.tick(); CHECK(s.flags & FLAG_FRONT); }
+      s.feedFront(200);                      // 3rd consecutive clear reading: obstacle left, driving resumes with a ramp
       s.write(cmd); s.tick();
+      CHECK(!(s.flags & FLAG_FRONT));
       CHECK_EQ(s.appliedL, SLEW_PER_TICK);
     }
   }
@@ -383,13 +390,13 @@ TEST(scenario_front_obstacle_while_phone_slows_to_zero_post_slew_clamp_needed) {
   Sim s; s.onConnect();
   for (int i = 0; i < 20; i++) { s.write("200,200\n"); s.tick(); }
   CHECK_EQ(s.appliedL, 200);
-  s.front = 10;
+  s.feedFront(10);
   s.write("0,0\n"); s.tick();                // phone releases the stick the same tick the obstacle shows
   CHECK_EQ(s.appliedL, 0); CHECK_EQ(s.appliedR, 0);
 }
 
 TEST(scenario_turning_allowed_when_blocked_front_and_rear) {
-  Sim s; s.onConnect(); s.front = 5; s.rear = 5;
+  Sim s; s.onConnect(); s.feedFront(5); s.feedRear(5);
   for (int i = 0; i < 30; i++) { s.write("-100,100\n"); s.tick(); }
   CHECK_EQ(s.appliedL, -100); CHECK_EQ(s.appliedR, 100);
   CHECK((s.flags & (FLAG_FRONT | FLAG_REAR)) == (FLAG_FRONT | FLAG_REAR));
@@ -455,6 +462,76 @@ TEST(ino_stby_high_only_after_ble_init_and_low_first) {
   CHECK(low != std::string::npos && ble != std::string::npos && high != std::string::npos);
   CHECK(low < ble); CHECK(ble < high);
   CHECK(ino.find("digitalWrite(PIN_STBY, HIGH);", high + 1) == std::string::npos);   // exactly one enable
+}
+
+// ---- release hysteresis (T-043). One feed = one fresh sonar measurement; run(100) = ~10 ticks between them.
+static void front100(Sim& s) { s.onConnect(); for (int i = 0; i < 50; i++) { s.write("100,100\n"); s.tick(); } }   // ramped up, driving
+
+TEST(hysteresis_replays_observed_front_trace) {
+  Sim s; front100(s);
+  CHECK(s.appliedL > 0);
+  const int trace[] = {11, 13, 16, 39, 16, 15, 13};   // real bench trace, hand 11-16 cm in front
+  for (int cm : trace) {
+    s.feedFront(cm);
+    for (int i = 0; i < 10; i++) {                    // 100 ms of ticks, command kept fresh
+      if (i == 0) s.write("100,100\n");
+      s.tick();
+      CHECK_EQ(s.appliedL, 0); CHECK_EQ(s.appliedR, 0);   // forward output stays 0 through the 39
+      CHECK(s.flags & FLAG_FRONT);
+    }
+  }
+}
+
+TEST(hysteresis_engages_on_single_close_reading) {
+  Sim s; front100(s);
+  s.feedFront(19); s.tick();
+  CHECK(s.flags & FLAG_FRONT); CHECK_EQ(s.appliedL, 0);
+  Sim r; r.onConnect(); for (int i = 0; i < 50; i++) { r.write("-100,-100\n"); r.tick(); }
+  r.feedRear(14); r.tick();
+  CHECK(r.flags & FLAG_REAR); CHECK_EQ(r.appliedL, 0);
+  Sim t; t.feedFront(20); t.feedRear(15); t.tick();                  // at threshold is clear
+  CHECK(!(t.flags & (FLAG_FRONT | FLAG_REAR)));
+}
+
+TEST(hysteresis_front_releases_only_on_third_consecutive_clear) {
+  Sim s; front100(s);
+  s.feedFront(10); s.tick(); CHECK(s.flags & FLAG_FRONT);
+  s.feedFront(50); s.tick(); CHECK(s.flags & FLAG_FRONT);            // clear 1
+  s.tick(); s.tick(); CHECK(s.flags & FLAG_FRONT);                   // no new measurement: no progress
+  s.feedFront(50); s.tick(); CHECK(s.flags & FLAG_FRONT);            // clear 2
+  s.feedFront(12); s.tick(); CHECK(s.flags & FLAG_FRONT);            // close: count resets
+  s.feedFront(50); s.tick(); CHECK(s.flags & FLAG_FRONT);            // clear 1
+  s.feedFront(NO_ECHO_CM); s.tick(); CHECK(s.flags & FLAG_FRONT);    // 999 counts as clear: 2
+  s.feedFront(50); s.write("100,100\n"); s.tick();                  // clear 3: released
+  CHECK(!(s.flags & FLAG_FRONT));
+  for (int i = 0; i < 10; i++) { s.write("100,100\n"); s.tick(); } CHECK(s.appliedL > 0);                                 // forward moves again
+}
+
+TEST(hysteresis_rear_releases_only_on_third_consecutive_clear) {
+  Sim s; s.onConnect(); for (int i = 0; i < 50; i++) { s.write("-100,-100\n"); s.tick(); }
+  s.feedRear(5); s.tick(); CHECK(s.flags & FLAG_REAR); CHECK_EQ(s.appliedL, 0);
+  s.feedRear(200); s.tick(); CHECK(s.flags & FLAG_REAR);
+  s.feedRear(200); s.tick(); CHECK(s.flags & FLAG_REAR);
+  s.feedRear(14); s.tick(); CHECK(s.flags & FLAG_REAR);              // close resets
+  s.feedRear(200); s.tick(); s.feedRear(200); s.tick();
+  CHECK(s.flags & FLAG_REAR);                                        // only 2 clear so far
+  s.write("-100,-100\n"); s.feedRear(200); s.tick();
+  CHECK(!(s.flags & FLAG_REAR));
+  for (int i = 0; i < 10; i++) { s.write("-100,-100\n"); s.tick(); } CHECK(s.appliedL < 0);
+}
+
+TEST(hysteresis_turning_and_opposite_direction_stay_allowed_while_blocked) {
+  Sim s; s.onConnect(); for (int i = 0; i < 30; i++) { s.write("-100,100\n"); s.tick(); }   // turn in place
+  s.feedFront(10); s.feedRear(10); s.tick();
+  CHECK(s.flags & FLAG_FRONT); CHECK(s.flags & FLAG_REAR);
+  for (int i = 0; i < 10; i++) { s.write("-100,100\n"); s.tick(); }
+  CHECK(s.appliedL < 0); CHECK(s.appliedR > 0);                      // turning allowed with both blocked
+  Sim f; f.onConnect(); for (int i = 0; i < 30; i++) { f.write("-100,-100\n"); f.tick(); }         // front blocked, reversing
+  f.feedFront(10); f.write("-100,-100\n"); f.tick();
+  CHECK(f.flags & FLAG_FRONT); for (int i = 0; i < 10; i++) { f.write("-100,-100\n"); f.tick(); } CHECK(f.appliedL < 0);
+  Sim r; r.onConnect(); for (int i = 0; i < 30; i++) { r.write("100,100\n"); r.tick(); }           // rear blocked, going forward
+  r.feedRear(10); r.write("100,100\n"); r.tick();
+  CHECK(r.flags & FLAG_REAR); for (int i = 0; i < 10; i++) { r.write("100,100\n"); r.tick(); } CHECK(r.appliedL > 0);
 }
 
 TEST(ino_uses_safety_h_and_does_not_redefine_its_constants) {

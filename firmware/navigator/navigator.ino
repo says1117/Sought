@@ -81,10 +81,11 @@ struct Sonar {
   volatile bool done;
   int hist[3];
   int cm;                                  // median of last 3, 999 = no echo
+  bool fresh;                              // true for the loop pass after sonarTick published a new cm
 };
 Sonar sonars[2] = {
-  {PIN_FRONT_TRIG, PIN_FRONT_ECHO, 0, 0, false, {NO_ECHO_CM, NO_ECHO_CM, NO_ECHO_CM}, NO_ECHO_CM},
-  {PIN_REAR_TRIG,  PIN_REAR_ECHO,  0, 0, false, {NO_ECHO_CM, NO_ECHO_CM, NO_ECHO_CM}, NO_ECHO_CM},
+  {PIN_FRONT_TRIG, PIN_FRONT_ECHO, 0, 0, false, {NO_ECHO_CM, NO_ECHO_CM, NO_ECHO_CM}, NO_ECHO_CM, false},
+  {PIN_REAR_TRIG,  PIN_REAR_ECHO,  0, 0, false, {NO_ECHO_CM, NO_ECHO_CM, NO_ECHO_CM}, NO_ECHO_CM, false},
 };
 int sonarActive = -1;                      // index being measured, -1 before first trigger
 
@@ -106,6 +107,7 @@ void sonarTick(unsigned long now) {
     int cm = nav::echoToCm(p.done, p.widthUs);
     p.hist[0] = p.hist[1]; p.hist[1] = p.hist[2]; p.hist[2] = cm;
     p.cm = nav::median3(p.hist);
+    p.fresh = true;                        // one new measurement: feeds the release hysteresis (safety.h)
   }
   sonarActive = (sonarActive + 1) % 2;     // -1 -> 0 on the first call
   Sonar& s = sonars[sonarActive];
@@ -232,10 +234,13 @@ void loop() {
   if ((long)(now - nextTick) < 0) { delay(1); return; }
   nextTick = now + LOOP_MS;
 
+  static nav::BlockLatch frontLatch, rearLatch;
   sonarTick(now);
   int front = sonars[0].cm, rear = sonars[1].cm;
-  bool frontBlocked = nav::frontBlocked(front);
-  bool rearBlocked  = nav::rearBlocked(rear);
+  // Blocked flags engage on one close reading, release after 3 clear ones; count measurements, not ticks.
+  bool frontBlocked = nav::updateFrontBlock(frontLatch, sonars[0].fresh, front);
+  bool rearBlocked  = nav::updateRearBlock(rearLatch, sonars[1].fresh, rear);
+  sonars[0].fresh = sonars[1].fresh = false;
 
   portENTER_CRITICAL(&commandMux);
   unsigned long last = lastCmdMs;
