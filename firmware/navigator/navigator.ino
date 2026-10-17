@@ -267,7 +267,10 @@ void loop() {
   bool frontBlocked = front < FRONT_STOP_CM;
   bool rearBlocked  = rear < REAR_STOP_CM;
 
-  bool fresh = cmdValid && connected && (now - lastCmdMs) < WATCHDOG_MS;
+  // lastCmdMs is written from the BLE task and can be newer than `now`; compare as
+  // signed so that reads as age <= 0 (fresh) instead of wrapping to a huge age.
+  unsigned long last = lastCmdMs;
+  bool fresh = cmdValid && connected && (long)(now - last) < (long)WATCHDOG_MS;
 
   if (!fresh) {
     // Watchdog / STOP / disconnect: brake and zero immediately, no ramp.
