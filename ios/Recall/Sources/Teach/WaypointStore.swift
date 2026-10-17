@@ -55,7 +55,15 @@ public final class WaypointStore {
                 makeId: @escaping (String) -> String = WaypointStore.randomId) throws {
         self.now = now
         self.makeId = makeId
-        guard sqlite3_open(path, &db) == SQLITE_OK else { throw WaypointStoreError.sqlite(msg()) }
+        if path != ":memory:" {
+            try FileManager.default.createDirectory(at: URL(fileURLWithPath: path).deletingLastPathComponent(),
+                                                    withIntermediateDirectories: true)
+        }
+        guard sqlite3_open(path, &db) == SQLITE_OK else {
+            let error = WaypointStoreError.sqlite(msg())
+            sqlite3_close(db); db = nil
+            throw error
+        }
         for s in MemorySchema.statements where s.contains("waypoints") || s.contains("routes") {
             try exec(s)
         }

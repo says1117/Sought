@@ -131,6 +131,17 @@ final class ExploreTests: XCTestCase {
         XCTAssertEqual(last.x, goals[0].x, accuracy: 1e-9)
     }
 
+    func testRoverClearanceUsesOccupiedCellFootprint() {
+        var m = ExploreMap(width: 12, height: 12, resolution: 0.05, fill: .free)
+        m.set(GridCell(col: 4, row: 4), .occupiedHigh)
+        let mask = TraversalMask(map: m, roverRadiusM: 0.15)
+
+        // The center is 3-by-1 cells from the obstacle center, but only about 12.7 cm
+        // from the occupied square's edge, so a 15 cm rover must not occupy this cell.
+        XCTAssertFalse(mask.isTraversable(GridCell(col: 7, row: 5)))
+        XCTAssertTrue(mask.isTraversable(GridCell(col: 8, row: 4)))
+    }
+
     func testScoringPrefersNearerAndPenalizesVisited() {
         var m = ExploreMap(width: 120, height: 40, fill: .free)
         // Two equal unknown strips: near (left) and far (right) along the top.

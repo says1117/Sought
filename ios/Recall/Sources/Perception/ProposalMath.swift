@@ -46,7 +46,7 @@ public enum ProposalMath {
     /// Union of sources -> clamp -> NMS -> cap.
     public static func merge(_ lists: [[Proposal]], limit: Int = maxCrops, iou: Float = nmsIoU) -> [Proposal] {
         let clamped = lists.flatMap { $0 }.map { Proposal(box: $0.box.clamped(), score: $0.score, origin: $0.origin) }
-        return Array(nms(clamped, iou: iou).prefix(limit))
+        return Array(nms(clamped, iou: iou).prefix(max(0, limit)))
     }
 }
 

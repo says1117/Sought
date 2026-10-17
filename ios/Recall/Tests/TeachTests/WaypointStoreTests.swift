@@ -94,6 +94,17 @@ final class WaypointStoreTests: XCTestCase {
         XCTAssertTrue(try s.routes().isEmpty)
     }
 
+    func testCreatesParentDirectoryAndPersistsOnFirstLaunch() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let path = dir.appendingPathComponent("Recall/recall.sqlite").path
+        do {
+            let store = try WaypointStore(path: path)
+            try store.addWaypoint(name: "kitchen", pose: Pose2D(x: 1, z: 2, yawDeg: 3))
+        }
+        XCTAssertEqual(try WaypointStore(path: path).waypoints().map(\.name), ["kitchen"])
+    }
+
     func testPersistsAcrossReopen() throws {
         let path = NSTemporaryDirectory() + "wp-\(UUID().uuidString).sqlite"
         defer { try? FileManager.default.removeItem(atPath: path) }

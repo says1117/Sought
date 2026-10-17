@@ -31,11 +31,29 @@ final class TeachViewModelTests: XCTestCase {
         TeachViewModel(store: try WaypointStore(path: ":memory:"), driver: driver, mapSaver: saver, currentPose: { [unowned self] in self.pose })
     }
 
+    func testTemporaryStorageWarningIsVisible() throws {
+        let store = try WaypointStore(path: ":memory:")
+        let m = TeachViewModel(store: store, driver: driver, mapSaver: saver,
+                               currentPose: { self.pose }, storageWarning: "Waypoints are temporary")
+        m.beginSession()
+        m.markWaypoint(name: "desk")
+        XCTAssertEqual(m.storageWarning, "Waypoints are temporary")
+        XCTAssertEqual(m.message, "Marked desk")
+    }
+
     func testBeginSessionCreatesHomeAtCurrentPose() throws {
         let m = try makeModel()
         m.beginSession()
         XCTAssertEqual(m.waypoints.map(\.name), ["home"])
         XCTAssertEqual(m.waypoints[0].pose, Pose2D(x: 1, z: 2, yawDeg: 90))
+    }
+
+    func testBeginSessionStartsRelocalizationWhenSavedMapExists() throws {
+        let m = try makeModel()
+        let monitor = RelocalizationMonitor()
+        m.beginSession(hasSavedMap: true, monitor: monitor)
+        XCTAssertEqual(monitor.state, .waiting(elapsed: 0))
+        XCTAssertEqual(m.waypoints.map(\.name), ["home"])
     }
 
     func testBeginSessionWithoutPoseMakesNoHome() throws {

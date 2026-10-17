@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 extension DriveLink: TeachDriving {}
 
@@ -9,6 +10,7 @@ struct TeachView: View {
     @ObservedObject var link: DriveLink
     @ObservedObject var tracker: PoseTracker
     let monitor: RelocalizationMonitor
+    let hasSavedMap: Bool
     @State private var reloc: RelocalizationState = .idle
     @GestureState private var held: DriveIntent?
     @State private var requireRelease = false
@@ -35,6 +37,7 @@ struct TeachView: View {
                 }
                 Button(model.isSaving ? "Saving map" : "Save map") { model.saveMap() }
                     .buttonStyle(.bordered).disabled(model.isSaving)
+                if let warning = model.storageWarning { Text(warning).font(.footnote).foregroundStyle(.orange) }
                 if !model.message.isEmpty { Text(model.message).font(.footnote) }
 
                 ForEach(model.waypoints, id: \.id) { w in
@@ -68,7 +71,10 @@ struct TeachView: View {
         .onChange(of: tracker.tracking) { _, _ in reloc = monitor.update(tracking: tracker.tracking, mapping: tracker.mapping) }
         .onChange(of: tracker.mapping) { _, _ in reloc = monitor.update(tracking: tracker.tracking, mapping: tracker.mapping) }
         .onReceive(ticker) { _ in reloc = monitor.tick() }
-        .onAppear { model.beginSession() }
+        .onAppear {
+            model.beginSession(hasSavedMap: hasSavedMap, monitor: monitor)
+            reloc = monitor.update(tracking: tracker.tracking, mapping: tracker.mapping)
+        }
         .onDisappear { model.stopDriving() }
     }
 
@@ -115,7 +121,8 @@ struct TeachContainer: View {
     }
 
     var body: some View {
-        TeachView(model: session.model, link: link, tracker: tracker, monitor: session.monitor)
+        TeachView(model: session.model, link: link, tracker: tracker, monitor: session.monitor,
+                  hasSavedMap: session.adapter.hasSavedMap)
     }
 }
 
@@ -126,9 +133,16 @@ final class TeachSession: ObservableObject {
 
     init(link: DriveLink, tracker: PoseTracker) {
         let dir = WorldMapStore.defaultURL().deletingLastPathComponent()
-        let store = (try? WaypointStore(path: dir.appendingPathComponent("recall.sqlite").path))
-            ?? (try! WaypointStore(path: ":memory:"))
+        let store: WaypointStore
+        let storageWarning: String?
+        do {
+            store = try WaypointStore(path: dir.appendingPathComponent("recall.sqlite").path)
+            storageWarning = nil
+        } catch {
+            store = try! WaypointStore(path: ":memory:")
+            storageWarning = "Waypoint storage unavailable. New waypoints are temporary and will be lost when Teach closes."
+        }
         adapter = ARWorldMapAdapter(tracker: tracker)
-        model = TeachViewModel(store: store, driver: link, mapSaver: adapter, currentPose: { tracker.pose })
+        model = TeachViewModel(store: store, driver: link, mapSaver: adapter, currentPose: { tracker.pose }, storageWarning: storageWarning)
     }
 }

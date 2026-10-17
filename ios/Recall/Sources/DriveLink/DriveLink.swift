@@ -12,6 +12,14 @@ final class DriveLink: NSObject, ObservableObject, CBCentralManagerDelegate, CBP
     @Published private(set) var statusText = "Starting Bluetooth"
     @Published private(set) var isConnected = false
     @Published private(set) var robot: RobotStatus?
+    private var lastStatusReceivedAt: TimeInterval?
+
+    /// A missing, disconnected, or stale telemetry sample is never treated as stopped.
+    var isRobotStationary: Bool {
+        StationaryStatus.isStationary(status: robot, connected: isConnected,
+                                      receivedAt: lastStatusReceivedAt,
+                                      now: ProcessInfo.processInfo.systemUptime)
+    }
 
     private var central: CBCentralManager!
     private var peripheral: CBPeripheral?
@@ -68,6 +76,7 @@ final class DriveLink: NSObject, ObservableObject, CBCentralManagerDelegate, CBP
         isConnected = false
         rx = nil; tx = nil
         robot = nil
+        lastStatusReceivedAt = nil
         lines = LineBuffer()
     }
 
@@ -175,7 +184,11 @@ final class DriveLink: NSObject, ObservableObject, CBCentralManagerDelegate, CBP
         guard p === peripheral, c === tx, error == nil,
               let d = c.value, let s = String(data: d, encoding: .utf8) else { return }
         for line in lines.append(s) {
-            if let st = RobotStatus.parse(line) { robot = st; onStatus?(st) }
+            if let st = RobotStatus.parse(line) {
+                robot = st
+                lastStatusReceivedAt = ProcessInfo.processInfo.systemUptime
+                onStatus?(st)
+            }
         }
     }
 }

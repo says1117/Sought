@@ -18,6 +18,25 @@ struct StubPlanner: Planner {
     }
 }
 
+actor PlannerGate {
+    private var continuation: CheckedContinuation<[ToolCall], Never>?
+    func wait() async -> [ToolCall] {
+        await withCheckedContinuation { continuation = $0 }
+    }
+    func isPending() -> Bool { continuation != nil }
+    func resume(_ calls: [ToolCall]) {
+        continuation?.resume(returning: calls)
+        continuation = nil
+    }
+}
+
+struct LatePlanner: Planner {
+    let gate: PlannerGate
+    func plan(_ utterance: String, context: PlannerContext) async throws -> [ToolCall] {
+        await gate.wait()
+    }
+}
+
 final class FailingExecutor: ToolExecuting {
     private(set) var stopCount = 0
     func execute(_ call: ToolCall) async throws { throw PlannerError.transport("boom") }
@@ -27,9 +46,9 @@ final class FailingExecutor: ToolExecuting {
 @MainActor
 final class FindBarViewModelTests: XCTestCase {
     private func make(_ planner: Planner, executor: ToolExecuting = LoggingToolExecutor(),
-                       speaker: FakeSpeaker = FakeSpeaker(), talk: PushToTalk? = nil,
+                       speaker: FakeSpeaker? = nil, talk: PushToTalk? = nil,
                        timeout: TimeInterval = 3) -> FindBarViewModel {
-        FindBarViewModel(planner: planner, executor: executor, speaker: speaker, talk: talk, plannerTimeout: timeout)
+        FindBarViewModel(planner: planner, executor: executor, speaker: speaker ?? FakeSpeaker(), talk: talk, plannerTimeout: timeout)
     }
 
     func testTextRunsPlannerExecutesAndSpeaks() async {
@@ -59,15 +78,15 @@ final class FindBarViewModelTests: XCTestCase {
         let exec = LoggingToolExecutor(); exec.log = { _ in }
         let slow = StubPlanner(result: .success([.comeToMe]), delay: 5)
         let vm = make(slow, executor: exec, timeout: 0.05)
-        await vm.run("stop").value
-        XCTAssertEqual(exec.executed, [.stop])
+        await vm.run("patrol").value
+        XCTAssertEqual(exec.executed, [.startPatrol])
     }
 
     func testPlannerErrorFallsBackToKeywords() async {
         let exec = LoggingToolExecutor(); exec.log = { _ in }
         let vm = make(StubPlanner(result: .failure(PlannerError.transport("offline"))), executor: exec)
-        await vm.run("stop").value
-        XCTAssertEqual(exec.executed, [.stop])
+        await vm.run("patrol").value
+        XCTAssertEqual(exec.executed, [.startPatrol])
     }
 
     func testUnintelligibleRequestIsErrorState() async {
@@ -105,6 +124,73 @@ final class FindBarViewModelTests: XCTestCase {
         XCTAssertEqual(vm.state, .idle)
     }
 
+    func testSpokenOrTypedStopUsesImmediateBrakeWithoutExecutingTools() async {
+        var braked = false
+        let exec = LoggingToolExecutor(stop: { braked = true }); exec.log = { _ in }
+        let vm = make(StubPlanner(result: .success([.comeToMe])), executor: exec)
+        await vm.run("please stop immediately").value
+        XCTAssertTrue(braked)
+        XCTAssertTrue(exec.executed.isEmpty)
+        XCTAssertEqual(vm.statusLine, "Stopped.")
+    }
+
+    func testLatePlannerResultAfterStopDoesNotExecute() async {
+        let gate = PlannerGate()
+        let exec = LoggingToolExecutor(); exec.log = { _ in }
+        let vm = make(LatePlanner(gate: gate), executor: exec)
+        let task = vm.run("patrol")
+        for _ in 0..<100 {
+            if await gate.isPending() { break }
+            await Task.yield()
+        }
+        let plannerStarted = await gate.isPending()
+        XCTAssertTrue(plannerStarted)
+        vm.stop()
+        await gate.resume([.startPatrol])
+        await task.value
+        XCTAssertTrue(exec.executed.isEmpty)
+        XCTAssertEqual(vm.statusLine, "Stopped.")
+    }
+
+    func testStopDuringPermissionPromptDoesNotStartListeningLater() async {
+        let rec = FakeRecognizer(); rec.holdAuthorization = true
+        let talk = PushToTalk(recognizer: rec, isStationary: { true })
+        let vm = make(StubPlanner(result: .success([])), talk: talk)
+        let startup = Task { await vm.startListening() }
+        for _ in 0..<100 where !rec.isAwaitingAuthorization { await Task.yield() }
+        XCTAssertTrue(rec.isAwaitingAuthorization)
+        XCTAssertEqual(vm.state, .starting)
+        vm.stop()
+        rec.resolveAuthorization(true)
+        await startup.value
+        XCTAssertEqual(vm.state, .idle)
+        XCTAssertEqual(vm.statusLine, "Stopped.")
+        XCTAssertEqual(rec.started, 0)
+    }
+
+    func testTypedSubmitDoesNotOverlapSpeechStartup() async {
+        let rec = FakeRecognizer(); rec.holdAuthorization = true
+        let talk = PushToTalk(recognizer: rec, isStationary: { true })
+        let vm = make(StubPlanner(result: .success([.startPatrol])), talk: talk)
+        let startup = Task { await vm.startListening() }
+        for _ in 0..<100 where !rec.isAwaitingAuthorization { await Task.yield() }
+        XCTAssertTrue(rec.isAwaitingAuthorization)
+        vm.text = "patrol"
+        vm.submitText()
+        XCTAssertEqual(vm.state, .starting)
+        rec.resolveAuthorization(true)
+        await startup.value
+        vm.stop()
+    }
+
+    func testLoggingExecutorInvokesImmediateStopHandler() {
+        var braked = false
+        let executor = LoggingToolExecutor(stop: { braked = true })
+        executor.stopAll()
+        XCTAssertTrue(braked)
+        XCTAssertEqual(executor.stopCount, 1)
+    }
+
     func testVoiceFlowTranscriptGoesThroughPlanner() async {
         let exec = LoggingToolExecutor(); exec.log = { _ in }
         let rec = FakeRecognizer(); rec.transcript = "start patrol"
@@ -134,6 +220,17 @@ final class FindBarViewModelTests: XCTestCase {
         await vm.startListening()
         vm.robotMoved()
         XCTAssertEqual(vm.state, .idle)
+        XCTAssertEqual(rec.cancelled, 1)
+    }
+
+    func testStationaryMonitorAbortsWhenRobotStartsMoving() async throws {
+        let rec = FakeRecognizer()
+        var stationary = true
+        let talk = PushToTalk(recognizer: rec, isStationary: { stationary })
+        try await talk.begin()
+        stationary = false
+        try await Task.sleep(nanoseconds: 150_000_000)
+        XCTAssertEqual(talk.state, .idle)
         XCTAssertEqual(rec.cancelled, 1)
     }
 

@@ -2,6 +2,7 @@ import Foundation
 import AVFoundation
 
 /// AVSpeechSynthesizer-backed Speaker.
+@MainActor
 final class AppleSpeaker: Speaking {
     private let synth = AVSpeechSynthesizer()
 

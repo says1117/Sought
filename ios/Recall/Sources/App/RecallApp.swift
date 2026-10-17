@@ -2,20 +2,30 @@ import SwiftUI
 
 @main
 struct RecallApp: App {
-    @StateObject private var link = DriveLink()
-    @StateObject private var pose = PoseTracker()
-    @StateObject private var findBar = RecallApp.makeFindBar()
+    @StateObject private var link: DriveLink
+    @StateObject private var pose: PoseTracker
+    @StateObject private var findBar: FindBarViewModel
     @Environment(\.scenePhase) private var phase
     @State private var showSelfTest = false
     @State private var showTeach = false
     @State private var showDrive = false
 
-    /// Planner = Gemini when a key is configured, offline keywords otherwise. The executor is a logging
-    /// stand-in until the coordinator exists. Robot is treated as stationary until motion state is wired in.
+    init() {
+        let link = DriveLink()
+        let pose = PoseTracker()
+        _link = StateObject(wrappedValue: link)
+        _pose = StateObject(wrappedValue: pose)
+        _findBar = StateObject(wrappedValue: Self.makeFindBar(link: link))
+    }
+
+    /// Planner = Gemini when a key is configured, offline keywords otherwise. The tool executor remains
+    /// a logging stand-in until the coordinator exists; STOP and speech gating use live DriveLink state.
     @MainActor
-    private static func makeFindBar() -> FindBarViewModel {
-        let talk = PushToTalk(recognizer: AppleSpeechRecognizer(), isStationary: { true })
-        return FindBarViewModel(planner: FallbackPlanner.make(), executor: LoggingToolExecutor(),
+    private static func makeFindBar(link: DriveLink) -> FindBarViewModel {
+        let talk = PushToTalk(recognizer: AppleSpeechRecognizer(), isStationary: {
+            link.isRobotStationary
+        })
+        return FindBarViewModel(planner: FallbackPlanner.make(), executor: LoggingToolExecutor(stop: { link.stop() }),
                                 speaker: AppleSpeaker(), talk: talk)
     }
 
@@ -53,11 +63,25 @@ struct RecallApp: App {
             .sheet(isPresented: $showSelfTest) { SelfTestContainer(link: link, tracker: pose) }
             .onAppear {
                 UIApplication.shared.isIdleTimerDisabled = true
-                pose.start()
+                startPoseSession()
             }
             .onChange(of: phase) { _, new in
-                if new != .active { link.stop(); pose.pause(); findBar.robotMoved() } else { pose.start() }
+                if new == .active {
+                    startPoseSession()
+                } else {
+                    link.stop()
+                    pose.pause()
+                    // The speech permission dialog can briefly make the scene inactive.
+                    if new == .background || findBar.state != .starting {
+                        findBar.stop(speakConfirmation: false)
+                    }
+                }
             }
         }
+    }
+
+    private func startPoseSession() {
+        let mapAdapter = ARWorldMapAdapter(tracker: pose)
+        pose.start(initialWorldMap: mapAdapter.initialWorldMap)
     }
 }

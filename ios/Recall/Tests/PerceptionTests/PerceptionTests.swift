@@ -77,6 +77,11 @@ final class ProposalMathTests: XCTestCase {
         XCTAssertEqual(out.count, 24)
         XCTAssertEqual(out.first?.origin, .yolo); XCTAssertEqual(out.first?.score, 0.95)
     }
+    func testMergeTreatsNonpositiveLimitAsEmpty() {
+        let proposal = Proposal(box: NormBox(x: 0.1, y: 0.1, w: 0.2, h: 0.2), score: 1, origin: .grid)
+        XCTAssertTrue(ProposalMath.merge([[proposal]], limit: 0).isEmpty)
+        XCTAssertTrue(ProposalMath.merge([[proposal]], limit: -1).isEmpty)
+    }
     func testYOLOStubEmptyWithoutDetectorAndFiltersLowConfidence() {
         XCTAssertTrue(YOLOProposalSource<Int>().proposals(in: 0).isEmpty)
         let src = YOLOProposalSource<Int> { _ in [
@@ -106,6 +111,10 @@ final class DepthLiftTests: XCTestCase {
         XCTAssertNil(DepthLift.medianDepth(m, box: NormBox(x: 0.2, y: 0.2, w: 0.6, h: 0.6)))
         XCTAssertNil(DepthLift.medianDepth(flat(5.5), box: NormBox(x: 0, y: 0, w: 1, h: 1)))
         XCTAssertNotNil(DepthLift.medianDepth(flat(5.0), box: NormBox(x: 0, y: 0, w: 1, h: 1)))
+    }
+    func testMedianRejectsEmptyBox() {
+        XCTAssertNil(DepthLift.medianDepth(flat(2), box: NormBox(x: 0.5, y: 0.5, w: 0, h: 0)))
+        XCTAssertNil(DepthLift.medianDepth(flat(2), box: NormBox(x: 2, y: 2, w: 0.2, h: 0.2)))
     }
     func testCentralRegionIs30PercentArea() {
         let c = NormBox(x: 0, y: 0, w: 1, h: 1).central(areaFraction: 0.3)
