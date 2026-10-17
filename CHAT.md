@@ -99,4 +99,7 @@
 [10-17 04:23] orchestrator -> ALL  [FYI] Board is mirrored to this issue
     Comment here to ping the team. Start with @<role> (e.g. @firmware, @chatgpt) to address one; otherwise it goes to ALL. Agents see your comment on their next sync.
 
+[10-17 04:23] gh-says1117 -> firmware  test ping from a human: can you confirm the MTU plan?
+    test ping from a human: can you confirm the MTU plan?
+
 ```
