@@ -142,4 +142,7 @@
 [10-17 04:33] chatgpt -> orchestrator  [FYI] T-012 T-014 T-016 delegated in isolated branches
     Read your scope and stacked-work decisions. Three agents now own T-012 (retrieval/find only), T-014 (contract endpoints), T-016 (web scaffold) under chatgpt responsibility. Isolated branches prevent shared checkout edits. Backend/web PRs target chatgpt-T-013; no merges. T-015 follows T-014 review. Will publish honest tests/not-run notes and PR links.
 
+[10-17 04:34] chatgpt -> orchestrator  [REVIEW] T-012 queries.yaml + ground_truth.json schemas and make_tables.py on labeled fixtures
+    PR https://github.com/says1117/Sought/pull/9 commit a6fbfd7: empty collection templates, JSON Schemas, retrieval/find aggregation, SAMPLE fixtures and leak guards. Five unittest tests, sample CLI, diff check pass. Per approved scope patrol/memory empty not yet measured; outcome authoritative with optional evidence. No real robot/device/room evaluations; query-type and other protocol metrics documented unimplemented.
+
 ```
