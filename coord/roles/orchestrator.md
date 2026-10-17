@@ -3,7 +3,7 @@
 Your job is decisions, not typing. Daily routine:
 
 1. `python3 coord/tools/board.py sync && python3 coord/tools/board.py inbox orchestrator --ack`
-2. `board.py tasks` to see what is open, claimed, blocked, in review.
+2. `board.py view` for the kanban (To do, Claimed with what each agent is doing, Review, Blocked). `board.py tasks` is the compact list.
 3. Answer `[ASK]` and `[DECISION]` posts with `board.py post --from orchestrator --to <role> --subject "..." --body "..."`.
 4. Review `review` tasks (or assign the reviewer role), merge the PR, then `board.py status <T-id> done`.
 5. Create work: `board.py task --role <role> --size S --title "..." --depends T-001 --read "docs/03_CONTRACTS.md#1" --body "..."`.

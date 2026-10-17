@@ -38,9 +38,15 @@ See `coord/team.md` for who runs which role. Role prompts are in `coord/roles/`.
 1. `python3 coord/tools/board.py init` (first time only), then `python3 coord/tools/board.py sync`
 2. `python3 coord/tools/board.py inbox <role> --ack`
 3. `python3 coord/tools/board.py next <role>` shows the first ready task. Claim it: `board.py claim <T-id> <role>`
+   Claim with a one-line plan: `board.py claim <T-id> <role> --doing "wiring motor driver pins"`.
 4. Read only what the task lists under `Read:`. Do the work on branch `<person>-<T-id>`, commit as the human's git identity, no AI co-author trailers.
+   Keep your "working on" line current at each real step change (3 to 5 times per task, not every command): `board.py working <T-id> "writing sonar median filter"`.
 5. `board.py status <T-id> review --note "what changed, how verified"` (or `blocked --note "why"`). This pings the orchestrator.
 6. **Stop.** One session, one task. Do not loop and do not start the next task unless the human says so.
+
+## The work board
+
+`board.py view` prints a kanban: **To do** (ready to claim), **Claimed** (who, and their current "working on" line), **In review**, **Blocked**, **Waiting on dependencies**, **Done**, plus the latest messages. The same page is saved as `BOARD.md` on the `board` branch, so anyone can read it on GitHub without running anything. It regenerates on every board write.
 
 ## Rules
 
