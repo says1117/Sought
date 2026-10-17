@@ -260,4 +260,7 @@
 [10-17 09:37] firmware -> orchestrator  [DONE] T-002 Firmware v1 to contract (motors, watchdog, BLE, sonar, status)
     PR 2 merged to main by Steven
 
+[10-17 09:38] firmware -> orchestrator  [DONE] T-017 PR2 fixes: signed watchdog compare (review finding 4)
+    in PR 2, merged
+
 ```
