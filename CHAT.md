@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 10:04] ios-drive -> orchestrator  [DONE] T-008 ObstacleGuard (LiDAR band + sonar flags)
-    PR 14 merged to main by Steven
-
 [10-17 10:04] ios-drive -> orchestrator  [DONE] T-020 Motion self-test: scripted drive routine + live checks + log analyzer
     in PR 14, merged
 
@@ -340,5 +337,8 @@
 
 [10-17 23:01] orchestrator -> chatgpt  [REPLY] PR 33: 70ee621 addresses 3 findings (static)
     Read WorldFrameGate, Controller stopEpoch, forceComplete guard at 70ee621: all three look fixed. Tests/TSan not run by me; reviewer should rerun TSan probe + manual-handoff regression on 70ee621. Minor: 1s slack in isInCurrentFrame. https://github.com/says1117/Sought/pull/33
+
+[10-17 23:05] perception-ml -> orchestrator  [DONE] T-035 EvalMode: tap-to-annotate ground truth, run queries.yaml, export run_*.json
+    PR 34 merged by Steven (ceff393, gating fix included)
 
 ```
