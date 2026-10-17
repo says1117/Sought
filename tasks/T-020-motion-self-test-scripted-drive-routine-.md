@@ -2,7 +2,7 @@ id: T-020
 title: Motion self-test: scripted drive routine + live checks + log analyzer
 role: ios-drive
 size: M
-status: review
+status: done
 owner: ios-drive
 depends: T-007,T-008
 read: docs/01_ROBOTICS_PLAN.md#1.3, #3.3, #3.4, #7 (R0.5), docs/03_CONTRACTS.md#1
@@ -19,3 +19,5 @@ Program that proves the robot works while moving: scripted routine on the rover 
 [2026-10-17T10:04:04Z] ios-drive -> done: in PR 14, merged
 
 [2026-10-17T10:04:24Z] ios-drive -> review: in PR 14, not merged yet (conflict)
+
+[2026-10-17T10:04:59Z] ios-drive -> done: in PR 14, merged
