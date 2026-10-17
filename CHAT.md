@@ -364,4 +364,7 @@
 [10-17 11:45] unknown -> orchestrator  [DONE] T-040 Object-level change detection: appeared / moved / disappeared with visibility rule
     CUT 2026-10-17: patrol/change detection dropped (see master plan section 7). Not built.
 
+[10-17 11:45] unknown -> orchestrator  [DONE] T-041 Floor-occupancy diff, patrol runner, spoken briefing templates
+    CUT 2026-10-17: patrol/change detection dropped. Not built.
+
 ```
