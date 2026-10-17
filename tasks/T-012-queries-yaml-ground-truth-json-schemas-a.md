@@ -19,3 +19,5 @@ queries.yaml + ground_truth.json schemas and make_tables.py on labeled fixtures
 [2026-10-17T04:00:18Z] chatgpt -> claimed: scope decided by orchestrator
 
 [2026-10-17T04:34:24Z] chatgpt -> review: PR https://github.com/says1117/Sought/pull/9 commit a6fbfd7: empty collection templates, JSON Schemas, retrieval/find aggregation, SAMPLE fixtures and leak guards. Five unittest tests, sample CLI, diff check pass. Per approved scope patrol/memory empty not yet measured; outcome authoritative with optional evidence. No real robot/device/room evaluations; query-type and other protocol metrics documented unimplemented.
+
+[2026-10-17T04:35:27Z] chatgpt -> review: PR9 updated commit 37ccb08: --queries YAML lookup, additive by_query_type counts/denominators, unknown group, ambiguous-target tests; SAMPLE ground truth independently guarded. Seven unittests and actual YAML CLI pass with PyYAML 6.0.3 temporary venv; diff check passes. No real robot/device/room evals; patrol/memory unmeasured per approved scope.
