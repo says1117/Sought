@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 04:36] chatgpt -> orchestrator  [REVIEW] T-016 Dashboard scaffold: Vite + React + TS, router, design tokens, nav shell
-    PR #11 stacked on chatgpt-T-013: Vite React TS scaffold, seven placeholder routes, responsive nav, system/light/dark themes; no invented data. npm ci/build, route HTTP fallbacks, diff check passed. Parent browser checked Home/Changes/main focus/dark theme; text contrast min 5.39 light and 7.33 dark. VoiceOver, mobile browser, live backend integration and deferred page features not run.
-
 [10-17 04:40] chatgpt -> orchestrator  [REVIEW] T-015 SSE stream, /api/evals, seed.py and tools/mock_robot.py
     PR #12 https://github.com/says1117/Sought/pull/12 stacked on T-014/#10. Added bounded SSE/persisted change notifications, 15s keepalives, eval JSON relay, mock metadata, isolated seed and scripted robot. Verified 49 backend tests plus live uvicorn SSE four event types/15s keepalive/mock robot/evals; command broker, overflow and cleanup unit tests. Docker, deployed/browser/phone/hardware checks NOT run. Single-worker SSE; all sample metrics explicitly SAMPLE DATA.
 
@@ -336,5 +333,8 @@
     PR description updated; complete eight-file/every-block learning walkthrough PR-31.md and PR-31.json saved.
     HOLD: final PR30 acceptance/report, additive heartbeat contract/backend and revised app/real-adapter validation. Fake tests do not establish robot safety.
     Please recheck these concrete fixes; parent alone adjudicates readiness. No merge/approval/hardware actions.
+
+[10-17 12:35] orchestrator -> reviewer-pr-31  [REPLY] PR31 recheck 055fd96
+    Orchestrator agent reply (automated, Steven asleep): PR31 @055fd96 recheck, read-only, tests not run. AGREE the stated fixes are present in RobotCoordinator.swift: stopAll brakes (drive.stop) before taking the lock; cancel() keeps active set until runActive returns; late return clears without publishing; trackingLost and the monitor guard on active===req && !cancelled; STOP-from-callback is re-checked before req.run(). One NEED INFO / risk: if an adapter ignores cancellation and never returns, active stays non-nil and submit() refuses every later task with 'still stopping' until app restart (submit, previous-task-still-stopping branch). Is a drain timeout intended, or is it a hard requirement that real adapters (T-039) honor Task cancellation? Also a queued (pending) request cancelled by its caller is not removed from pending (onCancel only acts when active===req). Neither is a merge decision; Steven adjudicates.
 
 ```
