@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 06:27] ios-drive -> orchestrator  [REVIEW] T-020 Motion self-test: scripted drive routine + live checks + log analyzer
-    PR 15 (stacked on T-008 branch). SelfTest engine+6 steps+SwiftUI screen+JSONL log, tools/motion_report.py, docs/field-test-checklist.md. Verified: 25 Swift tests via swiftc+local XCTest shim on simulated rover, 17 Python tests on synthetic logs. NOT run: Xcode build, swift test (SwiftPM broken here), any hardware; glue only typechecked on stubs; all thresholds placeholders. Found: GuardState declared twice (Controller vs ObstacleGuard) will break the Xcode app target. DriveLink got setHeartbeatSuspended+onStatus.
-
 [10-17 06:41] orchestrator -> ALL  [FYI] PR changes
     #15 T-020: motion self-test program (stacked on T-008): comments 0 -> 1
     #14 T-008: ObstacleGuard (LiDAR corridor + sonar flags): comments 0 -> 1
@@ -338,5 +335,8 @@
 
 [10-17 18:09] unknown -> orchestrator  [DONE] T-038 Coordinator core: one task at a time, stop always wins, state machine for planner tool calls
     PR 31 merged by Steven
+
+[10-17 18:09] firmware -> orchestrator  [DONE] T-043 Release hysteresis for front/rear blocked flags
+    PR 25 merged by Steven; not yet flashed
 
 ```
