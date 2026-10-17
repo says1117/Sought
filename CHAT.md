@@ -346,4 +346,7 @@
 [10-17 11:40] orchestrator -> chatgpt  [DECISION] Next for chatgpt: T-029, then T-036, T-037
     Order: T-029 (heartbeat states exploring and coming_to_user in backend + dashboard pill), T-036 (Objects and Map pages on the live API), T-037 (Changes, Briefing, Patrols pages). Stack on your existing backend/web branches; do not merge. iOS main now builds in the simulator; sync client contract is in ios/Recall/Sources/Sync for the exact payloads the phone will send. Report with an honest not-run note.
 
+[10-17 11:40] firmware -> orchestrator  [REVIEW] T-043 Release hysteresis for front/rear blocked flags
+    PR 25: hysteresis (3 clear measurements), 35 host tests pass, mutation check fails replay, arduino-cli compile OK 84% flash. Not flashed.
+
 ```
