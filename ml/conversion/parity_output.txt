@@ -1,0 +1,20 @@
+machine=macOS-15.0-arm64-arm-64bit arm64 coremltools=9.0 torch=2.7.0 compute_units=CPU_ONLY
+image noise                cosine(torch, coreml) = 0.999966
+image gradient             cosine(torch, coreml) = 0.999899
+image cat_dog_music.png    cosine(torch, coreml) = 0.998493
+image cats.png             cosine(torch, coreml) = 0.998426
+image dog.jpg              cosine(torch, coreml) = 0.998670
+text  a cat                                cosine(torch, coreml) = 0.999983
+text  a tiger                              cosine(torch, coreml) = 0.999982
+text  a red mug                            cosine(torch, coreml) = 0.999982
+text  a set of keys                        cosine(torch, coreml) = 0.999988
+text  a laptop                             cosine(torch, coreml) = 0.999985
+text  a photo of a cat                     cosine(torch, coreml) = 0.999981
+text  the blue backpack by the door        cosine(torch, coreml) = 0.999988
+min cosine over 12 items = 0.998426  mean = 0.999612
+
+Zero-shot sanity (Core ML image x Core ML text cosine; text = 'raw' phrase only):
+                             a cat      a tiger    a red mug a set of key     a laptop
+cat_dog_music.png            0.132        0.088        0.057        0.097        0.067
+cats.png                     0.165        0.116        0.049        0.105        0.096
+dog.jpg                      0.145        0.281        0.046        0.061        0.096
