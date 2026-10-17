@@ -59,5 +59,9 @@ let package = Package(
         .testTarget(name: "SyncTests", dependencies: ["SyncCore"], path: "Tests/SyncTests", exclude: ["Fixtures"]),
         .testTarget(name: "ComeToMeTests", dependencies: ["ComeToMeCore", "ControllerCore", "PoseCore"], path: "Tests/ComeToMeTests"),
             .testTarget(name: "ExploreTests", dependencies: ["ExploreCore", "OccupancyGridCore", "PoseCore"], path: "Tests/ExploreTests"),
+        .target(name: "EvalCore", dependencies: ["Memory", "Retrieval", "FindExecutor"], path: "Sources/EvalMode",
+                sources: ["EvalGroundTruth.swift", "EvalQueries.swift", "EvalRawRun.swift", "EvalScoring.swift",
+                          "EvalRetrievalRunner.swift", "EvalFindTrialLogger.swift", "EvalViewModel.swift"]),
+        .testTarget(name: "EvalModeTests", dependencies: ["EvalCore", "Memory", "Retrieval", "FindExecutor"], path: "Tests/EvalModeTests"),
     ]
 )

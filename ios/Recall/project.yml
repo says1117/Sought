@@ -62,6 +62,7 @@ targets:
       - path: Sources/Planner
       - path: Sources/Retrieval
       - path: Sources/FindExecutor
+      - path: Sources/EvalMode
       - path: Sources/Sync
         excludes: ["README.md"]
       - path: Sources/Perception
