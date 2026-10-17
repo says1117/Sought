@@ -24,7 +24,7 @@ Plan v2 (2026-10-17): autonomous exploration, LLM-first control and "come to me"
 - Come to me: the robot drives to the person using Nearby Interaction (UWB distance and direction) from a companion app on a second iPhone, with Vision person detection plus LiDAR depth for the last meters
 - Open-vocabulary object memory (crops, embeddings, 3D positions, tracks)
 - Find by description: retrieve, drive, **arrival check**, fall back to next candidate
-- Patrol and change report (appeared, disappeared, moved, new obstacle) with before and after thumbnails
+- ~~Patrol and change report with before and after thumbnails~~ moved to Cut on 2026-10-17 (see section 7); tasks T-040 and T-041 are parked
 - Eval harness, ablation tables, failure analysis
 - Dashboard: status, changes timeline, objects, map
 - Public repo with a README that explains the design choices and tradeoffs
@@ -69,7 +69,7 @@ Plan for at least one 4 to 5 hour sleep each, staggered, so someone is awake to 
 | H1 to H3 | Firmware v1 (motors, watchdog, BLE, ultrasonics). iOS project, BLE drive from buttons. **ARKit tracking test at two phone heights** | Mock data generator and seed script. API endpoints with OpenAPI. Dashboard shell, routing, design tokens | **M1 (H2): contracts v1 frozen** |
 | H3 to H10 | Pose publisher, go-to-pose controller, obstacle guard, keyframe capture, proposals and embeddings, SQLite memory, typed query highlights an object on screen | Changes timeline, Objects grid, status header, media upload, SSE stream, all against mock data | **M2 (H10): first live heartbeat and object upload from the phone to the dashboard** |
 | H10 to H18 | Occupancy grid and frontier Explore, Teach fallback and waypoints, world map persistence, retrieval and find executor with arrival check, keyword planner then Gemini planner, find bar (type, then speech), sync client | Map page, Briefing player, Patrols page, error and empty states, Accessibility baseline | **M3 (H18): full find loop on the robot, visible on the dashboard** |
-| H18 to H24 | Come to me (companion app, UWB, Vision fallback), patrol, object change detection, before and after capture, spoken briefing | Live before and after change cards, severity design, Evals page skeleton, README visuals started | **M4 (H24): FEATURE FREEZE. Tag `v0.9`** |
+| H18 to H24 | **Revised:** first real find on the robot, phone to dashboard sync, Teach waypoints, Explore only if the find loop works | Live before and after change cards, severity design, Evals page skeleton, README visuals started | **M4 (H24): FEATURE FREEZE. Tag `v0.9`** |
 | H24 to H32 | Run the eval protocol, fix only the top bugs, stretch work only if M4 was early | Evals page with real results, architecture diagram, pitch page, Devpost draft, record clips as things work | |
 | H32 to H36 | Rehearse the demo 3 times, charge everything, pre-save the map and memory | Final video edit, Devpost submit by H34, repo public check, secrets check | **Submit before the deadline, not at it** |
 
@@ -78,7 +78,7 @@ Plan for at least one 4 to 5 hour sleep each, staggered, so someone is awake to 
 - **M1 (H2):** `03_CONTRACTS.md` is v1. A fake robot script (`tools/mock_robot.py`) can post a heartbeat and the dashboard shows it.
 - **M2 (H10):** the real phone posts a heartbeat, one object with a thumbnail, and one waypoint. The dashboard shows them.
 - **M3 (H18):** after an autonomous Explore of one room (or the Teach fallback), say or type "find the blue backpack" in the app. The planner calls `find_object`, the robot drives there, runs the arrival check, speaks the result. The dashboard shows the objects found and the trace.
-- **M4 (H24):** "come to me" brings the robot to a person holding the companion iPhone in the same room, and a patrol with one moved chair and one new box produces two change events with before and after photos and a spoken briefing. No new features after this point.
+- **M4 (H24, revised):** typed or spoken "find the X" works live on the robot with the arrival check, objects and status appear on the dashboard, and the safety demo (kill the app, rover stops) works. The original M4 (come to me, and a patrol producing two change events with before and after photos and a spoken briefing) is cut. No new features after this point.
 
 ## 6. Risks and mitigations
 
@@ -99,25 +99,30 @@ Plan for at least one 4 to 5 hour sleep each, staggered, so someone is awake to 
 
 ## 7. Cut order if behind
 
-1. Sound source finding (never start before M4)
+Revised 2026-10-17 07:50 EDT (about 24 hours left, nothing yet run on a real iPhone): protect the find loop on the real robot.
+
+1. Sound source finding (never start)
 2. Remote tasking from the dashboard
 3. 3D map view
 4. Robot-height adapter fine-tune
 5. "Check the way to X"
-6. Floor occupancy diffing for change reports (keep the grid for exploration)
-7. Voice input (typed find bar instead)
-8. Come to me Vision fallback (UWB only)
-9. Gemini planner (keyword grammar only)
-10. Autonomous exploration (Teach drive only)
+6. **Patrol, change detection, floor-occupancy diff for change reports, spoken briefing (T-040, T-041)**. Keep the grid for exploration
+7. **Come to me (T-028 code exists; no further work, only a demo if everything else is done)**
+8. **Autonomous exploration (T-023). Teach drive is the fallback and becomes the main map path if Explore is not working on the robot by the feature freeze**
+9. Voice input (typed find bar instead)
+10. Come to me Vision fallback
+11. Gemini planner (keyword grammar only)
 
-**Never cut:** drive safety, retrieval plus arrival check, the find bar, change report with photos, the eval harness, the README.
+**Never cut:** drive safety, retrieval plus arrival check, the find bar, the dashboard showing live objects and status, the eval harness (retrieval and find only), the README.
+
+**Priority order for the remaining hours:** (1) floor drive and bench tests, (2) app on the real phone with ARKit tracking test, (3) perception to memory with real MobileCLIP models, (4) coordinator and typed find with the arrival check on the robot, (5) phone to dashboard sync, (6) Teach waypoints, (7) evals, README, video. Autonomous explore is attempted only after step 4 works.
 
 ## 8. Definition of done
 
 - [ ] Robot explores the demo room on its own and the dashboard shows the objects it stored
 - [ ] Robot finds at least 3 objects by free-form description typed or spoken into the find bar, live
 - [ ] Come to me reaches the person holding the companion iPhone (target within 1 m, measured, not assumed)
-- [ ] A patrol reports at least 2 injected changes with before and after photos
+- [ ] ~~A patrol reports at least 2 injected changes~~ cut on 2026-10-17 (section 7)
 - [ ] ESP32 stops the rover when the phone app is killed, with the wheels moving (watchdog demo)
 - [ ] `evals/results/` contains real runs, and every number in the README links to them
 - [ ] Public repo, README with architecture diagram, design choices and tradeoffs, how to run, limitations

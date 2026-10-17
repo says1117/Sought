@@ -47,3 +47,10 @@ Checked items in this section record product decisions, not completed implementa
 - [x] Autonomous Explore replaces Teach as the main way to build memory. Teach stays as a quick fallback.
 - [x] Come to me uses UWB (Nearby Interaction). A second, newer iPhone is available for the companion app.
 - [x] Contract additions (additive only): heartbeat states `exploring` and `coming_to_user`, and the companion link in section 1.1.
+
+## Scope cut (2026-10-17, 07:50 EDT)
+
+- [x] Patrol and change detection cut first, then come to me (code from T-028 stays, no more work), then autonomous Explore (Teach is the fallback and the main map path if Explore is not working by the feature freeze). Details in `00_MASTER_PLAN.md` section 7.
+- [x] Priority: find loop on the real robot, then phone to dashboard sync, then evals, README and video.
+- Verified so far: firmware flashed; forward, turn, watchdog and front stop bench-tested over BLE with wheels off the ground. Not yet verified: anything on the iPhone, ARKit tracking, floor driving, rear stop, find loop.
+
