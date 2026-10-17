@@ -30,6 +30,7 @@ let package = Package(
         .target(name: "SyncCore", path: "Sources/Sync", exclude: ["README.md"]),
         .target(name: "ComeToMeCore", dependencies: ["PoseCore", "ControllerCore"], path: "Sources/ComeToMe",
                 sources: ["CompanionMessages.swift", "ApproachPlanner.swift", "ComeToMeRunner.swift", "RangeSample.swift"]),
+        .target(name: "ExploreCore", dependencies: ["OccupancyGridCore", "PoseCore"], path: "Sources/Explore", exclude: ["README.md"]),
         .testTarget(name: "DriveLinkTests", dependencies: ["DriveLinkCore"], path: "Tests/DriveLinkTests"),
         .testTarget(name: "PoseTests", dependencies: ["PoseCore"], path: "Tests/PoseTests"),
         .testTarget(name: "ObstacleGuardTests", dependencies: ["ObstacleGuardCore", "RecallShared"], path: "Tests/ObstacleGuardTests"),
@@ -42,5 +43,6 @@ let package = Package(
         .testTarget(name: "FindExecutorTests", dependencies: ["FindExecutor", "Retrieval", "Memory"], path: "Tests/FindExecutorTests"),
         .testTarget(name: "SyncTests", dependencies: ["SyncCore"], path: "Tests/SyncTests", exclude: ["Fixtures"]),
         .testTarget(name: "ComeToMeTests", dependencies: ["ComeToMeCore", "ControllerCore", "PoseCore"], path: "Tests/ComeToMeTests"),
+            .testTarget(name: "ExploreTests", dependencies: ["ExploreCore", "OccupancyGridCore", "PoseCore"], path: "Tests/ExploreTests"),
     ]
 )
