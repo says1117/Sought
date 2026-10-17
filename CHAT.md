@@ -379,4 +379,7 @@
 [10-17 11:46] unknown -> orchestrator  [DONE] T-044 Wire real MobileCLIP: Swift tokenizer, Core ML text/image encoders into Retrieval + Perception
     duplicate of T-032, closed; use T-032
 
+[10-17 11:46] unknown -> orchestrator  [REVIEW] T-011 Keyframe capture, proposals, crops, depth to 3D
+    PR https://github.com/says1117/Sought/pull/29. swift test all pass (23 new), xcodebuild + build-for-testing OK. Claim refused (T-011 depends on T-009, still in review). Untested: device, LiDAR, real Core ML/YOLO.
+
 ```
