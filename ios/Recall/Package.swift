@@ -9,7 +9,10 @@ let package = Package(
         .target(name: "DriveLinkCore", path: "Sources/DriveLink",
                 sources: ["DriveLinkProtocol.swift"]),
         .target(name: "PoseCore", path: "Sources/Pose", sources: ["PoseMath.swift"]),
+        .target(name: "ObstacleGuardCore", path: "Sources/ObstacleGuard",
+                sources: ["GuardConfig.swift", "CorridorSampler.swift", "ObstacleGuardLogic.swift"]),
         .testTarget(name: "DriveLinkTests", dependencies: ["DriveLinkCore"], path: "Tests/DriveLinkTests"),
         .testTarget(name: "PoseTests", dependencies: ["PoseCore"], path: "Tests/PoseTests"),
+        .testTarget(name: "ObstacleGuardTests", dependencies: ["ObstacleGuardCore"], path: "Tests/ObstacleGuardTests"),
     ]
 )
