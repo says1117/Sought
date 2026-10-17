@@ -9,6 +9,9 @@ final class FakeRecognizer: SpeechRecognizing {
     var transcript = "find my keys"
     private(set) var started = 0, cancelled = 0, finished = 0
     var partialSink: ((String) -> Void)?
+    var holdFinish = false
+    private var finishContinuation: CheckedContinuation<String, Never>?
+    var isAwaitingFinish: Bool { finishContinuation != nil }
     var holdAuthorization = false
     private var authorizationContinuation: CheckedContinuation<Bool, Never>?
     var isAwaitingAuthorization: Bool { authorizationContinuation != nil }
@@ -26,7 +29,15 @@ final class FakeRecognizer: SpeechRecognizing {
         started += 1
         partialSink = onPartial
     }
-    func finish() async throws -> String { finished += 1; return transcript }
+    func finish() async throws -> String {
+        finished += 1
+        guard holdFinish else { return transcript }
+        return await withCheckedContinuation { finishContinuation = $0 }
+    }
+    func resolveFinish(_ text: String) {
+        finishContinuation?.resume(returning: text)
+        finishContinuation = nil
+    }
     func cancel() { cancelled += 1 }
 }
 
@@ -36,4 +47,3 @@ final class FakeSpeaker: Speaking {
     func speak(_ text: String) { spoken.append(text) }
     func stopSpeaking() { stops += 1 }
 }
-

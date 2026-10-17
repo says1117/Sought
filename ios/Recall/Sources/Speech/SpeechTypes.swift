@@ -55,6 +55,7 @@ final class PushToTalk {
 
     func begin(onPartial: @escaping (String) -> Void = { _ in }) async throws {
         guard state == .idle else { return }
+        generation &+= 1
         let currentGeneration = generation
         guard isStationary() else { state = .idle; throw SpeechError.notStationary }
         state = .authorizing
@@ -69,7 +70,7 @@ final class PushToTalk {
         do {
             try recognizer.start { [weak self] text in
                 Task { @MainActor in
-                    guard let self, self.state == .listening else { return }
+                    guard let self, self.generation == currentGeneration, self.state == .listening else { return }
                     self.partial = text
                     onPartial(text)
                 }
@@ -97,13 +98,17 @@ final class PushToTalk {
     func end() async throws -> String {
         guard state == .listening else { return "" }
         guard isStationary() else { abort(); throw SpeechError.notStationary }
+        let currentGeneration = generation
         state = .finishing
         defer {
-            stationaryMonitor?.cancel()
-            stationaryMonitor = nil
-            state = .idle
+            if generation == currentGeneration {
+                stationaryMonitor?.cancel()
+                stationaryMonitor = nil
+                state = .idle
+            }
         }
         let transcript = try await recognizer.finish()
+        guard generation == currentGeneration else { throw SpeechError.cancelled }
         guard state == .finishing, isStationary() else {
             recognizer.cancel()
             throw SpeechError.notStationary

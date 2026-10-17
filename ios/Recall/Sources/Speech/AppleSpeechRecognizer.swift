@@ -65,6 +65,7 @@ final class AppleSpeechRecognizer: SpeechRecognizing {
     }
 
     func finish() async throws -> String {
+        let generation = recognitionGeneration
         stopAudio()
         request?.endAudio()
         return try await withCheckedThrowingContinuation { c in
@@ -72,7 +73,7 @@ final class AppleSpeechRecognizer: SpeechRecognizing {
             // Safety net: never hang if the recognizer never reports final.
             Task { @MainActor [weak self] in
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
-                guard let self, self.continuation != nil else { return }
+                guard let self, self.recognitionGeneration == generation, self.continuation != nil else { return }
                 self.complete(.success(self.latest))
             }
         }
