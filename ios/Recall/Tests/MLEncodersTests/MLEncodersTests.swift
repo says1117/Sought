@@ -104,7 +104,7 @@ final class MLEncodersTests: XCTestCase {
 
     func testGoldenFixtureShape() throws {
         let g = try golden()
-        XCTAssertEqual(g.count, 10)
+        XCTAssertEqual(g.count, 11)
         XCTAssertTrue(g.allSatisfy { $0.ids.count == 77 })
     }
 
