@@ -69,15 +69,19 @@ struct TraversalMask {
     init(map: ExploreMap, roverRadiusM: Float) {
         self.map = map
         blocked = [Bool](repeating: false, count: map.width * map.height)
-        let rc = max(0, Int((roverRadiusM / map.resolution).rounded(.up)))
-        let r2 = rc * rc
+        // Occupied cells represent squares, not points. Measure clearance from each cell's
+        // footprint so a rover center cannot pass within roverRadiusM of an occupied square.
+        let rc = max(0, Int((roverRadiusM / map.resolution + 0.5).rounded(.up)))
         for row in 0..<map.height {
             for col in 0..<map.width {
                 let cell = GridCell(col: col, row: row)
                 if map.state(cell) != .free { blocked[row * map.width + col] = true }
                 guard map.isOccupied(cell) else { continue }
                 for dr in -rc...rc {
-                    for dc in -rc...rc where dr * dr + dc * dc <= r2 {
+                    for dc in -rc...rc {
+                        let dx = max(0, (Float(abs(dc)) - 0.5) * map.resolution)
+                        let dz = max(0, (Float(abs(dr)) - 0.5) * map.resolution)
+                        guard dx * dx + dz * dz <= roverRadiusM * roverRadiusM else { continue }
                         let n = GridCell(col: col + dc, row: row + dr)
                         if map.contains(n) { blocked[n.row * map.width + n.col] = true }
                     }
