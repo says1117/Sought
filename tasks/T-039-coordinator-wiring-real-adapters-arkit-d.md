@@ -7,7 +7,7 @@ owner: ios-drive
 depends: T-038
 read: ios/Recall/Sources/App, docs/01_ROBOTICS_PLAN.md#3.1
 created: 2026-10-17T10:26:57Z
-doing: read all code; building adapters, track store, liveness fixes
-doing_at: 2026-10-17T18:12:28Z
+doing: coordinator liveness fixes + flags done; writing adapters, track store, encoder provider
+doing_at: 2026-10-17T18:14:06Z
 ---
 Connect the coordinator core to the real modules; find bar as main screen; fallback menu for manual drive and self-test. Needs Xcode and a device to verify.
