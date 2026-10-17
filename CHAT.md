@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 03:32] perception-ml -> orchestrator  [REVIEW] T-010 Memory SQLite schema + track association with tests
-    Branch claude/steven-t-010-33e4bf: ios/Recall/Package.swift (SwiftPM target Memory) + Sources/Memory (Schema, Thresholds, Association, MemoryUpdate) + Tests/MemoryTests. Verified: SQL schema executes in sqlite (python); logic tests (29 checks) pass via a standalone swiftc harness with an XCTest shim. NOT run: real 'swift test' (Mac CLT toolchain is broken: no XCTest, SDK/compiler mismatch, no Xcode installed), so SchemaTests (SQLite3) is unrun. Human: run 'swift test' in ios/Recall with full Xcode. All thresholds marked TO BE CALIBRATED; movedDistance 0.15, persistenceThreshold 0.5, alpha 0.3 are my guesses. Note: coord/ is not on main/this branch (only on steven-coordination).
-
 [10-17 03:33] firmware -> orchestrator  [REVIEW] T-002 Firmware v1 to contract (motors, watchdog, BLE, sonar, status)
     Branch claude/steven-t-002-4b73e8 (pushed). Rewrote navigator.ino to contract: BLE cmds L,R/STOP/PING, 300ms watchdog (also on disconnect/STOP, boot-safe), front<20/rear<15 linear clamp (immediate, not ramped), slew 10/tick, LEDC 20kHz, interrupt-based sonar alternating 50ms w/ median-3, T, status at 5Hz, STBY high only after BLE init. VERIFIED: compiles with arduino-cli, esp32 core 3.3.12 (installed; code is 3.x-only, wont build on 2.x), board esp32:esp32:esp32, 84% flash. NOT verified: nothing flashed or run. Human needs: flash; bench tests 2-6; set LEFT/RIGHT_SIGN, PWM_MIN (placeholder 70), trims (placeholder 100); check iOS negotiates MTU>=64 (status line ~35B; default 20B truncates; firmware requests 185).
 
@@ -381,5 +378,8 @@
 
 [10-17 11:55] reviewer -> orchestrator  [REVIEW] T-047 Review PR 5 and write complete learning walkthrough
     Reviewed PR #5 head 4f5371cca520720d1b8b20a62b5954960b538ecb against current main; effective diff is 12 backend files, no material findings. 25 pytest passed; live Uvicorn health and diff check passed. PR description updated. Walkthrough: overnight-reviews/PR-5.md. Docker/deploy, phone integration, and hardware unrun; PR #10/#11 depend on this branch.
+
+[10-17 11:55] chatgpt -> orchestrator  [DECISION] Steven conditional merge clearance: PR5 exact reviewed head
+    Steven authorized this coordinator to clear reviewed PRs while he sleeps if a full learning walkthrough is saved. PR5 https://github.com/says1117/Sought/pull/5 is cleared ONLY at 4f5371cca520720d1b8b20a62b5954960b538ecb. Independent review + parent report check: no material findings, 25 pytest pass and live Uvicorn health smoke pass; GitHub says mergeable/CLEAN, no CI configured. Complete PR-5.md walkthrough saved in Overnight review PR 5 chat and private review index; PR description updated. Docker/deployment/phone integration unrun, later endpoints outside scope. Claude may merge this exact head after confirming it remains current; then retarget PR10/11 to main and preserve dependency order. This clears code merge only, not physical validation or deployment.
 
 ```
