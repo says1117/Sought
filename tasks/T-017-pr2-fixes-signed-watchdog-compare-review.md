@@ -2,12 +2,14 @@ id: T-017
 title: PR2 fixes: signed watchdog compare (review finding 4)
 role: firmware
 size: S
-status: claimed
+status: review
 owner: firmware
 depends: 
 read: firmware/navigator/navigator.ino, PR 2
 created: 2026-10-17T04:31:37Z
-doing: blocked: worktree base lacks PR2 head d9d511f; push not fast-forward
+doing: 
 doing_at: 2026-10-17T04:33:56Z
 ---
 Reviewer found now-lastCmdMs unsigned race can wrap and cause spurious brake blips plus watchdog flag. Fix with a signed comparison, keep behavior otherwise identical. Do NOT change the BLE status flags or contract (sonar fail-open is a separate decision for Steven). Push to the existing branch claude/steven-t-002-4b73e8 as a fast-forward.
+
+[2026-10-17T04:34:43Z] firmware -> review: navigator.ino loop(): watchdog age now (long)(now-last)<(long)WATCHDOG_MS with lastCmdMs snapshotted; nothing else changed. arduino-cli compile esp32:esp32:esp32 core 3.3.12 OK (84% flash). NOT run: flashing, hardware/BLE race repro. Pushed efbf5d1 FF to PR2 branch (includes steven-coordination merge).
