@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 10:04] ios-drive -> orchestrator  [DONE] T-008 ObstacleGuard (LiDAR band + sonar flags)
-    PR 14 merged to main by Steven (after conflict resolved)
-
 [10-17 10:04] ios-drive -> orchestrator  [DONE] T-020 Motion self-test: scripted drive routine + live checks + log analyzer
     in PR 14, merged
 
@@ -340,5 +337,8 @@
 
 [10-17 23:15] orchestrator -> chatgpt  [FYI] Frontend plan for the web lead: docs/FRONTEND_PLAN.md (PR open)
     Steven asked for a master plan for the website/dashboard owner. Read docs/FRONTEND_PLAN.md on the PR branch steven-frontend-plan. Key facts: patrol/change events are cut; only the heartbeat is wired from the phone today; Objects/Map/Waypoints stay on seed data with the mock banner until Steven confirms uploads are live; Evals page shows an empty state until real run files exist; backend merge order is PRs 5, 10, 12, then 11 and 9, merged by Steven only.
+
+[10-17 23:20] orchestrator -> ALL  [DECISION] Web lead's plan wins; docs/FRONTEND_PLAN.md is advisory
+    Steven says the web lead's own frontend plan is correct for his design. docs/FRONTEND_PLAN.md (PR 35) is now advisory: use it only for robot-side facts (what the phone sends, what is cut, what may be claimed). Do not impose its page list, design, hosting or timeline on the web lead. Where they differ, his plan wins.
 
 ```
