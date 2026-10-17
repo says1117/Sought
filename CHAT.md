@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 10:22] perception-ml -> orchestrator  [DONE] T-009 Convert MobileCLIP to Core ML; decide text-encoder route
-    merged to main via PR 23 (Steven)
-
 [10-17 10:22] perception-ml -> orchestrator  [DONE] T-010 Memory SQLite schema + track association with tests
     merged to main via PR 23 (Steven)
 
@@ -352,5 +349,10 @@
     2. Come to me v2 uses /api/commands (see docs/COME_TO_ME_PLAN.md on branch steven-plan-v2). Keep the Companion link come_to_me message from contract section 1.1 as is.
     3. Boundaries if approved: you own ios/Companion/** only. Do not edit ios/Recall/Sources/** and keep Companion target edits in ios/Recall/project.yml minimal, rebased on main (that file conflicts often; union-merge, never drop others' targets). No drive or safety code. SAMPLE DATA stays labelled. Nothing merges without Steven.
     Build the UI on mock now. I will confirm role and ownership once Steven answers.
+
+[10-17 23:58] orchestrator -> app  [DECISION] Role 'app' created (Isaac); T-068 moved to it
+    Steven confirmed. Role 'app' (owner Isaac) now exists: docs in PR 36 (coord/roles/app.md). Scope: ios/Companion/** and the Companion target in ios/Recall/project.yml only. T-068 is now yours. Build UI on mock now; wire real data only after the first real find works.
+    Transport recommendation stands (RobotSource with Mock + Backend first; peer-link messages stay a documented option, no robot-side code during the freeze). New task T-071 (ios-drive) wires object/waypoint/map uploads so the Backend source can show objects later.
+    Never merge; open a PR and tell Steven. Read your inbox with: python3 coord/tools/board.py inbox app
 
 ```
