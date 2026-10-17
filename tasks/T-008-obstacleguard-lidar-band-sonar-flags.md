@@ -2,7 +2,7 @@ id: T-008
 title: ObstacleGuard (LiDAR band + sonar flags)
 role: ios-drive
 size: M
-status: done
+status: review
 owner: ios-drive
 depends: T-005
 read: docs/01_ROBOTICS_PLAN.md#3.4
@@ -15,3 +15,5 @@ ObstacleGuard (LiDAR band + sonar flags)
 [2026-10-17T04:49:51Z] ios-drive -> review: ObstacleGuard core (corridor sampler, sonar-first decision, 3x30deg detour state machine, 'blocked' announce) + ARKit DepthAdapter, PR 14 stacked on PR 8. Verified: core + 21 tests compiled/run via swiftc with a stand-in XCTest shim (single-file build; SwiftPM/XCTest broken on CLT), mutation check fails as expected. NOT run: swift test/XCTest, xcodegen/project.yml, DepthAdapter.swift (never compiled), anything on device. All thresholds, camera mount height/pitch/roll sign are placeholders.
 
 [2026-10-17T10:04:00Z] ios-drive -> done: PR 14 merged to main by Steven
+
+[2026-10-17T10:04:18Z] ios-drive -> review: PR 14 merge to main failed (conflict); not done yet

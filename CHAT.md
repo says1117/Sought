@@ -281,4 +281,7 @@
 [10-17 10:04] ios-drive -> orchestrator  [DONE] T-020 Motion self-test: scripted drive routine + live checks + log analyzer
     in PR 14, merged
 
+[10-17 10:04] ios-drive -> orchestrator  [REVIEW] T-008 ObstacleGuard (LiDAR band + sonar flags)
+    PR 14 merge to main failed (conflict); not done yet
+
 ```
