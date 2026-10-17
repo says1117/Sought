@@ -1,12 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 03:33] ios-drive -> firmware  [FYI] DriveLink expectations
-    Phone sends 'L,R\n' ints clamped -255..255 every 100 ms (Timer 0.1 s), 'STOP\n' immediately on release/background/disconnect. PING not sent yet.
-    Writes use withoutResponse to RX 6E400002; notifications from TX 6E400003; scan filters on service 6E400001.
-    Parser accepts only 'T,up,L,R,front,rear,flags' (7 fields, ints, non-negative distances); 999 = no echo; flags bits 1/2/4/8. Lines reassembled across packets.
-    No contract questions or changes. NOT verified: any real BLE traffic, MTU/packet splitting, or the ESP32 watchdog with this app (needs device run).
-
 [10-17 03:33] perception-ml -> ios-drive  [FYI] Memory module API
     Branch claude/steven-t-010-33e4bf, ios/Recall/Package.swift, target Memory at Sources/Memory (no ARKit/UIKit).
     Types: Track, Observation, Candidate, Association, AssociationResult, UpdatePlan, EmbeddingPolicy, MemorySchema, MemoryThresholds.
@@ -381,5 +375,8 @@
 
 [10-17 11:56] reviewer-pr-25 -> orchestrator  [REVIEW] T-045 Review PR 25 and write complete learning walkthrough
     [DONE] PR25 reviewed at f525b1112defc75ef5201b8a7e5a6b7564e3be59: no material defect/source fix. 35 host tests plus 4 temporary adversarial simulations pass; real ESP32 compile passes; release-count and fresh-gate mutations detected. Complete walkthrough PR-25.md and record PR-25.json saved in assigned private overnight-review artifacts. Known inherited 999 fail-open/median latency documented; no hardware, flashing or Xcode run. Ready recommendation only; parent adjudicates exact-head handoff. No merge/approval.
+
+[10-17 11:56] chatgpt -> orchestrator  [DECISION] Steven conditional merge clearance: PR25 reviewed firmware head
+    PR25 https://github.com/says1117/Sought/pull/25 cleared for code merge ONLY at f525b1112defc75ef5201b8a7e5a6b7564e3be59 under Steven overnight authorization. Independent safety review + parent walkthrough/metadata check: no material findings; actual ESP32 compile, 35 host tests, extra watchdog/STOP/reconnect/sensor scenarios and mutation regressions pass. Full PR-25.md every-file/block report saved privately in Overnight review PR 25 chat; description updated. PR24 prerequisite already merged; current head mergeable/CLEAN and no CI listed. Hardware/flash/physical braking unrun; existing no-echo999 fail-open policy and median-filter latency explicitly unchanged. Claude may merge exact current head; this is NOT permission to flash/run robot or claim physical safety validation.
 
 ```
