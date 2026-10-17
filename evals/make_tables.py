@@ -14,10 +14,37 @@ def number(value):
     return value
 
 
-def aggregate(paths, ground_truth, allow_sample=False):
+def retrieval_metrics(trials, positions):
+    top1 = top3 = 0
+    errors = []
+    for trial in trials:
+        targets = trial['target']
+        targets = targets if isinstance(targets, list) else [targets]
+        ranked = trial['ranked']
+        top1 += bool(ranked and ranked[0]['track_id'] in targets)
+        top3 += any(r['track_id'] in targets for r in ranked[:3])
+        if ranked:
+            candidates = [positions[t] for t in targets if t in positions]
+            if len(candidates) != len(targets):
+                raise ValueError('Missing target ground truth')
+            if candidates:
+                errors.append(min(math.hypot(number(ranked[0]['x']) - number(p['x']),
+                                             number(ranked[0]['z']) - number(p['z'])) * 100
+                                  for p in candidates))
+    return dict(n=len(trials), top1=top1, top3=top3, pos_err_n=len(errors),
+               pos_err_cm_median=median(errors) if errors else None,
+               pos_err_cm_max=max(errors) if errors else None)
+
+
+def aggregate(paths, ground_truth, allow_sample=False, queries=None):
     positions = {o['id']: o for o in ground_truth['objects']}
     groups = defaultdict(list)
-    sample = False
+    sample = bool(ground_truth.get('sample'))
+    if sample and not allow_sample:
+        raise ValueError('SAMPLE ground truth refused')
+    query_types = {q['id']: q['type'] for q in (queries or [])}
+    if any(t not in ('exact', 'attribute', 'descriptive', 'ambiguous') for t in query_types.values()):
+        raise ValueError('Invalid query type')
     sources = []
     for path in sorted(paths):
         run = json.loads(Path(path).read_text())
@@ -41,25 +68,15 @@ def aggregate(paths, ground_truth, allow_sample=False):
             continue
         row = dict(variant=variant, n=len(trials))
         if kind == 'retrieval':
-            top1 = top3 = 0
-            errors = []
+            row.update(retrieval_metrics(trials, positions))
+            typed = defaultdict(list)
             for trial in trials:
-                targets = trial['target']
-                targets = targets if isinstance(targets, list) else [targets]
-                ranked = trial['ranked']
-                top1 += bool(ranked and ranked[0]['track_id'] in targets)
-                top3 += any(r['track_id'] in targets for r in ranked[:3])
-                if ranked:
-                    candidates = [positions[t] for t in targets if t in positions]
-                    if len(candidates) != len(targets):
-                        raise ValueError('Missing target ground truth')
-                    if candidates:
-                        errors.append(min(math.hypot(number(ranked[0]['x']) - number(p['x']),
-                                                     number(ranked[0]['z']) - number(p['z'])) * 100
-                                          for p in candidates))
-            row.update(top1=top1, top3=top3, pos_err_n=len(errors),
-                       pos_err_cm_median=median(errors) if errors else None,
-                       pos_err_cm_max=max(errors) if errors else None)
+                typed[query_types.get(trial['query_id'], 'unknown')].append(trial)
+            row['by_query_type'] = []
+            for query_type, subset in sorted(typed.items()):
+                # Reuse precisely the overall metric calculation for each denominator.
+                with_type = retrieval_metrics(subset, positions)
+                row['by_query_type'].append(dict(type=query_type, **with_type))
             output['retrieval'].append(row)
         else:
             successes = 0
@@ -99,10 +116,16 @@ def markdown(result):
         if not rows:
             lines += ['Not yet measured.', '']
             continue
-        columns = list(rows[0])
+        breakdowns = [dict(variant=r['variant'], **part) for r in rows for part in r.get('by_query_type', [])]
+        columns = [c for c in rows[0] if c != 'by_query_type']
         lines += ['| ' + ' | '.join(columns) + ' |', '| ' + ' | '.join(['---'] * len(columns)) + ' |']
         lines += ['| ' + ' | '.join('unmeasured' if r[c] is None else str(r[c]) for c in columns) + ' |' for r in rows]
         lines.append('')
+        if breakdowns:
+            columns = list(breakdowns[0])
+            lines += ['### By query type', '', '| ' + ' | '.join(columns) + ' |', '| ' + ' | '.join(['---'] * len(columns)) + ' |']
+            lines += ['| ' + ' | '.join('unmeasured' if r[c] is None else str(r[c]) for c in columns) + ' |' for r in breakdowns]
+            lines.append('')
     lines += ['## Raw sources', ''] + [f'- `{p}`' for p in result['sources']]
     return '\n'.join(lines) + '\n'
 
@@ -110,6 +133,7 @@ def markdown(result):
 def main():
     base = Path(__file__).resolve().parent
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--queries', type=Path, default=base / 'queries.yaml')
     parser.add_argument('--runs', type=Path, default=base / 'results')
     parser.add_argument('--ground-truth', type=Path, default=base / 'ground_truth.json')
     parser.add_argument('--output-dir', type=Path, default=base)
@@ -117,7 +141,15 @@ def main():
     args = parser.parse_args()
     if args.allow_sample and args.output_dir.resolve() == base:
         parser.error('SAMPLE output requires a separate --output-dir')
-    result = aggregate(args.runs.glob('run_*.json'), json.loads(args.ground_truth.read_text()), args.allow_sample)
+    try:
+        queries = json.loads(args.queries.read_text())
+    except json.JSONDecodeError:
+        try:
+            import yaml
+        except ImportError as exc:
+            raise ValueError('YAML query files require PyYAML; JSON syntax is also valid YAML') from exc
+        queries = yaml.safe_load(args.queries.read_text())
+    result = aggregate(args.runs.glob('run_*.json'), json.loads(args.ground_truth.read_text()), args.allow_sample, queries)
     args.output_dir.mkdir(parents=True, exist_ok=True)
     (args.output_dir / 'results.json').write_text(json.dumps(result, indent=2, allow_nan=False) + '\n')
     (args.output_dir / 'results.md').write_text(markdown(result))

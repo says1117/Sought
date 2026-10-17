@@ -20,7 +20,7 @@ are null, never fabricated zeros. Find time summarizes all trials with times,
 including unsuccessful trials; `time_n` states its denominator. Find success uses
 `outcome`, constrained by optional `arrival_dist_m` and `accepted_track_id` when
 present. Patrol and memory aggregation await defined raw interfaces and remain
-empty with explicit unmeasured notes. Query-type breakdowns, collision counts,
+empty with explicit unmeasured notes. Collision counts,
 distance driven, false-accept rates, and latency metrics are not implemented.
 
 `fixtures/` contains **SAMPLE synthetic test data**, never real measurements.
@@ -34,3 +34,10 @@ python3 -m unittest discover -s evals -p 'test_*.py'
 
 Do not cite sample output as robot performance. Real reports must describe the
 room, date, operator, lighting, small sample limitations, and link raw sources.
+
+Install `python3 -m pip install -r evals/requirements.txt` for YAML query files.
+`--queries evals/queries.yaml` maps query IDs to types. Overall retrieval rows
+retain their contract fields and add `by_query_type` rows with separate counts
+and measurement denominators. Unmapped IDs appear as `unknown`; absent types
+produce no invented rows. SAMPLE ground-truth metadata is guarded independently
+of raw-run SAMPLE metadata.
