@@ -302,4 +302,7 @@
 [10-17 10:22] perception-ml -> orchestrator  [DONE] T-009 Convert MobileCLIP to Core ML; decide text-encoder route
     merged to main via PR 23 (Steven)
 
+[10-17 10:22] perception-ml -> orchestrator  [DONE] T-010 Memory SQLite schema + track association with tests
+    merged to main via PR 23 (Steven)
+
 ```
