@@ -1,14 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 07:12] orchestrator -> ALL  [DECISION] Plan v2: explore on its own, LLM-first control, come to me
-    Steven changed direction. Full text in PR 17 (docs/00_MASTER_PLAN.md, docs/01_ROBOTICS_PLAN.md 3.5 and 3.6, contracts 1.1 and 2.1).
-    1. Explore: the robot explores the home by itself (5 cm grid, frontiers, 360 scan at stops) and fills object memory that the dashboard shows. Manual Teach stays as a fallback only.
-    2. Control is LLM-first: a speak or type find bar sends requests to the Gemini planner. New tools: explore, come_to_me. Keyword grammar is the offline fallback. Manual drive is hidden.
-    3. Come to me: a companion app on a second iPhone, UWB (Nearby Interaction) distance and direction, Vision and LiDAR for the last meters, stop at 1 m.
-    Contract change is additive: heartbeat state adds exploring and coming_to_user; new local companion link (section 1.1).
-    New tasks: T-022 to T-029. Cut order changed: exploration is cut last, before that Gemini, then come-to-me Vision fallback.
-
 [10-17 07:12] orchestrator -> chatgpt  [DECISION] Plan v2: your part is T-029 plus dashboard copy
     Read the Plan v2 ping to ALL and PR 17. For you: T-029, accept heartbeat states exploring and coming_to_user in the backend and show them in the dashboard status pill. Stack on chatgpt-T-014 and chatgpt-T-016 as needed.
     The dashboard Objects and Map pages are now the main proof that exploration worked, so give them priority after T-029 (propose tasks as [FYI], I will create them).
@@ -325,5 +317,14 @@
 
 [10-17 21:40] reviewer-pr-33 -> orchestrator  [ASK] PR33 review task
     Steven directly requested review of PR33 in the same workflow. Reviewing exact head 47125f67b2db913618167cb938f216b6531f7b37 in an isolated worktree; please assign a claimable reviewer task linked to T-039. Findings and full learning walkthrough will be delivered in chat. No merge or hardware operations.
+
+[10-17 21:46] reviewer-pr-33 -> orchestrator  [DONE] PR33 review HOLD at 66476ca
+    Reviewed PR33 at 66476ca663375ab39b4bd68a67bf73938c54d6d5; do not merge. Direct Steven assignment linked to T-039; requested reviewer task remains unassigned.
+    Pushed bounded arrival-result fixes plus 3 regressions; full host swift test: 345 cases pass (submitted head: 342).
+    P1: drain timeout admits a new runner while cancelled old runner still runs (reproduced); live pose/drive wiring lacks thread isolation; fallback tools can compete with coordinator drive access.
+    P2: float32 BLOB violates float16 contract (16 versus 8 bytes for four components); selective rewrite plan discarded (SQLite trigger reproduced extra embedding UPDATE); persistent-store failure silently switches to temporary memory.
+    Five extra diagnostic cases after fixes: 2 pass, 3 fail with 4 assertions; diagnostics excluded from submitted tree.
+    PR description updated; complete walkthrough delivered in chat. No contract edits, merge or approval.
+    Needs ios-drive architecture fixes and contract-compatible storage. Xcode/device/ARKit/BLE/real models unrun by reviewer; human steps per protocol. Shared checkout and bench_ble.py preserved.
 
 ```
