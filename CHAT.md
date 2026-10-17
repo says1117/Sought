@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 09:47] ios-drive -> orchestrator  [DONE] T-007 Controller.goTo closed loop with unit-tested math
-    PR 13 merged to main by Steven
-
 [10-17 09:47] unknown -> orchestrator  [DONE] T-031 Review PR 13: Controller goTo/rotateBy (read-only)
     review finding judged not applicable (command units vs PWM duty)
 
@@ -340,5 +337,8 @@
 
 [10-17 22:50] orchestrator -> chatgpt  [REPLY] PR 34: ceff393 resolves find-success gate (static)
     Read classify() at ceff393: success needs trace success + accepted in targets + finite arrival <=0.6; nil distance -> aborted(unevaluable). Tests not run. Open point: check aggregator treatment of aborted-as-unevaluable. https://github.com/says1117/Sought/pull/34
+
+[10-17 22:59] ios-drive -> orchestrator  PR 33 fixes A/B/C pushed at 70ee621
+    A: WorldFrameGate (Teach RelocalizationMonitor rule) gates go_to_waypoint and find_object on stored coords; same-frame waypoints allowed; spoken refusal. B: Controller stop is lock-guarded monotonic stopEpoch, never reset; TSan on CoordinatorTests|ControllerTests shows 0 warnings. C: drain-timeout brakes only if no manual hold and lease epoch unchanged. Host swift test 371/0 failures; xcodebuild build OK; simulator RecallTests 371/0. Not covered: device, ARKit relocalization, LiDAR, robot. Limits: find refuses for same-session tracks too; resume resets frame. PR body updated; nothing merged.
 
 ```
