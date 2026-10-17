@@ -17,6 +17,9 @@ final class DriveLink: NSObject, ObservableObject, CBCentralManagerDelegate, CBP
     private var rx: CBCharacteristic?
     private var heartbeat: Timer?
     private var left = 0, right = 0
+    private var heartbeatSuspended = false
+    /// Called for every well-formed status line (main queue). Used by the motion self-test to log each line with its receive time.
+    var onStatus: ((RobotStatus) -> Void)?
     private var lines = LineBuffer()
 
     override init() {
@@ -33,8 +36,13 @@ final class DriveLink: NSObject, ObservableObject, CBCentralManagerDelegate, CBP
     /// Zero the heartbeat and send an immediate STOP.
     func stop() {
         left = 0; right = 0
+        heartbeatSuspended = false
         send(DriveProtocol.stopCommand)
     }
+
+    /// Self-test only (watchdog step): while suspended the 10 Hz heartbeat sends nothing, so the ESP32 must stop on its own.
+    /// `stop()` and a disconnect clear it.
+    func setHeartbeatSuspended(_ suspended: Bool) { heartbeatSuspended = suspended }
 
     private func send(_ s: String) {
         guard let p = peripheral, let rx else { return }
@@ -44,7 +52,7 @@ final class DriveLink: NSObject, ObservableObject, CBCentralManagerDelegate, CBP
     private func startHeartbeat() {
         heartbeat?.invalidate()
         heartbeat = Timer.scheduledTimer(withTimeInterval: DriveProtocol.heartbeatInterval, repeats: true) { [weak self] _ in
-            guard let self else { return }
+            guard let self, !self.heartbeatSuspended else { return }
             self.send(DriveProtocol.driveCommand(left: self.left, right: self.right))
         }
     }
@@ -82,6 +90,7 @@ final class DriveLink: NSObject, ObservableObject, CBCentralManagerDelegate, CBP
         heartbeat?.invalidate()
         rx = nil
         left = 0; right = 0
+        heartbeatSuspended = false
         robot = nil
         statusText = "Disconnected, rescanning"
         c.scanForPeripherals(withServices: [Self.service])
@@ -113,7 +122,7 @@ final class DriveLink: NSObject, ObservableObject, CBCentralManagerDelegate, CBP
     func peripheral(_ p: CBPeripheral, didUpdateValueFor c: CBCharacteristic, error: Error?) {
         guard c.uuid == Self.txUUID, let d = c.value, let s = String(data: d, encoding: .utf8) else { return }
         for line in lines.append(s) {
-            if let st = RobotStatus.parse(line) { robot = st }
+            if let st = RobotStatus.parse(line) { robot = st; onStatus?(st) }
         }
     }
 }
