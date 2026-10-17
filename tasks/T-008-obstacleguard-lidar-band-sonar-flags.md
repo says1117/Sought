@@ -7,7 +7,7 @@ owner: ios-drive
 depends: T-005
 read: docs/01_ROBOTICS_PLAN.md#3.4
 created: 2026-10-17T03:26:01Z
-doing: ObstacleGuard pure core + ARKit adapter
-doing_at: 2026-10-17T04:45:51Z
+doing: reading specs done; writing pure core
+doing_at: 2026-10-17T04:46:00Z
 ---
 ObstacleGuard (LiDAR band + sonar flags)
