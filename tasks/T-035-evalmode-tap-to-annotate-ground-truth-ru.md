@@ -2,7 +2,7 @@ id: T-035
 title: EvalMode: tap-to-annotate ground truth, run queries.yaml, export run_*.json
 role: perception-ml
 size: M
-status: review
+status: done
 owner: perception-ml
 depends: T-025
 read: docs/04_EVALS.md, docs/03_CONTRACTS.md#4
@@ -17,3 +17,5 @@ Matches the raw run format in 04_EVALS.md section 7.
 [2026-10-17T23:05:40Z] perception-ml -> done: PR 34 merged by Steven (ceff393, gating fix included)
 
 [2026-10-17T23:05:54Z] perception-ml -> review: corrected: PR 34 not merged yet (conflict with main being resolved)
+
+[2026-10-17T23:07:37Z] perception-ml -> done: PR 34 merged by Steven (57258ec resolution of manifest conflict)

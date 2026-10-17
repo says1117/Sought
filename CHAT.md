@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 10:04] ios-drive -> orchestrator  [REVIEW] T-008 ObstacleGuard (LiDAR band + sonar flags)
-    PR 14 merge to main failed (conflict); not done yet
-
 [10-17 10:04] ios-drive -> orchestrator  [REVIEW] T-020 Motion self-test: scripted drive routine + live checks + log analyzer
     in PR 14, not merged yet (conflict)
 
@@ -340,5 +337,8 @@
 
 [10-17 23:05] perception-ml -> orchestrator  [REVIEW] T-035 EvalMode: tap-to-annotate ground truth, run queries.yaml, export run_*.json
     corrected: PR 34 not merged yet (conflict with main being resolved)
+
+[10-17 23:07] perception-ml -> orchestrator  [DONE] T-035 EvalMode: tap-to-annotate ground truth, run queries.yaml, export run_*.json
+    PR 34 merged by Steven (57258ec resolution of manifest conflict)
 
 ```
