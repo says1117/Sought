@@ -23,6 +23,7 @@ public final class TeachViewModel: ObservableObject {
     @Published public private(set) var waypoints: [Waypoint] = []
     @Published public private(set) var message: String = ""
     @Published public private(set) var isSaving = false
+    public let storageWarning: String?
     @Published public var speed: Double = 150
     /// Typed or spoken text; the view binds a text field, a speech layer may set it.
     @Published public var nameDraft: String = ""
@@ -34,11 +35,12 @@ public final class TeachViewModel: ObservableObject {
     private var held: DriveIntent?
     private var enabled = true
 
-    public init(store: WaypointStore, driver: TeachDriving, mapSaver: TeachMapSaving, currentPose: @escaping () -> Pose2D?) {
+    public init(store: WaypointStore, driver: TeachDriving, mapSaver: TeachMapSaving, currentPose: @escaping () -> Pose2D?, storageWarning: String? = nil) {
         self.store = store
         self.driver = driver
         self.mapSaver = mapSaver
         self.currentPose = currentPose
+        self.storageWarning = storageWarning
         reload()
     }
 

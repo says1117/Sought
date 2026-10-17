@@ -31,6 +31,16 @@ final class TeachViewModelTests: XCTestCase {
         TeachViewModel(store: try WaypointStore(path: ":memory:"), driver: driver, mapSaver: saver, currentPose: { [unowned self] in self.pose })
     }
 
+    func testTemporaryStorageWarningIsVisible() throws {
+        let store = try WaypointStore(path: ":memory:")
+        let m = TeachViewModel(store: store, driver: driver, mapSaver: saver,
+                               currentPose: { self.pose }, storageWarning: "Waypoints are temporary")
+        m.beginSession()
+        m.markWaypoint(name: "desk")
+        XCTAssertEqual(m.storageWarning, "Waypoints are temporary")
+        XCTAssertEqual(m.message, "Marked desk")
+    }
+
     func testBeginSessionCreatesHomeAtCurrentPose() throws {
         let m = try makeModel()
         m.beginSession()

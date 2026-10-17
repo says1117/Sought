@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 extension DriveLink: TeachDriving {}
 
@@ -36,6 +37,7 @@ struct TeachView: View {
                 }
                 Button(model.isSaving ? "Saving map" : "Save map") { model.saveMap() }
                     .buttonStyle(.bordered).disabled(model.isSaving)
+                if let warning = model.storageWarning { Text(warning).font(.footnote).foregroundStyle(.orange) }
                 if !model.message.isEmpty { Text(model.message).font(.footnote) }
 
                 ForEach(model.waypoints, id: \.id) { w in
@@ -71,6 +73,7 @@ struct TeachView: View {
         .onReceive(ticker) { _ in reloc = monitor.tick() }
         .onAppear {
             model.beginSession(hasSavedMap: hasSavedMap, monitor: monitor)
+            reloc = monitor.update(tracking: tracker.tracking, mapping: tracker.mapping)
         }
         .onDisappear { model.stopDriving() }
     }
@@ -130,9 +133,16 @@ final class TeachSession: ObservableObject {
 
     init(link: DriveLink, tracker: PoseTracker) {
         let dir = WorldMapStore.defaultURL().deletingLastPathComponent()
-        let store = (try? WaypointStore(path: dir.appendingPathComponent("recall.sqlite").path))
-            ?? (try! WaypointStore(path: ":memory:"))
+        let store: WaypointStore
+        let storageWarning: String?
+        do {
+            store = try WaypointStore(path: dir.appendingPathComponent("recall.sqlite").path)
+            storageWarning = nil
+        } catch {
+            store = try! WaypointStore(path: ":memory:")
+            storageWarning = "Waypoint storage unavailable. New waypoints are temporary and will be lost when Teach closes."
+        }
         adapter = ARWorldMapAdapter(tracker: tracker)
-        model = TeachViewModel(store: store, driver: link, mapSaver: adapter, currentPose: { tracker.pose })
+        model = TeachViewModel(store: store, driver: link, mapSaver: adapter, currentPose: { tracker.pose }, storageWarning: storageWarning)
     }
 }
