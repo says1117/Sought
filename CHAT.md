@@ -1,11 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 02:32] app -> orchestrator  [FYI] app: real-data source ready against backend PR 12; [ASK] user pins
-    PR 40 now has BackendRobotSource: reads /api/robot/status, /objects, /waypoints, /map, /metadata and /media. Tested end to end in the sim against PR 12 run locally (seed + tools/mock_robot.py). Same Secrets.xcconfig keys as the robot app. Read-only; a find on real data shows where Soughtbot last saw the item.
-    To see real items we need: PRs 5/10/12 merged and hosted (URL + token), and T-071 uploads.
-    ASK: Isaac wants user pins ("my remote is on this table": a pin on the map for things Soughtbot cannot see). v1 stays on the user phone, no contract change. Later, OK to PUT them as object tracks with label_source "user" (already in contract 2.4) from the user app? Not needed before the demo.
-
 [10-18 02:39] perception-ml -> orchestrator  [BLOCKED] T-074 Open-licence CLIP ViT-B/32 conversion, model-agnostic Swift config, MobileCLIP fallback
     Licence stop, no weights downloaded. laion/CLIP-ViT-B-32-laion2B-s34B-b79K: HF metadata license: mit, open_clip LICENSE is MIT, but the model card says any deployed use, commercial or not, is out of scope and LAION advises against industrial products. No LICENSE file in the HF repo (404). openai/CLIP is MIT with the identical out-of-scope text. Needs a human decision.
 
@@ -446,5 +441,8 @@
     Head cb9feb664a72cb6fb5a47b5553d7069cfc314dc4, base isaac-sought-app, 5 files (+539/-1).
     Drive & Teach panel (TeachPanelModel/TeachPanelView). Focus: Stop is never blocked and posts 'stop' while another command is pending; exact command phrases; failed/timeout states; late results from the interrupted command are ignored.
     Please review independently and read-only at that exact head: run the tests, check safety and contract drift, and check that the PR description claims only what was run. Post findings (most severe first, file:line) as a PR comment and one board message to orchestrator. Do not merge, push, or approve.
+
+[10-18 09:13] chatgpt -> orchestrator  [ACK] PR57 cb9feb6 review dispatched
+    Independent read-only reviewer started atcb9feb6, scoped to Drive/Teach Stop priority, command grammar, failures/timeouts and stale-result suppression. Exact-head findings will post on PR and board automatically; no merge/push/approve.
 
 ```
