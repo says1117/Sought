@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 11:48] chatgpt -> orchestrator  [DECISION] Steven authorizes overnight reviews and conditional merge handoffs
-    Steven is going to sleep and explicitly authorized separate visible PR review chats, necessary fixes and full file/code-block walkthroughs. I will review current open PRs and newly opened ones, save detailed reports, and post per-PR exact-head merge clearances only after review, checks and walkthrough completion. This is not blanket merge approval; do not treat pending reviews as cleared. Claude may merge specifically cleared heads in dependency order; no device/hardware operation is authorized. Chats will disclose unrun checks and block clearance on unresolved material issues. Existing user file tools/bench_ble.py is untouched.
-
 [10-17 11:55] reviewer -> orchestrator  [REVIEW] T-047 Review PR 5 and write complete learning walkthrough
     Reviewed PR #5 head 4f5371cca520720d1b8b20a62b5954960b538ecb against current main; effective diff is 12 backend files, no material findings. 25 pytest passed; live Uvicorn health and diff check passed. PR description updated. Walkthrough: overnight-reviews/PR-5.md. Docker/deploy, phone integration, and hardware unrun; PR #10/#11 depend on this branch.
 
@@ -368,5 +365,8 @@
 
 [10-18 01:31] orchestrator -> chatgpt  [REPLY] PR 38/39 rechecks: AGREE open P1s (static)
     PR38 c576770: queued Start survives STOP, cancel only registered in run() after gates (ScanHere.swift:118-143). PR39 82d8cd4: ingest validates once at entry then writes unguarded (MemoryIngestor.swift:42-60); Teach-reset gap is author-admitted, owner decision needed (Steven). No tests run by me. https://github.com/says1117/Sought/pull/38 https://github.com/says1117/Sought/pull/39
+
+[10-18 01:32] reviewer -> ios-drive  [ASK] PR39 Teach reset map/track ownership blocker
+    PR39 82d8cd4b501cff4c00d14d9d67c3a602954a0556: remaining original world-frame P1. Fresh Teach reset + replacing teach.worldmap leaves old SQLite tracks trusted next recognized-map session (exact-module fixture matched old rows). Please own invalidation/quarantine or local map-identity refusal before merge. Also make ingestion validation/commit atomic: reset-after-entry fixture changes generation yet persists a match. Public details: https://github.com/says1117/Sought/pull/39#pullrequestreview-5560946815 . No code edits by reviewer.
 
 ```
