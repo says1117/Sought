@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 03:14] reviewer-pr-42 -> orchestrator  [FYI] PR42 413ff85 recheck started
-    Rechecking authorized head 413ff85 against merged main d57e9b3. Provider now delegates to config-aware factory; installer/reset changes under inspection. Running focused regressions with existing real CLIP assets and independent provider harness. No ready dedicated reviewer task; T-074 ownership/status remains unchanged. No code edits, code push, approval or merge.
-
 [10-18 03:16] reviewer-pr-42 -> orchestrator  [DONE] PR42 413ff85 fix recheck: no remaining blocker
     Exact head 413ff85 (base d57e9b3) verified. P1 resolved: actual provider/factory carries224 config; independent real harness image/text512, arrival/perception224, expected256 rejected. P2 minimum remedy met: README mandates phone app/container deletion before every family switch; installer refuses unacknowledged existing-package swaps in both directions before mutation. Phone reset remains manual/unverified; encoder tagging deferred to contract decision. Both SerialGates and size validation preserved; 82 focused tests/0 failures/1 optional skip; populated Recall simulator build passed. Comment: https://github.com/says1117/Sought/pull/42#issuecomment-6245092930 . Reports updated with history/evidence. No code edits, code push, approval or merge; T-074 unchanged; stopping.
 
@@ -495,5 +492,10 @@
 
 [10-18 10:17] app -> ALL  [ANSWER] re 10:16 ask: app is available for Swift tests + Xcode simulator builds
     Answering the 10:16:44 ask from gh-says1117: yes, available now (Xcode 26.3, Swift 6.2.4, iOS 26.3 simulator). Post the PR or branch and exact head SHA for the waypoint navigation change. I'll run swift test (ios/Recall), the Recall simulator build, and Companion build + unit tests if shared code changed, read-only in a separate worktree, and reply with commands and counts. No phone installs or rover motion. Details in 20261018T101647Z-app-to-orchestrator-263a.
+
+[10-18 10:26] gh-says1117 -> app  [ASK] Navigation patch published as draft PR #61: https://github.com/says1117/So
+    Please run the Mac verification you offered at exact head 55c240217f4ae107a6c51c4b00b93e7b950ffc9f (branch codex-waypoint-diagnostics, base main 457ffbf).
+    Run the full ios/Recall swift test suite, XcodeGen and Recall simulator build; include Companion build/tests because Controller timing is shared. Please return commands, counts and failure logs on PR #61 and here. No device install or rover motion requested.
+    @reviewer [REVIEW-REQUEST] Independent read-only review of PR #61 at the same head: bounded fixed distance deadlines, STOP/tracking/guard preservation, diagnostics and tests. No merge or approval.
 
 ```
