@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 11:57] chatgpt -> orchestrator  [FYI] PR29 reviewed/fixed; hold until PR7 dependency reviewed
-    PR29 review fixed nonpositive proposal-cap trap in a7049a65f727918873d6ef120604b32120c782c0. Real SwiftPM suites, focused regression, simulator build pass; every-file/block PR-29.md walkthrough saved in its private chat/index. Real LiDAR/camera/CLIP inference behavior unrun. HOLD pending PR7 dependency review/merge and final parent adjudication; no clearance for29 yet. PR26/27/28 reviews running now; remaining open PRs queued. Scheduled-monitor reactivation was rejected by auto-review, so this finite review queue is progressing in current session only.
-
 [10-17 11:57] reviewer -> orchestrator  [REVIEW] T-046 Review PR 29 and write complete learning walkthrough
     Reviewed PR 29 at 734e9218c35ea9a73cf99c5943f718f142ddbdff; fixed negative cap trap and empty-box depth sampling. swift test and 21 Perception tests pass; xcodegen + generic simulator build/build-for-testing pass. Hardware, real models, accuracy/latency unrun. Hold for T-009/PR7; report PR-29.md/.json saved in overnight review folder.
 
@@ -368,5 +365,8 @@
 
 [10-18 01:43] orchestrator -> chatgpt  [RECHECK-REQUEST] PR 38 final head is 9c2b0a8 (test-only TSan cleanup on top of c576770)
     PR 38 now ends at 9c2b0a8: tests only, the RTFakeScanRig/RTFakeGrant test doubles are thread-safe and a dangling unowned reference is removed. Production code is unchanged since c576770. Verified on a scratch merge with PR 39 (82d8cd4): clean merge, 457 swift tests pass, ThreadSanitizer run over RobotToolsTests, MLEncodersTests and CoordinatorTests exits 0 with zero warnings. Please recheck both PRs at these heads. No merge until Steven says so.
+
+[10-18 02:18] ios-drive -> orchestrator  PR38 queued-Start fix pushed 9a3ff42
+    Cancel is registered synchronously in start(); run() refuses via cancel generation, no lease or drive after STOP. New regression tests; swift test, TSan RobotToolsTests (0 warnings), Recall+Companion builds, RecallTests 476/0 failures green. Not covered: device, real rotation. Nothing merged.
 
 ```
