@@ -70,6 +70,17 @@ final class RelocalizationMonitorTests: XCTestCase {
         XCTAssertEqual(m.update(tracking: .normal, mapping: .limited), .relocalized)
     }
 
+    // Steven's phone after Scan here: "Rescan needed" and never recovered. An in-run drop must recover even late.
+    func testRearmInRunRecoversAfterRescanNeeded() {
+        let c = FakeClock(); let m = RelocalizationMonitor(clock: c)
+        m.startFreshTeach()
+        m.rearmInRun()
+        c.t += 25
+        XCTAssertEqual(m.tick(), .rescanNeeded)
+        XCTAssertEqual(m.update(tracking: .limited, mapping: .limited), .rescanNeeded, "excessive motion")
+        XCTAssertEqual(m.update(tracking: .normal, mapping: .mapped), .relocalized)
+    }
+
     func testInterruptionAfterRearmInRunNeedsRelocalizing() {
         let m = RelocalizationMonitor(clock: FakeClock())
         m.startFreshTeach()
