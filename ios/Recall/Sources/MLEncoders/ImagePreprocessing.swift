@@ -14,16 +14,18 @@ public struct RawImage: Equatable {
 }
 
 public enum CropFitMode: Equatable {
-    /// MobileCLIP's own transform: resize the SHORT side to 256 then center-crop 256x256 (default).
+    /// The CLIP transform: resize the SHORT side to the model size then center-crop a square (default).
     case centerCrop
-    /// Stretch the whole crop to 256x256 (keeps everything in the detector box, distorts aspect).
+    /// Stretch the whole crop to a square of the model size (keeps everything in the detector box, distorts aspect).
     case squash
 }
 
-/// MobileCLIP-S0 image input: 256x256 RGB, bytes 0...255. The 1/255 scale lives INSIDE the Core ML graph
-/// (ImageType scale=1/255, no mean/std; see ml/conversion/README.md), so we must NOT scale here.
+/// Image model input: `size` x `size` RGB, bytes 0...255 (256 for MobileCLIP-S0, 224 for CLIP ViT-B/32; the size comes
+/// from `ModelConfig.imageSize`). All scaling and any mean/std live INSIDE the Core ML graph (see ml/conversion/README.md),
+/// so we must NOT scale here.
 public enum ImagePreprocessing {
-    public static let inputSize = 256
+    /// Default size (MobileCLIP-S0), used when no model_config.json is present.
+    public static let inputSize = ModelConfig.mobileClipS0.imageSize
 
     /// Resize like the conversion reference (PIL `Image.resize(..., BICUBIC)`, which antialiases when downscaling):
     /// `.centerCrop` resizes the short side to `size` (long side `Int(size * long / short)`, as torchvision

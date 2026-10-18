@@ -20,7 +20,7 @@ targets:
       - path: Sources
         excludes: ["**/.gitkeep", "**/README.md"]
       # Gitignored, produced by ml/conversion/install_models.sh. Optional so the build works when absent.
-      # Xcode compiles the .mlpackage files into MobileCLIP_S0_*.mlmodelc at the bundle root.
+      # Xcode compiles the .mlpackage files into <model>.mlmodelc at the bundle root; model_config.json (if any) names them.
       - path: Resources/Models
         optional: true
         excludes: ["**/.gitkeep"]
