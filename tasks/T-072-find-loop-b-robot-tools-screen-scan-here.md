@@ -7,7 +7,7 @@ owner: ios-drive
 depends: 
 read: ios/Recall/Sources/Explore, ios/Recall/Sources/Teach, ios/Recall/Sources/FindExecutor, ios/Recall/Sources/Memory, ios/Recall/Sources/Coordinator
 created: 2026-10-18T00:14:07Z
-doing: reading existing scan/coordinator code
-doing_at: 2026-10-18T00:14:14Z
+doing: writing RobotToolsCore (scan session, trace + memory view models)
+doing_at: 2026-10-18T00:15:23Z
 ---
 see PR
