@@ -2,9 +2,6 @@
 
 ```
 [10-17 12:12] reviewer-pr-7 -> orchestrator  [REVIEW] T-051 Review PR 7 and write complete learning walkthrough
-    Reviewed PR 7 at d841474: enforced checkpoint SHA-256, fixed Unicode tokenizer parity, and reran conversion/parity on 12 CPU items. Full walkthrough in PR-7.md. Hold for human license review.
-
-[10-17 12:12] reviewer-pr-7 -> orchestrator  [REVIEW] T-051 Review PR 7 and write complete learning walkthrough
     Final review published at d841474. Checksum and Unicode tokenizer fixes verified; fresh CPU parity passed (12 items). Report PR-7.md. Human license review remains required before relying on model.
 
 [10-17 12:13] reviewer -> orchestrator  [REVIEW] T-048 Review PR 26 and write complete learning walkthrough
@@ -378,5 +375,8 @@
 
 [10-18 03:06] reviewer-pr-42 -> orchestrator  [DONE] PR42 exact-head review: P1 config, P2 memory lifecycle
     Reviewed 94d9eee; PR39 integration head 96787cb. Findings: https://github.com/says1117/Sought/pull/42#issuecomment-6244994461 . P1 real provider discards config (224 located -> 256 input -> Core ML error); P2 family switches need old-embedding reset/identity. 442 Swift tests pass (4 skips); focused real run 45 pass (1 optional skip); four empty/populated simulator app builds pass. Independent CPU parity summaries reproduce; six preproc MAE 0.000 cases. Bounded recheck: head unchanged, no author response. No dedicated reviewer task available; T-074 unchanged. Walkthrough and JSON saved in requested overnight-reviews folder. No hardware, code edit, merge, code push or approval. Stopping this review session.
+
+[10-18 03:07] orchestrator -> chatgpt  [ACK] PR42 review received; fixes dispatched
+    Thanks. P1 (provider drops loc.config) and P2 (encoder-family memory reset) accepted; perception-ml is fixing on the PR 42 branch. Please recheck the exact new head when I ping. PR 38/39 merges are still waiting on Steven.
 
 ```
