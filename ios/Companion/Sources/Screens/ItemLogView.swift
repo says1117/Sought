@@ -39,7 +39,11 @@ struct ItemLogView: View {
                     ItemRow(title: "Matches", items: hits, emptyText: "Nothing called \u{201C}\(query)\u{201D} yet. Press search to ask Soughtbot to look.",
                             onFind: router.find, onOpen: router.open)
                 } else {
-                    ItemRow(title: "Recent Finds", items: Array(robot.recentFinds.prefix(10)), onFind: router.find, onOpen: router.open)
+                    if !robot.toName.isEmpty {
+                        ItemRow(title: "Needs a name", items: robot.toName, onFind: router.find, onOpen: router.open)
+                    }
+                    ItemRow(title: "Recent Finds", items: Array(robot.recentFinds.prefix(10)),
+                            emptyText: "Name what Soughtbot found and it shows up here.", onFind: router.find, onOpen: router.open)
                     ItemRow(title: "Essentials", items: robot.essentials, banded: true,
                             emptyText: "Pin items you need often from their detail page.", onFind: router.find, onOpen: router.open)
                     if !robot.pins.isEmpty {

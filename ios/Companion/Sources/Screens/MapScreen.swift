@@ -335,6 +335,12 @@ struct MapScreen: View {
                 Text("Seen by Soughtbot")
             }
             HStack(spacing: 6) { UserPinMarker().scaleEffect(0.6).frame(width: 14, height: 18); Text("Pinned by you") }
+            if !(robot.map?.explored.isEmpty ?? true) {
+                HStack(spacing: 6) {
+                    Capsule().fill(p.mapPath.opacity(0.25)).frame(width: 18, height: 8).accessibilityHidden(true)
+                    Text("Where it has driven")
+                }
+            }
         }
         .font(SoughtFont.cardMeta).foregroundStyle(p.text)
         .accessibilityElement(children: .combine)
@@ -489,7 +495,9 @@ struct MapScreen: View {
     // MARK: Item list
 
     private var itemList: some View {
-        let list = sorted(room.map(items(in:)) ?? robot.items)
+        let all = sorted(room.map(items(in:)) ?? robot.items)
+        // Named items first; the list stops at 50 so hundreds of unnamed robot items stay usable.
+        let list = Array((all.filter { !$0.needsName } + all.filter(\.needsName)).prefix(50))
         let title = Text(room.map { "In the \($0)" } ?? "Everything").font(SoughtFont.sectionTitle).foregroundStyle(p.sectionTitle)
             .accessibilityAddTraits(.isHeader)
         let sortMenu = Menu {
@@ -509,6 +517,9 @@ struct MapScreen: View {
                 Text("Nothing remembered here yet.").font(SoughtFont.body).foregroundStyle(p.text)
             }
             ForEach(list) { o in row(o) }
+            if all.count > list.count {
+                Text("And \(all.count - list.count) more, most still unnamed.").font(SoughtFont.cardMeta).foregroundStyle(p.text)
+            }
         }
     }
 

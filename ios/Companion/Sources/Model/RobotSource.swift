@@ -100,7 +100,9 @@ class RobotSource: ObservableObject {
     var items: [TrackedObject] { objects + pins.map(\.asItem) }
 
     /// Soughtbot's sightings only (pins are not "finds").
-    var recentFinds: [TrackedObject] { objects.sorted { $0.lastSeen > $1.lastSeen } }
+    var recentFinds: [TrackedObject] { objects.filter { !$0.needsName }.sorted { $0.lastSeen > $1.lastSeen } }
+    /// Newest unnamed robot items first; the Item Log shows a short row of them, not hundreds of blank cards.
+    var toName: [TrackedObject] { Array(unnamed.prefix(20)) }
     var essentials: [TrackedObject] { objects.filter(\.isEssential).sorted { $0.lastSeen > $1.lastSeen } }
     var frequentlySought: [TrackedObject] { objects.filter { $0.timesSought > 0 }.sorted { $0.timesSought > $1.timesSought } }
     var pinnedItems: [TrackedObject] { pins.sorted { $0.createdAt > $1.createdAt }.map(\.asItem) }

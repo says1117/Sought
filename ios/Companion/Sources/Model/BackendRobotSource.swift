@@ -82,6 +82,9 @@ final class BackendRobotSource: RobotSource {
     private var photos: [String: Data] = [:]
     private var photoRequests: Set<String> = []
     private var waypoints: [Waypoint] = []
+    /// Robot positions from heartbeats, drawn as the explored path (the robot sends no floor plan yet).
+    private var explored: [ExploredPoint] = ExploredStore.load()
+    private var exploredDirty = 0
     private let commands: CommandClient
     private var findTask: Task<Void, Never>?
     private var comeTask: Task<Void, Never>?
@@ -136,8 +139,15 @@ final class BackendRobotSource: RobotSource {
             // The server says whether the last heartbeat is under 10 s old; keep its time so "last seen" is honest.
             s.lastHeartbeat = hb.online ? Date() : (hb.t ?? s.lastHeartbeat)
             status = s
+            if let p = s.pose, hb.online, !itemsAreSample {
+                if ExploredStore.append(ExploredPoint(x: p.x, z: p.z), to: &explored) {
+                    exploredDirty += 1
+                    if exploredDirty >= 10 { ExploredStore.save(explored); exploredDirty = 0 }
+                }
+            }
             if let p = s.pose, var m = map {
                 if m.trail.last != p { m.trail.append(p); if m.trail.count > 14 { m.trail.removeFirst(m.trail.count - 14) } }
+                if !itemsAreSample { m.explored = explored }
                 map = m
             }
             connectionProblem = nil
@@ -159,7 +169,8 @@ final class BackendRobotSource: RobotSource {
                 snapshot.updatedAt = m.updated_at ?? snapshot.updatedAt
             }
             snapshot.waypoints = waypoints
-            map = (snapshot.grid != nil || !waypoints.isEmpty) ? snapshot : nil
+            snapshot.explored = explored
+            map = (snapshot.grid != nil || !waypoints.isEmpty || !explored.isEmpty) ? snapshot : nil
 
             let tracks = try await get("api/objects", as: [ObjectDTO].self)
             if tracks.isEmpty && !serverIsMock {
@@ -198,6 +209,7 @@ final class BackendRobotSource: RobotSource {
                 return o
             }
             for t in tracks { if let id = t.media_id, photos[id] == nil { fetchPhoto(id, for: t.id) } }
+            if var m = map { m.anchors = objects.map { ExploredPoint(x: $0.x, z: $0.z) }; map = m }
             isLoading = false
             if connectionProblem?.hasPrefix("Connected") != true { connectionProblem = nil }
         } catch {

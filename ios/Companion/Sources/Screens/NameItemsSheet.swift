@@ -134,13 +134,14 @@ struct NamePrompt: View {
     var body: some View {
         let list = robot.unnamed
         if !list.isEmpty {
-            Button { router.nameRequest = list.map(\.id) } label: {
+            Button { router.nameRequest = list.prefix(10).map(\.id) } label: {
                 HStack(spacing: Space.m) {
                     Circle().fill(p.signal).frame(width: 8, height: 8).accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(list.count == 1 ? "Soughtbot found something new" : "Soughtbot found \(list.count) new things")
                             .font(SoughtFont.bodyMedium).foregroundStyle(p.text)
-                        Text(list.count == 1 ? "\(list[0].whereText). What is it?" : "Tell Sought what they are")
+                        Text(list.count == 1 ? "\(list[0].whereText). What is it?"
+                             : list.count > 10 ? "Name the 10 newest" : "Tell Sought what they are")
                             .font(SoughtFont.cardMeta).foregroundStyle(p.text)
                     }
                     Spacer(minLength: 0)

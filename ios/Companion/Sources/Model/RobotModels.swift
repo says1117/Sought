@@ -99,6 +99,10 @@ struct MapSnapshot: Equatable {
     var waypoints: [Waypoint]
     var grid: OccupancyGrid?
     var trail: [Pose2D]          // recent robot poses for the dotted path
+    /// Every place the robot has reported being, from its heartbeats (no floor plan from the robot yet).
+    var explored: [ExploredPoint] = []
+    /// Points that must fit on screen (item positions) without drawing anything.
+    var anchors: [ExploredPoint] = []
     var updatedAt: Date
 
     /// World bounds that the map view fits to the screen.
@@ -106,9 +110,11 @@ struct MapSnapshot: Equatable {
         if let g = grid {
             return (g.originX, g.originZ, g.originX + Double(g.width) * g.resolution, g.originZ + Double(g.height) * g.resolution)
         }
-        let xs = rooms.flatMap { [$0.minX, $0.maxX] } + waypoints.map(\.x)
-        let zs = rooms.flatMap { [$0.minZ, $0.maxZ] } + waypoints.map(\.z)
-        return (xs.min() ?? -1, zs.min() ?? -1, xs.max() ?? 1, zs.max() ?? 1)
+        let pts = explored + anchors
+        let xs = rooms.flatMap { [$0.minX, $0.maxX] } + waypoints.map(\.x) + pts.map(\.x)
+        let zs = rooms.flatMap { [$0.minZ, $0.maxZ] } + waypoints.map(\.z) + pts.map(\.z)
+        let pad = (rooms.isEmpty && !pts.isEmpty) ? 0.6 : 0   // room around a path with no walls
+        return ((xs.min() ?? -1) - pad, (zs.min() ?? -1) - pad, (xs.max() ?? 1) + pad, (zs.max() ?? 1) + pad)
     }
 
     func room(atX x: Double, z: Double) -> Room? { rooms.first { $0.contains(x: x, z: z) } }
@@ -177,4 +183,36 @@ struct ComeProgress: Equatable {
     var phase: ComePhase
     /// Backend source: what the robot said when the command finished.
     var result: String? = nil
+}
+
+struct ExploredPoint: Codable, Equatable {
+    var x: Double
+    var z: Double
+}
+
+/// Where the robot has been, kept on this iPhone across launches. A new point every 15 cm of travel; a jump over
+/// 1.5 m starts a new stroke (relocalized or a new session) so the map never draws a line through walls.
+enum ExploredStore {
+    static let minStep = 0.15
+    static let maxPoints = 6000
+    private static var url: URL {
+        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("explored.json")
+    }
+    static func load() -> [ExploredPoint] {
+        (try? JSONDecoder().decode([ExploredPoint].self, from: Data(contentsOf: url))) ?? []
+    }
+    static func save(_ pts: [ExploredPoint]) {
+        if let d = try? JSONEncoder().encode(pts) { try? d.write(to: url, options: .atomic) }
+    }
+    static func clear() { try? FileManager.default.removeItem(at: url) }
+
+    /// Adds `p` when it is far enough from the last point; returns true if added.
+    static func append(_ p: ExploredPoint, to pts: inout [ExploredPoint]) -> Bool {
+        if let last = pts.last, hypot(last.x - p.x, last.z - p.z) < minStep { return false }
+        pts.append(p)
+        if pts.count > maxPoints { pts.removeFirst(pts.count - maxPoints) }
+        return true
+    }
 }

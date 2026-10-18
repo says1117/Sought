@@ -39,6 +39,7 @@ struct MapCanvas: View {
             ZStack(alignment: .topLeading) {
                 Canvas { ctx, _ in
                     if let g = map.grid { drawGrid(g, tf, &ctx) } else { drawRooms(tf, &ctx) }
+                    drawExplored(tf, &ctx)
                     if layers.trail { drawTrail(tf, &ctx) }
                     if layers.spots {
                         for w in map.waypoints {
@@ -72,6 +73,11 @@ struct MapCanvas: View {
                             Group {
                                 if o.isPin {
                                     UserPinMarker(selected: sel).offset(y: -12)   // tip sits on the spot
+                                } else if case .none = o.photo {
+                                    // No photo yet (robot items): a small dot, so hundreds of them stay readable.
+                                    Circle().fill(sel ? p.found : p.mapPath.opacity(o.needsName ? 0.55 : 0.85))
+                                        .frame(width: sel ? 16 : 9, height: sel ? 16 : 9)
+                                        .overlay(Circle().stroke(.white, lineWidth: sel ? 2.5 : 1.5))
                                 } else {
                                     PhotoView(photo: o.photo)
                                         .frame(width: sel ? 38 : 28, height: sel ? 38 : 28)
@@ -143,6 +149,23 @@ struct MapCanvas: View {
                 ctx.fill(Path(CGRect(x: pt.x, y: pt.y, width: cell + 0.5, height: cell + 0.5)), with: .color(color))
             }
         }
+    }
+
+    /// Where the robot has driven, as a soft band about the rover's width, so the apartment's shape builds up
+    /// as it moves. Breaks the stroke on jumps over 1.5 m so it never cuts across walls.
+    private func drawExplored(_ tf: Transform, _ ctx: inout GraphicsContext) {
+        guard map.explored.count > 1 else { return }
+        var path = Path()
+        var prev: ExploredPoint?
+        for e in map.explored {
+            let pt = tf.point(e.x, e.z)
+            if let pr = prev, hypot(pr.x - e.x, pr.z - e.z) < 1.5 { path.addLine(to: pt) } else { path.move(to: pt) }
+            prev = e
+        }
+        let width = max(6, CGFloat(0.45) * tf.scale)    // about the rover's footprint
+        ctx.stroke(path, with: .color(p.mapPath.opacity(0.16)),
+                   style: StrokeStyle(lineWidth: width, lineCap: .round, lineJoin: .round))
+        ctx.stroke(path, with: .color(p.mapPath.opacity(0.35)), style: StrokeStyle(lineWidth: 1, lineCap: .round, lineJoin: .round))
     }
 
     private func drawTrail(_ tf: Transform, _ ctx: inout GraphicsContext) {
