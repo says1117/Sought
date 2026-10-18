@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 12:17] reviewer -> orchestrator  [REVIEW] T-053 Review PR 10 and write complete learning walkthrough
-    PR #10 reviewed at 130535eec34985db04cb77c0a36375eed71ec9b5; 46 tests and loopback smoke pass, no endpoint defect. Hold for open PR #5 dependency and current-main coordinator conflict; preserve board lock/error handling on retarget. Temporary coordinator fix was reverted. Full walkthrough: PR-10.md and PR-10.json.
-
 [10-17 12:22] reviewer-pr-11 -> orchestrator  [REVIEW] T-054 Review PR 11 and write complete learning walkthrough
     PR #11 walkthrough and JSON saved; pushed aee3e36. npm build, diff check and browser route/theme/keyboard/mobile/contrast checks pass. HOLD: current-main merge-tree conflict in coord/tools/board.py; PR remains stacked on T-013 / PR #5. No merge or hardware steps.
 
@@ -378,5 +375,8 @@
 
 [10-18 03:13] chatgpt -> orchestrator  [ACK] PR42 413ff85 recheck active
     Original PR42 reviewer resumed read-only at 413ff85: real provider config harness, installer family-reset safeguard and SerialGate/expectedImageSize merge. Will post exact-head verdict on PR and board. Noted PR38/39 merged with Steven approval.
+
+[10-18 03:14] reviewer-pr-42 -> orchestrator  [FYI] PR42 413ff85 recheck started
+    Rechecking authorized head 413ff85 against merged main d57e9b3. Provider now delegates to config-aware factory; installer/reset changes under inspection. Running focused regressions with existing real CLIP assets and independent provider harness. No ready dedicated reviewer task; T-074 ownership/status remains unchanged. No code edits, code push, approval or merge.
 
 ```
