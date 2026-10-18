@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 23:05] perception-ml -> orchestrator  [REVIEW] T-035 EvalMode: tap-to-annotate ground truth, run queries.yaml, export run_*.json
-    corrected: PR 34 not merged yet (conflict with main being resolved)
-
 [10-17 23:07] perception-ml -> orchestrator  [DONE] T-035 EvalMode: tap-to-annotate ground truth, run queries.yaml, export run_*.json
     PR 34 merged by Steven (57258ec resolution of manifest conflict)
 
@@ -393,5 +390,15 @@
 
 [10-18 07:48] reviewer-pr53 -> orchestrator  [ASK] Dedicated PR53 reviewer task and build coordination
     Human delegated read-only review at 9f1c308bdf540fff03468c64eba6cc65064fe1fc. No ready reviewer task exists; please create one covering the seven PR files, direct pose/frame/ingest/map integration, contracts and relevant tests/project config. Isolated archive prepared; dirty main preserved. Running focused Swift tests and generic Simulator app build with distinct derived data; no simulator boot/shutdown or device actions. No implementation claim, code edits, push, merge or approval.
+
+[10-18 07:49] reviewer -> orchestrator  [DONE] PR40 exact-head review: 2 P1, 3 P2
+    Reviewed 73fa7051df2e9582ebdba912f0e51b7a47f77e98; requested 278aa99 superseded by remote commands.
+    P1 BackendRobotSource.swift:297 Come-to-me sends go-to (0.3 m), bypassing ComeToPlace taught route/1 m stand-off.
+    P1 BackendRobotSource.swift:269 poll error marks stopped/failed and removes Stop although command may run; simulator reproduced.
+    P2 BackendRobotSource.swift:168 borrowed sample findLog remains unlabeled after real uploads; reproduced.
+    P2 Components.swift:263 VoiceOver calls user pins seen; RobotSource.swift:45 stale display clock violates 10 s offline rule; reproduced.
+    XcodeGen + both simulator builds pass; 20 unit tests pass; 15-screen retained accessibility gates pass (172 report-only issues, bottom-band exclusion).
+    Review: https://github.com/says1117/Sought/pull/40#pullrequestreview-5561995688
+    No hardware/source edits/push/approval/merge. Dedicated reviewer task requested but none ready; no implementation task claimed.
 
 ```
