@@ -9,8 +9,8 @@ import UIKit
 //   GET /api/map            occupancy snapshot              every 10 s
 //   GET /api/metadata       {"mock": true} when the server is serving seed data -> SAMPLE DATA badge stays on
 //   GET /media/{id}.jpg     thumbnails (public, no token)
-// Read-only. The app cannot start a find or come-to-me through the backend yet (no command route), so a find shows
-// where Soughtbot last saw the item instead of pretending the robot is driving.
+//   POST /api/commands, GET /api/commands/{id}   find and come-to-me go to the robot's planner (section 2.9, CommandClient)
+// A server without the command route answers 404, and the find falls back to where Soughtbot last saw the item.
 
 struct BackendConfig: Equatable {
     var baseURL: URL
@@ -76,15 +76,19 @@ final class BackendRobotSource: RobotSource {
     override var sourceName: String {
         serverIsMock ? "Soughtbot server (sample data)" : itemsAreSample ? "Soughtbot server (live status, sample items)" : "Soughtbot server"
     }
-    override var canComeToMe: Bool { false }   // needs POST /api/commands (board task T-070)
+    override var canComeToMe: Bool { true }   // POST /api/commands "go to <taught spot>"
 
     private var loop: Task<Void, Never>?
     private var photos: [String: Data] = [:]
     private var photoRequests: Set<String> = []
     private var waypoints: [Waypoint] = []
+    private let commands: CommandClient
+    private var findTask: Task<Void, Never>?
+    private var comeTask: Task<Void, Never>?
 
     init(config: BackendConfig) {
         self.config = config
+        self.commands = CommandClient(config: config)
         super.init()
         isLoading = true
     }
@@ -103,7 +107,7 @@ final class BackendRobotSource: RobotSource {
         }
     }
 
-    override func stop() { super.stop(); loop?.cancel(); loop = nil }
+    override func stop() { super.stop(); loop?.cancel(); loop = nil; findTask?.cancel(); comeTask?.cancel() }
 
     // MARK: Fetching
 
@@ -236,13 +240,95 @@ final class BackendRobotSource: RobotSource {
 
     // MARK: Commands
 
-    /// No command route yet: show where Soughtbot last saw it, honestly, instead of a fake drive.
-    override func startFind(_ query: String, match: TrackedObject?) {
-        find = FindProgress(id: "cmd_local_\(Int(Date().timeIntervalSince1970))", query: query,
-                            phase: match == nil ? .notFound : .remembered, match: match)
+    override func sendCommand(_ text: String, onUpdate: @escaping (RobotCommand) -> Void = { _ in }) async throws -> RobotCommand {
+        try await commands.run(text, onUpdate: onUpdate)
     }
 
-    override func cancelFind() { super.cancelFind() }
+    /// Sends "find <item>" and follows the command: queued, running, then the robot's own result words.
+    override func startFind(_ query: String, match: TrackedObject?) {
+        findTask?.cancel()
+        let text = Self.findText(query: query, match: match)
+        find = FindProgress(id: "cmd_pending", query: query, phase: .queued, match: match)
+        findTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let cmd = try await self.sendCommand(text) { [weak self] c in
+                    guard let self, var f = self.find, f.phase != .cancelled else { return }
+                    f.id = c.id
+                    if c.status == .queued { f.phase = .queued }
+                    if c.status == .running { f.phase = .driving(distanceM: nil) }
+                    self.find = f
+                }
+                guard !Task.isCancelled else { return }
+                let said = cmd.result?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                self.find?.phase = .reported(result: said.isEmpty ? "Soughtbot finished." : said)
+            } catch CommandError.notAvailable {
+                // Older server without the command route: say where it was last seen, as before.
+                guard !Task.isCancelled else { return }
+                self.find?.phase = match == nil ? .notFound : .remembered
+            } catch let e as CommandError {
+                guard !Task.isCancelled else { return }
+                self.find?.phase = .failed(reason: e.message)
+            } catch {}   // cancelled
+        }
+    }
+
+    /// "find red umbrella" for a known item; the person's own words when they already start with find / where.
+    static func findText(query: String, match: TrackedObject?) -> String {
+        if let m = match, !m.needsName, !m.isPin { return "find \(m.label.lowercased())" }
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lower = q.lowercased()
+        return ["find ", "where is ", "where are ", "where\u{2019}s ", "where's "].contains { lower.hasPrefix($0) } ? q : "find \(q)"
+    }
+
+    override func cancelFind() {
+        let wasRunning: Bool = {
+            switch find?.phase { case .queued?, .searching?, .driving?: return true; default: return false }
+        }()
+        findTask?.cancel(); findTask = nil
+        super.cancelFind()
+        if wasRunning { sendStop() }
+    }
+
+    /// Sends "go to <taught spot name>" (the planner resolves waypoint names) and follows it to done or failed.
+    override func comeToMe(to target: ComeTarget) {
+        comeTask?.cancel()
+        come = ComeProgress(target: target, phase: .going(distanceM: nil))
+        let text = "go to \(Self.placeName(target, waypoints: waypoints))"
+        comeTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let cmd = try await self.sendCommand(text)
+                guard !Task.isCancelled, self.come?.phase != .cancelled else { return }
+                let said = cmd.result?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                self.come?.result = said.isEmpty ? nil : said
+                self.come?.phase = .arrived
+            } catch let e as CommandError {
+                guard !Task.isCancelled, self.come?.phase != .cancelled else { return }
+                self.come?.phase = .failed(reason: e.message)
+            } catch {}   // cancelled
+        }
+    }
+
+    /// The taught name the robot knows ("kitchen table"), not the sheet's spoken form ("the kitchen table").
+    static func placeName(_ target: ComeTarget, waypoints: [Waypoint]) -> String {
+        if let id = target.waypointId, let w = waypoints.first(where: { $0.id == id }) { return w.name }
+        let n = target.name.trimmingCharacters(in: .whitespaces)
+        return n.lowercased().hasPrefix("the ") ? String(n.dropFirst(4)) : n
+    }
+
+    override func cancelComeToMe() {
+        let wasGoing: Bool = { if case .going = come?.phase { return true }; return false }()
+        comeTask?.cancel(); comeTask = nil
+        super.cancelComeToMe()
+        if wasGoing { sendStop() }
+    }
+
+    /// The contract has no cancel route; the planner treats a leading "stop" as stop now.
+    private func sendStop() {
+        let client = commands
+        Task { _ = try? await client.send("stop") }
+    }
 
     // MARK: Decoding
 

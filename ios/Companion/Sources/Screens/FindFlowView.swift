@@ -58,10 +58,12 @@ struct FindFlowView: View {
     private var phaseKey: String {
         guard started else { return "confirm" }
         switch robot.find?.phase ?? .searching {
+        case .queued: return "queued"
         case .searching: return "searching"
         case .driving: return "driving"
         case .arrived: return "arrived"
         case .remembered: return "remembered"
+        case .reported: return "reported"
         case .notFound: return "notFound"
         case .failed: return "failed"
         case .cancelled: return "cancelled"
@@ -70,7 +72,7 @@ struct FindFlowView: View {
 
     private var isActive: Bool {
         guard started, let ph = robot.find?.phase else { return false }
-        switch ph { case .searching, .driving: return true; default: return false }
+        switch ph { case .queued, .searching, .driving: return true; default: return false }
     }
 
     /// Robot labels read naturally in lowercase ("your red umbrella"); pin names keep the person's own capitals.
@@ -129,6 +131,11 @@ struct FindFlowView: View {
 
     @ViewBuilder private var phaseView: some View {
         switch robot.find?.phase ?? .searching {
+        case .queued:
+            Radar(color: p.signal, animate: !reduceMotion).frame(width: 180, height: 180)
+            title("Looking for your \(label)")
+            body("Sent to Soughtbot. It will start in a moment.")
+            secondary("Cancel", id: "cancelFind") { cancel() }
         case .searching:
             Radar(color: p.signal, animate: !reduceMotion).frame(width: 180, height: 180)
             title("Looking for your \(label)")
@@ -161,6 +168,12 @@ struct FindFlowView: View {
                 Text("Sending Soughtbot from this app is not connected yet.").font(SoughtFont.cardMeta).foregroundStyle(p.text)
             }
             primary("Done", id: "findDone") { close() }
+        case let .reported(result):
+            icon("checkmark.circle.fill", color: p.signal)
+            title("Soughtbot is done")
+            body(result)
+            primary("Done", id: "findDone") { close() }
+            tertiary("Try again", id: "tryAgain") { start() }
         case .notFound:
             icon("magnifyingglass.circle", color: p.searching)
             title("Soughtbot could not find your \(label)")
@@ -217,6 +230,9 @@ struct FindFlowView: View {
         case .remembered:
             Haptics.shared.success()
             say("Soughtbot last saw your \(label)" + (request.match.map { ", \($0.whereText.lowercased())." } ?? "."))
+        case let .reported(r):
+            pulseTask?.cancel(); Haptics.shared.success()
+            say("Soughtbot is done. \(r)")
         case .notFound:
             pulseTask?.cancel(); Haptics.shared.warning()
             say("Soughtbot could not find your \(label).")

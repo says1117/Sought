@@ -3,7 +3,7 @@ import SwiftUI
 // Come to me, user phone (board task T-068). Waypoint version of docs/COME_TO_ME_PLAN.md: the person says where they
 // are by picking a taught spot or a room, and Soughtbot drives there and stops about 1 m short. The pose version
 // (relocalize this phone against the robot's saved map) is the plan's stretch and is not offered here.
-// Sample data only for now: the command goes over POST /api/commands once T-067 and T-070 exist.
+// With a server configured the pick goes over POST /api/commands as "go to <taught spot>" (BackendRobotSource).
 
 struct ComeToMeSheet: View {
     @EnvironmentObject private var robot: RobotSource
@@ -132,7 +132,7 @@ struct ComeToMeSheet: View {
             Image(systemName: "checkmark.circle.fill").font(.system(size: 64)).foregroundStyle(p.found)
                 .symbolEffect(.bounce.up, options: .nonRepeating, value: phaseKey).accessibilityHidden(true)
             Text("Soughtbot is here").font(SoughtFont.largeTitle).foregroundStyle(p.text).accessibilityAddTraits(.isHeader)
-            Text("It stopped near \(c.target.name).").font(SoughtFont.body).foregroundStyle(p.text)
+            Text(c.result ?? "It stopped near \(c.target.name).").font(SoughtFont.body).foregroundStyle(p.text)
             wideButton("Done", primary: true) { closeSheet() }
         case let .failed(reason):
             Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 56)).foregroundStyle(p.alert).accessibilityHidden(true)

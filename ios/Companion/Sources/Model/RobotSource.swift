@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 
 // Every screen reads from one RobotSource. Swapping mock for real data is one line in SoughtApp.
-// Subclasses: MockRobotSource (default, SAMPLE DATA), BackendRobotSource (REST, after T-071 lands).
+// Subclasses: MockRobotSource (default, SAMPLE DATA), BackendRobotSource (REST, plus remote commands, contract 2.9).
 // A base class rather than a protocol so views can hold it as one @EnvironmentObject type.
 
 @MainActor
@@ -58,6 +58,11 @@ class RobotSource: ObservableObject {
     func clearFind() { find = nil }
     func comeToMe(to target: ComeTarget) {}
     func cancelComeToMe() { if var c = come { c.phase = .cancelled; come = c } }
+    /// Sends a plain-words command to Soughtbot's planner (contract 2.9) and waits for done or failed.
+    /// `onUpdate` sees each status (queued, running). Throws `CommandError`.
+    func sendCommand(_ text: String, onUpdate: @escaping (RobotCommand) -> Void = { _ in }) async throws -> RobotCommand {
+        throw CommandError.notAvailable
+    }
 
     // MARK: Derived
 
