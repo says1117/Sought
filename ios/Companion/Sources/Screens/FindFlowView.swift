@@ -169,7 +169,7 @@ struct FindFlowView: View {
             }
             primary("Done", id: "findDone") { close() }
         case let .reported(result):
-            icon("checkmark.circle.fill", color: p.signal)
+            icon("checkmark.circle.fill", color: p.found)   // signal is only for "busy right now"
             title("Soughtbot is done")
             body(result)
             primary("Done", id: "findDone") { close() }
