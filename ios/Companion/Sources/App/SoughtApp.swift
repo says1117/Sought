@@ -124,7 +124,7 @@ struct RootView: View {
         }
         .onChange(of: robot.status.state) { _, s in announce(s) }
         .onChange(of: settings.haptics) { _, v in Haptics.shared.enabled = v }
-        .onAppear { Haptics.shared.enabled = settings.haptics }
+        .onAppear { Haptics.shared.enabled = settings.haptics; TouchIndicators.installIfRequested() }
     }
 
     /// Announce status changes that matter (plan section 7). Roaming and resting flip often, so they stay quiet.

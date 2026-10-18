@@ -41,7 +41,8 @@ final class MockRobotSource: RobotSource {
         objects = [
             // The sandals' last move is 2 hours old, matching "Slippers moved to front door · 2 hours ago" on Home.
             { var o = obj("obj_sample0001", "Brown Sandals", "sandals", "By the front door", "Hallway", 4.2, 1.4, 12, sought: 4,
-                          movedFrom: (-2.0, -0.5, 150)); o.history[1].t = Date().addingTimeInterval(-120 * 60); return o }(),
+                          movedFrom: (-2.0, -0.5, 150)); o.history[1].t = Date().addingTimeInterval(-120 * 60)
+              o.description = "brown leather slippers"; return o }(),
             obj("obj_sample0002", "White Chair", "chair", "In the kitchen", "Kitchen", 2.2, -1.6, 15),
             obj("obj_sample0003", "Laundry Basket", "laundry", "In the living room", "Living Room", -3.2, -3.0, 20),
             obj("obj_sample0004", "Metal Water Bottle", "bottle", "Under the table", "Kitchen", 2.0, -0.9, 13, essential: true,

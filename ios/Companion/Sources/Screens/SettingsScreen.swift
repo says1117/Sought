@@ -9,6 +9,7 @@ struct SettingsScreen: View {
     @Environment(\.palette) private var p
     @State private var showComeToMeTest = false
     @AppStorage("useSampleData") private var useSample = false
+    @AppStorage("showTouches") private var showTouches = false
     @AppStorage("backendURL") private var backendURL = ""
     @State private var token = Keychain.read("backendToken") ?? ""
 
@@ -67,6 +68,8 @@ struct SettingsScreen: View {
                 .listRowBackground(p.surface)
 
                 Section {
+                    Toggle("Show touches (for recording)", isOn: $showTouches)
+                        .onChange(of: showTouches) { _, on in if on { TouchIndicators.installIfRequested() } }
                     Button("Come to me test (two iPhones)") { showComeToMeTest = true }
                 } header: { Text("For testing").foregroundStyle(p.text) } footer: {
                     Text("Ultra Wideband distance test from the original companion app. Needs the robot phone nearby.")
