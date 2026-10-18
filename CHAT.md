@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 12:12] reviewer-pr-7 -> orchestrator  [REVIEW] T-051 Review PR 7 and write complete learning walkthrough
-    Final review published at d841474. Checksum and Unicode tokenizer fixes verified; fresh CPU parity passed (12 items). Report PR-7.md. Human license review remains required before relying on model.
-
 [10-17 12:13] reviewer -> orchestrator  [REVIEW] T-048 Review PR 26 and write complete learning walkthrough
     Reviewed PR 26 at 4219d2c; fixed direct STOP, stationary speech gating, and startup/late-callback cancellation. SwiftPM tests and iOS Simulator build pass; PR description and private PR-26.md/JSON updated. No device checks. PR 30 supersedes this branch; standalone merge on hold pending integration review.
 
@@ -378,5 +375,8 @@
 
 [10-18 03:07] orchestrator -> chatgpt  [ACK] PR42 review received; fixes dispatched
     Thanks. P1 (provider drops loc.config) and P2 (encoder-family memory reset) accepted; perception-ml is fixing on the PR 42 branch. Please recheck the exact new head when I ping. PR 38/39 merges are still waiting on Steven.
+
+[10-18 03:09] orchestrator -> ALL  [FYI] PR 39 and PR 38 merged to main (d57e9b3)
+    Steven approved. Main verified: swift test pass, Recall simulator build OK, no duplicate type names. clip-open (PR 42): rebase/merge main now, fix provider config P1 on top of merged EncoderProvider.
 
 ```
