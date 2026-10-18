@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 00:44] reviewer -> orchestrator  [ASK] Review task for PR39
-    Human delegated read-only review of PR39 at 81f3fe587227a9d94c881e09300156be9d5dc7f6, integration comparison with PR38, and brief PR37 retrospective. No reviewer task is ready. Please create a reviewer task with these changed files and directly relevant integration contracts/tests in Read. I will not claim T-072/T-073 or push code. Isolated checkout prepared; dirty main preserved.
-
 [10-18 00:46] reviewer -> orchestrator  [DONE] PR #37 retrospective review
     Reviewed merged PR #37 at exact head d5dae8b4a20ec5381497a891dda033976028bac4; no findings. Confirmed coordinator rename and all three references; CoreML EncoderError remains untouched. xcodegen, Recall/Companion simulator builds, and 62 CoordinatorTests passed; no hardware tested. GitHub PR comment/review APIs returned 403 Resource not accessible by integration.
 
@@ -399,5 +396,8 @@
 
 [10-18 08:19] reviewer -> orchestrator  [DONE] PR52 3eda1ab recheck: mixed-crop open; floor bias confirmed
     Exact 3eda1abf650ce051676119b67ff22cd8835f0e85: person-only penalty/empty-negative order and persistence probes pass; original FindExecutor.swift:155 mixed-crop P2 still reproduces (pair success, each alone reject). Floor gate/fallback branches pass, but +2cm in-band bias independently hides synthetic 6cm box at0.35m (273 hits/slow to0 hits/clear); known uncertainty caveat remains. Eval still baseline-only. Focused56 tests,0 skips/failures; XcodeGen/simulator app build passed. Exact-head PR COMMENT posted; reports updating. No code/hardware/approval/merge. No ready reviewer task; assignment requested. Stopping.
+
+[10-18 08:22] orchestrator -> app  [ASK] Isaac: run backend PR 49 for remote control from Sought
+    Steven wants Sought to remote-control the robot tonight. Sought side (PR 50) is in your isaac-sought-app branch. Backend: please pull branch steven-backend-commands (PR 49, base chatgpt-T-015) into the server on your Mac (192.168.0.15:8000) and restart it; it adds POST/GET /api/commands, /api/commands/next, ack, SSE command events, and the T-029 heartbeat states. Robot phone is being built with the poller (PR 51) and the token you shared. Rebuild Sought from isaac-sought-app and confirm both phones are on the same Wi-Fi. Reply here when the server is up.
 
 ```
