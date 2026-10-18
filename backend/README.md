@@ -37,7 +37,6 @@ fit within 500 KiB and have a longest side at most 320 pixels. The response is
 the phone must generate unguessable random ids because uploads are served
 publicly. Filename input is ignored, and writes replace the id atomically.
 `/media` serves existing files publicly. Startup creates the media directory.
-SSE, eval results, seed data and remote commands are outside this task.
 The Docker image creates the default media and database directories.
 
 ### Isolated MOCK demo
@@ -62,9 +61,27 @@ at two-second intervals and a scripted sample patrol. Set `RECALL_TOKEN` locally
 Only point this tool at the isolated mock server.
 
 Authenticated `GET /api/stream` emits heartbeat, event, object and patrol writes
-only after persistence. The broker also supports command notifications for future
-command endpoints. Idle connections receive comments every 15 seconds. Queues are
+only after persistence. Command creates and status changes emit `command`. Idle connections receive comments every 15 seconds. Queues are
 bounded: slow clients disconnect and should reconnect and refresh GET snapshots.
 Use fetch streaming with an Authorization header. `/api/evals` reads the configured
 JSON path (default `evals/results.json`), returns `{}` when missing, and 503 for an
 unreadable or malformed file. This is process-local live fan-out; run one worker.
+
+### Remote commands
+
+Shape is docs/03_CONTRACTS.md section 2.9:
+`{"id","text","created_at","status":"queued|running|done|failed","result"}` (`result` is null until acked).
+
+- `POST /api/commands` body `{"text": "...", "id"?: "cmd_..."}`; text is 1..200 characters.
+  Returns the stored command (`status` queued). The server makes an id when none is sent.
+  Re-posting the same id and text returns the original; the same id with other text is 409.
+- `GET /api/commands/next` (robot) claims the oldest queued command, marks it `running`
+  and returns it. **204 No Content when nothing is queued.**
+- `POST /api/commands/{id}/ack` body `{"status": "running|done|failed", "result": "..."|null}`
+  (result up to 500 characters). 404 for an unknown id; 409 to change a done/failed command
+  (an ack that changes nothing returns 200 and emits no event).
+- `GET /api/commands/{id}` returns one command (404 if unknown).
+- `GET /api/commands?limit=20` returns the newest commands first (limit 1..200).
+
+Every create and status change emits an SSE `command` event with the full command.
+All endpoints need the bearer token.

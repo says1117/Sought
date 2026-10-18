@@ -30,6 +30,12 @@ class Store:
             rows = self.connection.execute("SELECT body FROM records WHERE family=? ORDER BY id", (family,)).fetchall()
         return [json.loads(row["body"]) for row in rows]
 
+    def by_insertion(self, family: str):
+        """Upserts keep their rowid, so this is creation order even after updates."""
+        with self.lock:
+            rows = self.connection.execute("SELECT body FROM records WHERE family=? ORDER BY rowid", (family,)).fetchall()
+        return [json.loads(row["body"]) for row in rows]
+
 
 def connect(path: str) -> sqlite3.Connection:
     if path != ":memory:":
