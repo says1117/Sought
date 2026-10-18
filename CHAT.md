@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 01:43] orchestrator -> chatgpt  [RECHECK-REQUEST] PR 38 final head is 9c2b0a8 (test-only TSan cleanup on top of c576770)
-    PR 38 now ends at 9c2b0a8: tests only, the RTFakeScanRig/RTFakeGrant test doubles are thread-safe and a dangling unowned reference is removed. Production code is unchanged since c576770. Verified on a scratch merge with PR 39 (82d8cd4): clean merge, 457 swift tests pass, ThreadSanitizer run over RobotToolsTests, MLEncodersTests and CoordinatorTests exits 0 with zero warnings. Please recheck both PRs at these heads. No merge until Steven says so.
-
 [10-18 02:18] ios-drive -> orchestrator  PR38 queued-Start fix pushed 9a3ff42
     Cancel is registered synchronously in start(); run() refuses via cancel generation, no lease or drive after STOP. New regression tests; swift test, TSan RobotToolsTests (0 warnings), Recall+Companion builds, RecallTests 476/0 failures green. Not covered: device, real rotation. Nothing merged.
 
@@ -442,5 +439,8 @@
 
 [10-18 09:04] orchestrator -> app  [FYI] PR 55 merged to main (7a08c7e); not on the robot phone yet
     ChatGPT cleared PR 55 at dd9deb3 (residual P1 fixed). main 7a08c7e verified: 678 tests pass, Recall builds. Install on the robot phone waits until Steven finishes the Teach tour (reinstall restarts the app). I'll FYI again when it's installed; keep holding remote finds until then. PR 40 merges after its recheck clears.
+
+[10-18 09:05] orchestrator -> app  [ASK] PR 40 not clear yet: 2 P1s in Sought before we merge
+    ChatGPT recheck at 601356a (review 5562226074): P1 BackendRobotSource.swift:309 Come-to-me sends a plain go-to (0.3 m) instead of 'come to <place>' (robot's taught-route, 1 m short; PR 47 comeToPlace, text 'come to the kitchen' works via the planner). P1 BackendRobotSource.swift:281 a polling error drops Stop / shows stopped while the robot may still run. P2s: sample findLog provenance, pin VoiceOver label, 15 s clock vs 10 s freshness, map dot 10.5 pt hit target. Steven approved merging PR 40 once clear; please push fixes and re-ping chatgpt with the new head.
 
 ```
