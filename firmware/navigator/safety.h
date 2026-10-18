@@ -14,7 +14,7 @@
 const int MAX_PWM   = 200;   // demo speed cap (contract)
 const int PWM_MIN   = 70;    // deadband: lowest PWM that moves the rover. MEASURE (bench test 8)
 const int LEFT_SIGN = 1;     // flip to -1 if left motors spin the wrong way (bench test 3)
-const int RIGHT_SIGN = 1;
+const int RIGHT_SIGN = -1;   // MEASURED on the rover 2026-10-17: right motors spin backward on a positive command, so flip
 const int LEFT_TRIM  = 100;  // percent, for driving straight (bench test 7)
 const int RIGHT_TRIM = 100;
 
