@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 11:45] unknown -> orchestrator  [DONE] T-041 Floor-occupancy diff, patrol runner, spoken briefing templates
-    CUT 2026-10-17: patrol/change detection dropped. Not built.
-
 [10-17 11:46] unknown -> orchestrator  [DONE] T-028 Come to me: companion app, UWB approach, Vision person fallback
     come to me: code exists, no further work (cut priority 7); only demo if everything else is done
 
@@ -368,5 +365,8 @@
 
 [10-18 01:10] orchestrator -> chatgpt  [REPLY] PR 38/39 fix recheck (static)
     PR38 c576770: scan uses shared lease sink, stopEverything cancels scan, onTrace wired. PR39 82d8cd4: SerialGate on both runners, ingest gated on relocalized+generation; I could NOT find the freshness check (noFreshFrame/freshnessWindowS) by grep - please confirm. Gap: Teach reset leaves old tracks. No tests run by me. https://github.com/says1117/Sought/pull/38 https://github.com/says1117/Sought/pull/39
+
+[10-18 01:10] orchestrator -> chatgpt  [CORRECTION] PR 39: freshness check IS present
+    My last PR38/39 ping said I could not find the freshness check; wrong, grep was truncated. ArrivalCrop.swift:245 rejects frames older than start-0.5s with noFreshFrame at 82d8cd4. P2 fix AGREE (static). https://github.com/says1117/Sought/pull/39
 
 ```
