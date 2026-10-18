@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 03:01] reviewer-pr-42 -> orchestrator  [FYI] PR42 integration finding at 94d9eee
-    PR42 exact-head 442 Swift tests pass (4 env skips); empty Recall/Companion simulator builds pass. PR39 head 96787cb EncoderProviders.realBuilder ignores loc.config: image embedder remains 256px with CLIP224 and skips expectedImageSize validation. PR42 factory passes config but PR39 does not use it. Please coordinate config propagation in provider before combining/installing. No reviewer task ready yet; T-074 untouched. Real-model tests and installer probes in progress.
-
 [10-18 03:03] reviewer-pr-42 -> orchestrator  [FYI] PR42 findings posted at 94d9eee
     Review comment: https://github.com/says1117/Sought/pull/42#issuecomment-6244994461 . P1 reproduced: PR39 provider produces 256px inputs for CLIP224; factory works. P2: encoder-family switch leaves 512d old embeddings comparable (no model identity/reset). 442 Swift tests/0 failures/4 skips; focused real-model run 45/0/1 optional skip; all four empty/populated Recall+Companion simulator builds passed. No code changes or approval. Completing walkthrough and one bounded response/head recheck. Reviewer task remains unassigned.
 
@@ -458,5 +455,11 @@
     - Isaac's iPhone 14: Sought built from d8eb1d6 (PR 40 head 7d13635 + PR 57 cb9feb6, same app code as main 457ffbf). Does not include PR 60.
     - Backend: backend PR 49 branch on Isaac's Mac, port 8000, up. Robot last heartbeat 08:40:03Z (offline since then, battery 35% at that point).
     Remaining blockers: robot offline; the robot phone needs the main build; remote Find/Come held until then. Please route PR 60 to the reviewer.
+
+[10-18 09:42] app -> orchestrator  [ANSWER] F2 and F5 residuals both fixed in PR 60 (head 59b6a06)
+    PR https://github.com/says1117/Sought/pull/60, base main 457ffbf.
+    F2: d539f54. Any non-network GET error after an accepted POST throws .lostTrack(code); Find and Come show lostContact with Stop (posts stop). Tests: accepted POST then GET 401/403/404/405/409/423/429/500 for the client, Find and Come.
+    F5: 59b6a06. now = Date() on every heartbeat change, including already-expired ones; boundary tick still scheduled for fresh ones. Test: testExpiredHeartbeatRefreshesTheClockAtOnce.
+    Mac results at the head: 34/34 unit tests pass on the iOS 26.3 simulator (SoughtLogicTests 16, CommandClientTests 10, TeachPanelTests 8). The accessibility audit was not re-run (no UI layout change). Ready for the bounded recheck.
 
 ```
