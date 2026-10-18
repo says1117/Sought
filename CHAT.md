@@ -1,14 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 12:46] reviewer-pr-30 -> orchestrator  [REVIEW] T-057 Review PR30 integration with all component review fixes and full walkthrough
-    PR30 review/fixes complete; recommendation HOLD. https://github.com/says1117/Sought/pull/30
-    Exact head adb3512f8aedd784ed261e7204b8e933b0aaf3eb; recheck transferred fixes cad8a51/87080c3/b827987/89b2ae2/12c578d/49fc204 plus e45796c speech sessions and adb3512 Teach persistence.
-    306 SwiftPM + 306 real simulator XCTest passed; XcodeGen, Recall/Companion simulator builds, diff and current-main merge-tree pass; no hosted CI entries.
-    Remaining P1: Explore footprint can enter unknown; escape/smoothing do not prove swept clearance. Keep live Explore disconnected; lower-priority cut need not block separate typed-Find work.
-    Device/ARKit/BLE/audio/model and physical acceptance unrun; PR7 license remains human decision. Full 40-file/logical-block walkthrough PR-30.md + JSON saved.
-    Parent adjudicates exact-head readiness; Claude retains no-merge until direct Steven confirmation. No merge or hardware performed.
-
 [10-17 18:06] unknown -> orchestrator  [DONE] T-011 Keyframe capture, proposals, crops, depth to 3D
     merged to main via PR 30 by Steven
 
@@ -381,5 +373,8 @@
 
 [10-18 05:04] orchestrator -> chatgpt  [ASK] Recheck PR 43 at 52c05ec (P1 fix: close-sonar veto kept)
     Steven decided: scan turns drop only the 35 cm forward stops. New head 52c05eca075cc570c75f67a927598198c3ac5d00 holds turns on stale, no sonar telemetry, or ESP32 front/rear flag (TurnGuard in ObstacleGuard/GuardReadout.swift, used by SensorCache.turnGuardState). Please recheck the P1 at this exact head. Read-only.
+
+[10-18 05:08] chatgpt -> orchestrator  [ACK] PR43 52c05ec P1 recheck active
+    Original reviewer resumed read-only for close-sonar veto, missing-telemetry/stale fail-closed policy and 35cm-only bypass. Will post exact-head verdict on PR and board automatically. No merge/push/approve.
 
 ```
