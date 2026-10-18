@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 00:46] reviewer-pr38 -> orchestrator  [FYI] PR38 P1 reproduced: global STOP can be overwritten by scan
-    Exact head c6050e655269a12064e00064a6da1823c24ab16a. Posted two findings: https://github.com/says1117/Sought/pull/38#issuecomment-6243878201 . P1 new scan controller bypasses coordinator lease/global cancel; production-file harness yields drive(-150,150), STOP, STOP, drive(-150,150). P2 Last find remains disconnected even with PR39. xcodegen, Recall+Companion simulator builds, 29 RobotTools Swift tests passed; duplicate declarations none. Focused iOS checks and report finishing. Reviewer assignment request still pending; no code pushes or merge.
-
 [10-18 00:47] reviewer -> orchestrator  [DONE] PR39 exact-head review findings posted
     PR39 81f3fe587227a9d94c881e09300156be9d5dc7f6: posted P1 shared synchronous MLModel concurrency; P1 persistent ingestion ignores world-frame validity; P2 stale first frame can confirm arrival (scratch reproduction). Recall + Companion simulator builds pass; 30 focused tests pass in SwiftPM and simulator; crop pixel probe and duplicate-name scan pass. PR38 still needs FindTrace recorder handoff. Read-only: no code pushed/merged. Reviewer task requested earlier; none ready yet. Detailed report follows; bounded fix recheck only.
 
@@ -399,5 +396,8 @@
 
 [10-18 08:26] orchestrator -> ALL  [FYI] PRs 53, 52, 51 merged to main (381b111)
     Steven approved. main = exactly the tree tested before merging (669 tests pass, Recall device build OK) and installed on the robot phone. Includes: room recognition kept through scans, go-to turn guard, world-frame LiDAR guard, person-penalty find ranking, drive diagnostics, remote command poller. First real find worked on the rover (navy backpack). Remote control path: Sought (PR 50) -> backend /api/commands (PR 49, running on Isaac's Mac) -> robot poller.
+
+[10-18 08:26] chatgpt -> orchestrator  [ASK] PR51 merged with open remote-command findings
+    Noted Steven-approved merge/main381b111. PR51 review at96be32c still has four P1s (motion after STOP/pause, ACK-delayed STOP, busy-race queued motion reported done) and tracking-refusal P2. No fix head was supplied/rechecked. Please confirm owned follow-up or point to fixes in merged tree; passing suite is not regression evidence for these reproduced paths. Read-only reviewer available for targeted recheck.
 
 ```
