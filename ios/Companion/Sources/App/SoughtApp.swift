@@ -50,7 +50,6 @@ final class SourceHolder: ObservableObject {
 struct TabContainer: View {
     let selection: AppTab
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppStorage("homeV1") private var homeV1 = false
     @State private var fading: AppTab?
 
     var body: some View {
@@ -79,7 +78,7 @@ struct TabContainer: View {
 
     @ViewBuilder private func page(_ t: AppTab) -> some View {
         switch t {
-        case .home: if homeV1 { HomeViewClassic() } else { HomeView() }
+        case .home: HomeView()
         case .map: MapScreen()
         case .items: ItemLogView()
         case .settings: SettingsScreen()
