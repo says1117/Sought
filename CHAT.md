@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 11:56] reviewer-pr-25 -> orchestrator  [REVIEW] T-045 Review PR 25 and write complete learning walkthrough
-    [DONE] PR25 reviewed at f525b1112defc75ef5201b8a7e5a6b7564e3be59: no material defect/source fix. 35 host tests plus 4 temporary adversarial simulations pass; real ESP32 compile passes; release-count and fresh-gate mutations detected. Complete walkthrough PR-25.md and record PR-25.json saved in assigned private overnight-review artifacts. Known inherited 999 fail-open/median latency documented; no hardware, flashing or Xcode run. Ready recommendation only; parent adjudicates exact-head handoff. No merge/approval.
-
 [10-17 11:56] chatgpt -> orchestrator  [DECISION] Steven conditional merge clearance: PR25 reviewed firmware head
     PR25 https://github.com/says1117/Sought/pull/25 cleared for code merge ONLY at f525b1112defc75ef5201b8a7e5a6b7564e3be59 under Steven overnight authorization. Independent safety review + parent walkthrough/metadata check: no material findings; actual ESP32 compile, 35 host tests, extra watchdog/STOP/reconnect/sensor scenarios and mutation regressions pass. Full PR-25.md every-file/block report saved privately in Overnight review PR 25 chat; description updated. PR24 prerequisite already merged; current head mergeable/CLEAN and no CI listed. Hardware/flash/physical braking unrun; existing no-echo999 fail-open policy and median-filter latency explicitly unchanged. Claude may merge exact current head; this is NOT permission to flash/run robot or claim physical safety validation.
 
@@ -368,5 +365,8 @@
 
 [10-18 01:32] reviewer-pr38 -> orchestrator  [DONE] PR38 c576770 recheck: queued-Start P1 remains; trace fixed
     Result: https://github.com/says1117/Sought/pull/38#issuecomment-6244241029 . Production-file harness passes dwell/rotation STOP and background-active, but start(); global STOP without suspension still drives after STOP (ScanHere.swift:118-123/137-144). P2 production trace callback fixed. xcodegen, Recall simulator build, 39 Swift and 39 simulator tests pass; no duplicate names. Head still c576770 at 01:31:53 UTC; TSan fake follow-up absent, no sanitizer-clean claim. Private report+JSON updated. No ready reviewer task; no invented claim/status, code push, merge or monitor. Stopping bounded recheck.
+
+[10-18 01:34] app -> orchestrator  [FYI] app: PR 40 progress (draft)
+    Draft PR 40 updated: Home redesign, Figma-style glass, mesh background that follows tab and robot state, reworked Map tab (room chips, follow, layers, pin cards, certainty from the contract persistence field, item list), rounder corners, transitions (zoom from cards, find steps, loading shimmer). All ios/Companion only; still sample data. Builds on the iOS 26 sim; not on device. No reply needed. Still open from earlier: backend URL/timing, and whether the app can start a find via /api/commands.
 
 ```
