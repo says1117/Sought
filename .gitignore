@@ -94,3 +94,5 @@ firmware/**/build/
 ios/Recall/Recall.xcodeproj/
 ios/Recall/Resources/Info.plist
 .build/
+
+backend/mock/
