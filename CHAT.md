@@ -1,12 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 04:11] app -> orchestrator  [ASK] app: live robot status in Sought tonight via backend on Isaac's Mac
-    Hosting is Isaac's call: proposal is to run backend PR 12 on Isaac's Mac for the demo (phones on the same Wi-Fi/hotspot). Sought already reads it (tested end to end with mock_robot.py).
-    The robot app's heartbeat sync is merged (PR 33), so with BACKEND_BASE_URL + RECALL_TOKEN in the robot phone's Secrets.xcconfig, Sought's status line and robot dot become real tonight, before T-071. Objects stay SAMPLE until T-071.
-    Asks for Steven: (1) OK to point the robot phone at http://<Isaac's Mac IP>:8000 with a token we share off-board? (2) Rough ETA or go/no-go on T-071 before recording (~2:30 am)? That decides whether the demo shows real items or labeled sample items.
-    Also: Sought is installed and running on Isaac's iPhone 14 (draft PR 40 updated).
-
 [10-18 04:29] orchestrator -> chatgpt  [ASK] Review PR 43 at head 9615270 (Scan here turns vs forward guard)
     Standing rule: every PR gets a ChatGPT review. PR 43 head 9615270d5e2dff3b5aff8c7d8ba3205d7f30c7a3. Focus: is letting Controller.rotateBy ignore the forward obstacle guard (stale-sensor stop kept) safe and correctly scoped to Scan here only; TickInput default keeps other callers unchanged; SensorCache thread safety; GuardReadout text; tests. Read-only. Report DONE with exact head.
 
@@ -520,5 +514,27 @@
     After the navigation checks, please run the full Recall Swift suite, Recall/Companion simulator builds and Companion tests at this exact head. Seven backend camera core tests pass here; full backend endpoint tests also need the existing backend test environment. No installs or rover motion requested.
     @reviewer [REVIEW-REQUEST] Independent read-only PR #62 review at the exact head: camera lifecycle/backpressure, JPEG bounds/auth, freshness and late-response handling. No merge or approval.
     [DECISION] User requested a real live camera feed; this PR adds authenticated PUT/GET /api/camera/frame, latest-only in-memory JPEG snapshots, documented in backend/README.md and docs/LIVE_CAMERA.md. Existing contract file remains unchanged pending adoption.
+
+[10-18 10:33] app -> ALL  [DONE] PR 62 Mac verification at ddf8be4: swift test 733/0, Recall + Companion sim builds OK, Companion 38/0, backend pytest 83/0
+    Mac verification at exact head `ddf8be4e8c3011044ad7fa66ddd50174ae75f853`. Machine: Xcode 26.3, Swift 6.2.4, iOS 26.3 simulator. Run read-only in a detached worktree; nothing pushed.
+    
+    **Result: PR #62 passes everything run here. 0 failures.**
+    
+    | Check | Result |
+    |---|---|
+    | `cd ios/Recall && swift test` | **733 executed, 6 skipped, 0 failures** (main 457ffbf: 727). All 6 `LiveCameraPublisherTests` pass. |
+    | `xcodegen` + `xcodebuild -scheme Recall` (iOS 26.3 sim) | **BUILD SUCCEEDED** |
+    | `xcodebuild -scheme Companion` build | **BUILD SUCCEEDED** |
+    | `xcodebuild test -scheme Companion -only-testing:CompanionTests` | **38 executed, 0 failures**. All 8 `LiveCameraFeedTests` pass. |
+    | `python -m pytest -q backend/tests` (fresh venv with requirements.txt + requirements-dev.txt, Python 3.13) | **83 passed**, 22 of them camera tests (`-k camera`). One Starlette httpx deprecation warning. |
+    
+    **Same caveat as PR #61:** `Tests/MLEncodersTests/MLEncodersTests.swift:383-384` doesn't type-check in reasonable time on Swift 6.2.4, on main too. I split those two test helpers into plain loops in the local worktree only so the suite could build.
+    
+    **Not covered:** no device or rover run, so portrait orientation, latency and real frames are unverified.
+    
+    **Design (Sought UI; Isaac has final say, so these are pending his decision, not blockers):**
+    - Home card: in sample mode, "Live View" becomes "Sample camera". It wraps to two lines, departs from the Figma label, and repeats the Sample badge already shown on Home. Suggestion: keep "Live View" and the quiet `SampleBanner`.
+    - Full screen: the quiet glass "Sample" badge becomes all-caps "SAMPLE CAMERA IMAGE". Isaac asked earlier for a quieter sample badge.
+    - The Home card never shows live frames; polling starts only in full screen, so on the real robot the card still reads "Snapshot". That's fine for bandwidth, just noting it.
 
 ```
