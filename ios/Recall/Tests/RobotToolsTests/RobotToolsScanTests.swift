@@ -12,47 +12,74 @@ import XCTest
 // Synthetic fakes only. Nothing here measures a real rover.
 
 final class RTFakeScanRig: ExploreDrive, ExploreClock, ExplorePoseSource, ScanHereGate {
-    var tracking: TrackingKind = .normal
-    var otherTaskActive = false
-    var manualToolHeld = false
-    var rotations: [Double] = []
-    var stops = 0
-    var sleeps: [Double] = []
-    var events: [String] = []
-    var rotateResults: [DriveResult] = []
-    var onSleep: ((Int) -> Void)?
-    var onRotate: ((Int) -> Void)?
-    /// When set, rotateBy suspends until stop() is called, like a real turn in progress.
-    var blockRotate = false
+    // The scan runs turns on background tasks while tests read and write from the main actor: every field is behind one lock.
+    private let lock = NSLock()
+    private var _tracking: TrackingKind = .normal
+    private var _otherTaskActive = false, _manualToolHeld = false
+    private var _rotations: [Double] = [], _sleeps: [Double] = [], _events: [String] = []
+    private var _stops = 0
+    private var _rotateResults: [DriveResult] = []
+    private var _onSleep: ((Int) -> Void)?, _onRotate: ((Int) -> Void)?
+    private var _blockRotate = false
     private var blocked: CheckedContinuation<Void, Never>?
-    private var stoppedWhileBlocked = false
-    var driveAvailable = true
-    var grantCurrent = true
-    var registeredCancel: (() -> Void)?
-    var scanEndedCount = 0
+    private var _driveAvailable = true, _grantCurrent = true
+    private var _registeredCancel: (() -> Void)?
+    private var _scanEndedCount = 0
+
+    private func locked<T>(_ body: () -> T) -> T { lock.lock(); defer { lock.unlock() }; return body() }
+
+    var tracking: TrackingKind { get { locked { _tracking } } set { locked { _tracking = newValue } } }
+    var otherTaskActive: Bool { get { locked { _otherTaskActive } } set { locked { _otherTaskActive = newValue } } }
+    var manualToolHeld: Bool { get { locked { _manualToolHeld } } set { locked { _manualToolHeld = newValue } } }
+    var rotations: [Double] { get { locked { _rotations } } set { locked { _rotations = newValue } } }
+    var stops: Int { locked { _stops } }
+    var sleeps: [Double] { locked { _sleeps } }
+    var events: [String] { locked { _events } }
+    var rotateResults: [DriveResult] { get { locked { _rotateResults } } set { locked { _rotateResults = newValue } } }
+    var onSleep: ((Int) -> Void)? { get { locked { _onSleep } } set { locked { _onSleep = newValue } } }
+    var onRotate: ((Int) -> Void)? { get { locked { _onRotate } } set { locked { _onRotate = newValue } } }
+    /// When set, rotateBy suspends until stop() is called, like a real turn in progress.
+    var blockRotate: Bool { get { locked { _blockRotate } } set { locked { _blockRotate = newValue } } }
+    var driveAvailable: Bool { get { locked { _driveAvailable } } set { locked { _driveAvailable = newValue } } }
+    var grantCurrent: Bool { get { locked { _grantCurrent } } set { locked { _grantCurrent = newValue } } }
+    var registeredCancel: (() -> Void)? { get { locked { _registeredCancel } } set { locked { _registeredCancel = newValue } } }
+    var scanEndedCount: Int { locked { _scanEndedCount } }
 
     func acquireDrive() -> ScanDriveGrant? { guard driveAvailable else { return nil }; grantCurrent = true; return RTFakeGrant(rig: self) }
     func scanStarted(cancel: @escaping () -> Void) { registeredCancel = cancel }
-    func scanEnded() { scanEndedCount += 1; registeredCancel = nil }
+    func scanEnded() { locked { _scanEndedCount += 1; _registeredCancel = nil } }
 
     func goTo(x: Double, z: Double, stopDistance: Double) async -> DriveResult { .failed }
     func rotateBy(_ deg: Double) async -> DriveResult {
-        rotations.append(deg); events.append("rotate")
-        onRotate?(rotations.count)
-        if blockRotate {
-            await withCheckedContinuation { c in blocked = c }
+        let (count, hook, block) = locked { () -> (Int, ((Int) -> Void)?, Bool) in
+            _rotations.append(deg); _events.append("rotate")
+            return (_rotations.count, _onRotate, _blockRotate)
+        }
+        hook?(count)
+        if block {
+            await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in locked { blocked = c } }
             return .cancelled
         }
-        return rotateResults.isEmpty ? .reached : rotateResults.removeFirst()
+        return locked { _rotateResults.isEmpty ? .reached : _rotateResults.removeFirst() }
     }
-    func stop() { stops += 1; events.append("stop"); blocked?.resume(); blocked = nil }
+    func stop() {
+        let c = locked { () -> CheckedContinuation<Void, Never>? in
+            _stops += 1; _events.append("stop"); let c = blocked; blocked = nil; return c
+        }
+        c?.resume()
+    }
     func now() -> Double { 0 }
-    func sleep(_ seconds: Double) async { sleeps.append(seconds); events.append("dwell"); onSleep?(sleeps.count) }
+    func sleep(_ seconds: Double) async {
+        let (n, hook) = locked { () -> (Int, ((Int) -> Void)?) in
+            _sleeps.append(seconds); _events.append("dwell"); return (_sleeps.count, _onSleep)
+        }
+        hook?(n)
+    }
     func latest() -> (pose: Pose2D?, tracking: TrackingKind) { (Pose2D(x: 0, z: 0, yawDeg: 0), tracking) }
 }
 
 final class RTFakeGrant: ScanDriveGrant {
-    private unowned let rig: RTFakeScanRig
+    private let rig: RTFakeScanRig   // strong: the scan's watcher can outlive the test by a tick
     init(rig: RTFakeScanRig) { self.rig = rig }
     var isCurrent: Bool { rig.grantCurrent }
     func run(_ body: () async -> Void) async { await body() }
@@ -65,7 +92,7 @@ final class RobotToolsScanTests: XCTestCase {
 
     private func model(_ rig: RTFakeScanRig) -> ScanHereModel {
         stopAllCalls = 0
-        return ScanHereModel(drive: rig, clock: rig, poses: rig, gate: rig, stopAll: { [unowned self] in self.stopAllCalls += 1 })
+        return ScanHereModel(drive: rig, clock: rig, poses: rig, gate: rig, stopAll: { [weak self] in self?.stopAllCalls += 1 })
     }
 
     func testFullScanIsFourTurnsOf90WithDwellEach() async {
