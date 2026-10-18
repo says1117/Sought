@@ -185,10 +185,11 @@ final class AppRuntime: ObservableObject {
             heartbeat = HeartbeatPublisher(transport: URLSessionTransport(config: cfg), provider: { hb.snapshot() })
         }
         // BEGIN T-071 backend uploads: objects of the active map + waypoints, in the background (Sources/Sync).
+        // Objects only while the session is relocalized against that map (one locked read of both).
         if let cfg = SyncConfig.fromBundle() {
             uploader = BackendUploader.make(config: cfg, databasePath: dbPath,
                                             queuePath: dir.appendingPathComponent("sync-queue.sqlite").path,
-                                            mapId: { [frameGate] in frameGate.activeMapId })
+                                            mapId: { [frameGate] in frameGate.performIfCurrent(generation: nil) { $0 } })
             uploader?.start()
         }
         // END T-071

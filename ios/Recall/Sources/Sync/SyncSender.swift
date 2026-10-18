@@ -42,12 +42,15 @@ public final class SyncSender {
         try? queue.makeAllDue(now: clock())
     }
 
-    /// One pass over everything currently due. Returns the number of rows delivered.
+    /// One pass over the rows due when it starts, each sent at most once. Rows queued meanwhile (or a delivered row
+    /// whose delete failed) wait for the next pass instead of being re-sent in a tight loop. Returns rows delivered.
     @discardableResult
     public func drain() async -> Int {
         guard state != .authRequired else { return 0 }
         var delivered = 0
-        while let item = (try? queue.nextDue(now: clock())) ?? nil {
+        let due: [QueueItem]
+        do { due = try queue.allDue(now: clock()) } catch { log("could not read the queue: \(error)"); return 0 }
+        for item in due {
             let request: SyncRequest
             if let mp = item.mediaPath {
                 let url = URL(fileURLWithPath: mp)
@@ -64,7 +67,8 @@ public final class SyncSender {
                 let status = try await transport.send(request)
                 switch status {
                 case 200..<300:
-                    try? queue.remove(item); delivered += 1; set(.idle)
+                    do { try queue.remove(item) } catch { log("ERROR delivered \(item.method) \(item.path) but could not unqueue it: \(error)") }
+                    delivered += 1; set(.idle)
                 case 401:
                     log("401 from backend: pausing sync, check RECALL_TOKEN (\(queue.safeCount()) queued)")
                     set(.authRequired); return delivered

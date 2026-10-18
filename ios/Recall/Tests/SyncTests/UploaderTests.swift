@@ -22,11 +22,11 @@ private final class PhoneDB {
     deinit { sqlite3_close(db); try? FileManager.default.removeItem(atPath: path) }
     func exec(_ sql: String) { XCTAssertEqual(sqlite3_exec(db, sql, nil, nil, nil), SQLITE_OK, sql) }
     func track(_ id: String, map: String?, x: Double = 0.8, z: Double = -2.9, last: String = "2026-10-17T14:02:10Z",
-               first: String? = "2026-10-17T13:05:00Z", persistence: Double = 0.86, active: Int = 1) {
+               first: String? = "2026-10-17T13:05:00Z", persistence: Double = 0.86, active: Int = 1, height: Double = 0.05) {
         let m = map.map { "'\($0)'" } ?? "NULL", f = first.map { "'\($0)'" } ?? "NULL"
         exec("""
         INSERT OR REPLACE INTO tracks (id,label,label_source,description,x,y,z,height_above_floor,embedding,embedding_dim,first_seen,last_seen,sightings,persistence,media_id,active,map_id)
-        VALUES ('\(id)',NULL,'none',NULL,\(x),0.1,\(z),0.05,x'0000',1,\(f),'\(last)',7,\(persistence),NULL,\(active),\(m))
+        VALUES ('\(id)',NULL,'none',NULL,\(x),0.1,\(z),\(height),x'0000',1,\(f),'\(last)',7,\(persistence),NULL,\(active),\(m))
         """)
     }
     func waypoint(_ id: String, name: String, created: String = "2026-10-17T13:01:00Z", media: String? = nil) {
@@ -67,6 +67,19 @@ final class LocalStoreReaderTests: XCTestCase {
         XCTAssertEqual(objs.map(\.id), ["obj_nofirstaaa"])
         XCTAssertEqual(objs[0].firstSeen, objs[0].lastSeen)     // missing first_seen falls back to last_seen
         XCTAssertEqual(objs[0].persistence, 1)                   // backend requires 0..1
+    }
+
+    func testImplausibleHeightsAreNotSentAndFloorNoiseReadsAsZero() throws {
+        // Seen on the live backend: tracks lifted from one bad keyframe at height -4.7 m, y -6 m (floor at y -1.3 m).
+        let db = PhoneDB()
+        db.track("obj_underfloor", map: "m", height: -4.73)
+        db.track("obj_justunder1", map: "m", height: -0.31)
+        db.track("obj_overceilin", map: "m", height: 3.6)
+        db.track("obj_floornoise", map: "m", height: -0.04)
+        db.track("obj_onshelfaaa", map: "m", height: 1.2)
+        let objs = try XCTUnwrap(LocalStoreReader(path: db.path)).objects(mapId: "m")
+        XCTAssertEqual(objs.map(\.id), ["obj_floornoise", "obj_onshelfaaa"])
+        XCTAssertEqual(objs.map(\.heightAboveFloorM), [0, 1.2])
     }
 
     func testWaypoints() throws {
@@ -134,9 +147,12 @@ final class BackendUploaderTests: XCTestCase {
         let again = await u.tick()
         XCTAssertEqual(again, 0)
         XCTAssertEqual(s.calls.count, 3)
-        snap.value.objects = [object("obj_aaaaaaaaaa", last: "2026-10-17T14:05:00Z")]   // seen again
+        snap.value.objects = [object("obj_aaaaaaaaaa", last: "2026-10-17T14:05:00Z")]   // seen again: waits for the refresh
         let third = await u.tick()
-        XCTAssertEqual(third, 1)
+        XCTAssertEqual(third, 0)
+        snap.value.objects = [object("obj_aaaaaaaaaa", x: 1.5, last: "2026-10-17T14:05:00Z")]   // moved: sent now
+        let fourth = await u.tick()
+        XCTAssertEqual(fourth, 1)
         XCTAssertEqual(s.calls.last?.path, "/api/objects/obj_aaaaaaaaaa")
     }
 
@@ -199,6 +215,138 @@ final class BackendUploaderTests: XCTestCase {
         await u.tick()
         XCTAssertEqual(Set(try q.all().map(\.path)), ["/api/waypoints/wpt_home", "/api/objects/obj_aaaaaaaaaa"])
         XCTAssertEqual(u.queuedTotal, 2)
+    }
+}
+
+/// The upload storm (live backend, 2026-10-18: one track PUT 6,133 times, the rest about 10): objects go out only on
+/// a real change, refresh-only changes at most every 30 s, one queue row per object, one send per row per drain pass.
+final class ObjectUploadGateTests: XCTestCase {
+    private func setup(_ snap: Box<UploadSnapshot>) throws -> (BackendUploader, FakeServer, SyncQueue, Box<Double>) {
+        let q = try SyncQueue(path: ":memory:"), s = FakeServer(), clock = Box(1_000.0)
+        let sender = SyncSender(queue: q, transport: s, clock: { clock.value }, random: { 0.5 }, log: { _ in })
+        return (BackendUploader(queue: q, sender: sender, clock: { clock.value }) { snap.value }, s, q, clock)
+    }
+    private func seen(_ o: WireObjectTrack, at t: Double, x: Double? = nil) -> WireObjectTrack {
+        var o = o
+        o.lastSeen = SyncTime.string(from: Date(timeIntervalSince1970: t)); o.sightings += 1
+        o.persistence = min(1, o.persistence + 0.01)
+        if let x { o.position.x = x }
+        return o
+    }
+    private func puts(_ s: FakeServer) -> Int { s.calls.filter { $0.path == "/api/objects/obj_aaaaaaaaaa" }.count }
+
+    func testConstantlySeenTrackIsRefreshedAtMostEvery30s() async throws {
+        var o = object("obj_aaaaaaaaaa")
+        let snap = Box(UploadSnapshot(objects: [o]))
+        let (u, s, q, clock) = try setup(snap)
+        for _ in 0..<24 {                                         // two minutes of 5 s ticks, seen on every one
+            o = seen(o, at: clock.value); snap.value.objects = [o]
+            await u.tick(); clock.value += 5
+        }
+        XCTAssertEqual(puts(s), 4)                                // t = 0, 30, 60, 90 (was 24)
+        XCTAssertEqual(try q.count(), 0)
+        let body = try JSONSerialization.jsonObject(with: XCTUnwrap(s.store["/api/objects/obj_aaaaaaaaaa"])) as! [String: Any]
+        XCTAssertEqual(body["sightings"] as? Int, 1 + 19)         // the t = 90 s version
+    }
+
+    func testRefreshOnlyChangeIsDeliveredOnceItIsDueEvenIfNotSeenAgain() async throws {
+        let o = object("obj_aaaaaaaaaa")
+        let snap = Box(UploadSnapshot(objects: [o]))
+        let (u, s, _, clock) = try setup(snap)
+        await u.tick()
+        clock.value += 5; snap.value.objects = [seen(o, at: clock.value)]
+        await u.tick()
+        XCTAssertEqual(puts(s), 1)
+        clock.value += 25; await u.tick()                         // 30 s after the first send: the newer last_seen goes
+        XCTAssertEqual(puts(s), 2)
+        clock.value += 5; await u.tick()
+        XCTAssertEqual(puts(s), 2)
+    }
+
+    func testMeaningfulChangesAreSentImmediately() async throws {
+        var o = object("obj_aaaaaaaaaa")
+        let snap = Box(UploadSnapshot(mapId: "map-1", objects: [o]))
+        let (u, s, _, clock) = try setup(snap)
+        await u.tick()
+        func step(_ change: (inout WireObjectTrack) -> Void, mapId: String = "map-1") async -> Int {
+            clock.value += 5; change(&o); snap.value.mapId = mapId; snap.value.objects = [o]
+            await u.tick(); return puts(s)
+        }
+        var n = await step { $0.position.x += 0.03 }              // jitter under 5 cm
+        XCTAssertEqual(n, 1)
+        n = await step { $0.position.x += 0.03 }                  // now 6 cm from what was sent
+        XCTAssertEqual(n, 2)
+        n = await step { $0.position.y += 0.06 }
+        XCTAssertEqual(n, 3)
+        n = await step { $0.label = "backpack"; $0.labelSource = .detector }
+        XCTAssertEqual(n, 4)
+        n = await step { $0.description = "blue backpack" }
+        XCTAssertEqual(n, 5)
+        n = await step { $0.mediaId = "med_thumb12345" }
+        XCTAssertEqual(n, 6)
+        n = await step({ _ in }, mapId: "map-2")                  // Teach saved a new map and the track moved over
+        XCTAssertEqual(n, 7)
+        n = await step({ _ in }, mapId: "map-2")
+        XCTAssertEqual(n, 7)
+    }
+
+    func testTrackThatLeavesAndReturnsIsResentButNoMapForgetsNothing() async throws {
+        let o = object("obj_aaaaaaaaaa")
+        let snap = Box(UploadSnapshot(mapId: "map-1", objects: [o]))
+        let (u, s, _, clock) = try setup(snap)
+        await u.tick()
+        snap.value = UploadSnapshot(mapId: nil); clock.value += 5; await u.tick()        // not relocalized: no objects
+        snap.value = UploadSnapshot(mapId: "map-1", objects: [o]); clock.value += 5; await u.tick()
+        XCTAssertEqual(puts(s), 1)                                // recognised again, nothing changed: not resent
+        snap.value.objects = []; clock.value += 5; await u.tick()                       // deactivated
+        snap.value.objects = [o]; clock.value += 5; await u.tick()                      // active again
+        XCTAssertEqual(puts(s), 2)
+    }
+
+    func testFastChangingTrackHoldsOneQueueRowWhileOffline() async throws {
+        var o = object("obj_aaaaaaaaaa")
+        let snap = Box(UploadSnapshot(objects: [o, object("obj_bbbbbbbbbb")]))
+        let (u, s, q, clock) = try setup(snap)
+        s.online = false
+        for i in 0..<50 {
+            o = seen(o, at: clock.value, x: 0.8 + Double(i) * 0.1)  // moves 10 cm every tick
+            snap.value.objects = [o, object("obj_bbbbbbbbbb")]
+            await u.tick(); clock.value += 5
+        }
+        XCTAssertEqual(Set(try q.all().map(\.path)), ["/api/objects/obj_aaaaaaaaaa", "/api/objects/obj_bbbbbbbbbb"])
+        s.online = true; clock.value += 120
+        await u.tick()
+        let body = try JSONSerialization.jsonObject(with: XCTUnwrap(s.store["/api/objects/obj_aaaaaaaaaa"])) as! [String: Any]
+        XCTAssertEqual((body["position"] as? [String: Double])?["x"] ?? 0, 0.8 + 49 * 0.1, accuracy: 1e-9)
+        XCTAssertEqual(try q.count(), 0)
+    }
+}
+
+/// A transport that queues a newer body for the same object while each PUT is in flight, so the delivered row's
+/// delete never matches what is in the queue. The old drain re-read the queue after every send and PUT forever.
+private final class RequeueingServer: SyncTransport {
+    let queue: SyncQueue
+    var calls = 0
+    init(queue: SyncQueue) { self.queue = queue }
+    func send(_ r: SyncRequest) async throws -> Int {
+        calls += 1
+        try queue.enqueue(object("obj_aaaaaaaaaa", last: SyncTime.string(from: Date(timeIntervalSince1970: Double(calls)))))
+        return 200
+    }
+}
+
+final class DrainBoundTests: XCTestCase {
+    func testEachRowIsSentAtMostOncePerPass() async throws {
+        let q = try SyncQueue(path: ":memory:")
+        try q.enqueue(object("obj_aaaaaaaaaa"))
+        let s = RequeueingServer(queue: q)
+        let sender = SyncSender(queue: q, transport: s, clock: { 1_000 }, random: { 0.5 }, log: { _ in })
+        let delivered = await sender.drain()
+        XCTAssertEqual(delivered, 1)
+        XCTAssertEqual(s.calls, 1)
+        XCTAssertEqual(try q.count(), 1)                          // the newer version waits for the next pass
+        await sender.drain()
+        XCTAssertEqual(s.calls, 2)
     }
 }
 
