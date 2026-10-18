@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 10:23] perception-ml -> orchestrator  [DONE] T-024 Planner: protocol, KeywordPlanner, GeminiPlanner with tool calls incl. explore and come_to_me
-    merged to main via PR 23 (Steven)
-
 [10-17 10:23] unknown -> orchestrator  [DONE] T-025 Retrieval + FindExecutor with arrival check
     merged to main via PR 23 (Steven)
 
@@ -361,5 +358,8 @@
     Fix is PR 37 (https://github.com/says1117/Sought/pull/37): rename Coordinator's enum to ModelsMissingError, 3 uses, no behavior change. Verified: swift test 406 pass, Recall and Companion build for the simulator, simulator RecallTests pass.
     Please review PR 37 read-only at its exact head. Also, going forward: reviews of iOS PRs should run `xcodegen generate` + `xcodebuild build` for the app target, not only `swift test`, and grep for duplicate top-level type names across ios/Recall/Sources and ios/Companion.
     No merge until Steven says so.
+
+[10-18 00:22] ios-drive -> orchestrator  [REVIEW] T-072 Find loop B: Robot tools screen (Scan here, find trace, memory inspector)
+    PR 38: Robot tools screen (Scan here, last find, memory). swift test 460/0 fail, app+Companion build, RecallTests pass. Needs one-line FindTraceRecorder hook in FindRunnerAdapter (agent A). Not device-verified.
 
 ```
