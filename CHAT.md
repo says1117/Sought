@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 03:03] reviewer-pr-42 -> orchestrator  [FYI] PR42 findings posted at 94d9eee
-    Review comment: https://github.com/says1117/Sought/pull/42#issuecomment-6244994461 . P1 reproduced: PR39 provider produces 256px inputs for CLIP224; factory works. P2: encoder-family switch leaves 512d old embeddings comparable (no model identity/reset). 442 Swift tests/0 failures/4 skips; focused real-model run 45/0/1 optional skip; all four empty/populated Recall+Companion simulator builds passed. No code changes or approval. Completing walkthrough and one bounded response/head recheck. Reviewer task remains unassigned.
-
 [10-18 03:06] reviewer-pr-42 -> orchestrator  [DONE] PR42 exact-head review: P1 config, P2 memory lifecycle
     Reviewed 94d9eee; PR39 integration head 96787cb. Findings: https://github.com/says1117/Sought/pull/42#issuecomment-6244994461 . P1 real provider discards config (224 located -> 256 input -> Core ML error); P2 family switches need old-embedding reset/identity. 442 Swift tests pass (4 skips); focused real run 45 pass (1 optional skip); four empty/populated simulator app builds pass. Independent CPU parity summaries reproduce; six preproc MAE 0.000 cases. Bounded recheck: head unchanged, no author response. No dedicated reviewer task available; T-074 unchanged. Walkthrough and JSON saved in requested overnight-reviews folder. No hardware, code edit, merge, code push or approval. Stopping this review session.
 
@@ -461,5 +458,15 @@
     F2: d539f54. Any non-network GET error after an accepted POST throws .lostTrack(code); Find and Come show lostContact with Stop (posts stop). Tests: accepted POST then GET 401/403/404/405/409/423/429/500 for the client, Find and Come.
     F5: 59b6a06. now = Date() on every heartbeat change, including already-expired ones; boundary tick still scheduled for fresh ones. Test: testExpiredHeartbeatRefreshesTheClockAtOnce.
     Mac results at the head: 34/34 unit tests pass on the iOS 26.3 simulator (SoughtLogicTests 16, CommandClientTests 10, TeachPanelTests 8). The accessibility audit was not re-run (no UI layout change). Ready for the bounded recheck.
+
+[10-18 09:50] app -> orchestrator  [FYI] Why 'go to kitchen' fails: likely the 30 s go-to timeout vs ~0.1 m/s (robot side, not backend)
+    Steven asked us to look at waypoint finding. Read-only findings from the backend command log on Isaac's Mac:
+    - Name resolution works. 'mark kitchen' at 09:42:19 saved wpt kitchen (3.49, -4.72). The planner resolved 'find kitchen' -> 'go to: kitchen' and 'come to the kitchen' -> 'come to: kitchen'. Both were ended by Stop after ~20-25 s ('stop: cancelled ...'). The backend only stores and relays; nothing there decides navigation.
+    - The waypoint looks right: the completed teach moves dead-reckon to ~4.1 m from the start, and kitchen is ~4.6 m from the 08:40 pose. The robot now reports (0.97, -1.66), ~4 m from kitchen.
+    - Likely cause: ControllerTuning.timeout = 30 s (ControllerMath.swift) for every goTo. Remote 'forward 1.0 m' took ~11 s per command, so ~0.1 m/s; 4 m plus turning needs more than 30 s. Expect 'I couldn't get there in time' if not stopped by hand.
+    - Diagnostics gap: ControllerNavigator.goTo (CoordinatorAdapters.swift:93) drops controller.lastRun.summary, unlike ControllerApproachDriver, so a waypoint timeout doesn't say dist start->closest, guard-stop % or turning %.
+    Suggested robot-side fix (owner's call): scale the goTo timeout with distance (e.g. 15 s + 12 s/m) or fail on no progress for N s instead of a flat 30 s; append lastRun.summary to the go-to timeout reason.
+    Quick test without code changes: send 'find kitchen' from ~1.5 m away and don't press Stop; then from 4 m. I'm logging /api/robot/status every 0.5 s on the Mac to capture the path of the next attempt.
+    App bug on our side: typing 'Go to the kitchen' in Sought's search sent 'find Go to the kitchen'. I'll pass go to / come to phrases through unchanged.
 
 ```
