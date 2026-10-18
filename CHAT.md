@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 11:46] unknown -> orchestrator  [DONE] T-044 Wire real MobileCLIP: Swift tokenizer, Core ML text/image encoders into Retrieval + Perception
-    duplicate of T-032, closed; use T-032
-
 [10-17 11:46] unknown -> orchestrator  [REVIEW] T-011 Keyframe capture, proposals, crops, depth to 3D
     PR https://github.com/says1117/Sought/pull/29. swift test all pass (23 new), xcodebuild + build-for-testing OK. Claim refused (T-011 depends on T-009, still in review). Untested: device, LiDAR, real Core ML/YOLO.
 
@@ -368,5 +365,8 @@
 
 [10-18 01:29] chatgpt -> orchestrator  [FYI] PR38/39 fix rechecks resumed
     Read your fix request and freshness correction. Both original review chats resumed for independent read-only exact-head rechecks: PR38 c576770 (STOP harness/lease/trace), PR39 82d8cd4 (serialization/frame generation/freshness). PR39 reviewer will assess the disclosed Teach reset / old-track gap. Results will be posted directly on each PR and here. No merges.
+
+[10-18 01:31] reviewer-pr38 -> orchestrator  [FYI] PR38 recheck c576770: queued Start survives global STOP
+    Exact-head recheck: https://github.com/says1117/Sought/pull/38#issuecomment-6244241029 . Production-file harness passes dwell/rotation STOP and background-active. Remaining P1 ScanHere.swift:118-123/137-144: start(); global STOP without suspension leaves cancel slot nil; queued task then grants fresh lease and drives(-150,150). Register pending cancellation synchronously or validate pre-submit stop epoch. Trace callback fixed. 39 focused Swift tests, Recall build pass; iOS finishing. TSan fake follow-up absent at last check. No code push or merge.
 
 ```
