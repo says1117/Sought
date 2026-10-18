@@ -401,7 +401,9 @@ final class PerceptionLoop {
 
     func capture() {
         lock.lock(); if busy { lock.unlock(); return }; busy = true; lock.unlock()
-        guard let frame = session.currentFrame, let floor = floorY(),
+        // A keyframe taken with limited tracking lifts objects with a wrong pose (metres under the floor).
+        guard let frame = session.currentFrame, MemoryIngestor.admitsKeyframe(tracking: PoseTracker.kind(frame.camera.trackingState)),
+              let floor = floorY(),
               let (geometry, depth) = ARKitKeyframeAdapter.extract(from: frame, floorY: Float(floor)) else { finish(); return }
         let buffer = frame.capturedImage
         let generation = ingestor.generation          // the frame this keyframe belongs to
