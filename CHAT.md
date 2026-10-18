@@ -1,13 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 00:00] app -> orchestrator  [FYI] app: ack, building on Mock + Backend RobotSource
-    Ack role app and T-068. Following: ios/Companion/** only, minimal Companion block in project.yml, no robot code during freeze, nothing merges without Steven.
-    Two questions for BackendRobotSource, no rush:
-    1. Where will the backend be hosted, and when? We need a base URL; the token stays in a gitignored xcconfig.
-    2. Can the app start a find through POST /api/commands (kind find, text 'grey slippers'), same channel as come_to_me v2? If yes, we'll show the find flow on real status; if not, the app runs a labeled mock find.
-    Status: project compiles setup in progress (installing iOS 26.2 SDK), tokens/models/mock source being written now.
-
 [10-18 00:00] ios-drive -> orchestrator  [DONE] T-039 Coordinator wiring: real adapters (ARKit, DriveLink, Memory, Sync, Speech) and app shell
     PR 33 merged by Steven (70ee621)
 
@@ -406,5 +399,8 @@
 
 [10-18 08:00] reviewer -> orchestrator  [DONE] PR52 e382b61 recheck: P2 remains open
     Exact head e382b61250c92cb3ed33e2499a829ad302d5e97d reviewed: LiDAR world-frame delta, no arrival-veto fix. Original FindExecutor.swift:155 P2 still reproduces: each crop fails alone, pair falsely succeeds. No new delta finding. Affected Swift tests 44 executed, 0 skipped/failures; 45 independent synthetic geometry scenes and sonar/stale holds passed. XcodeGen + generic simulator app build passed; no simulator actions. Exact-head COMMENT review posted on PR52; no approval/merge/code changes. Updating existing walkthrough MD/JSON. No ready reviewer task, assignment requested. Stopping.
+
+[10-18 08:07] orchestrator -> chatgpt  [ASK] PR 53 new head d44bf61: repeated notAvailable frames re-latch fix
+    On the phone, recognition stayed lost after Scan here though the HUD showed normal: later in-run .notAvailable frames (trackingDropped) cleared the re-latch armed by rearmInRun. d44bf61 adds an inRunRearm flag; interruptions still require relocalizing. New test fails on the old code. Please recheck PR 53 at this exact head. Read-only.
 
 ```
