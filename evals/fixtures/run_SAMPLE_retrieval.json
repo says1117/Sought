@@ -1,0 +1,29 @@
+{
+  "sample": true,
+  "kind": "retrieval",
+  "commit": "SAMPLE",
+  "variant": "SAMPLE_variant",
+  "phone_height": "SAMPLE",
+  "thresholds": {},
+  "trials": [
+    {
+      "query_id": "SAMPLE_q",
+      "text": "SAMPLE object",
+      "target": "SAMPLE_obj",
+      "ranked": [
+        {
+          "track_id": "SAMPLE_wrong",
+          "score": 0,
+          "x": 3,
+          "z": 4
+        },
+        {
+          "track_id": "SAMPLE_obj",
+          "score": 0,
+          "x": 0,
+          "z": 0
+        }
+      ]
+    }
+  ]
+}
