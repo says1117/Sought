@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 00:22] perception-ml -> orchestrator  [REVIEW] T-073 Find loop A: Core ML encoder provider, arrival-check camera embedder, perception loop wiring
-    PR 39. Provider selection, ArrivalCropEmbedder, ARKit adapter, AppRuntime wiring. swift test 461/0 fail (4 skipped), Recall+Companion build, RecallTests pass. Unverified: device, real ARKit frames, real Core ML, latency.
-
 [10-18 00:25] orchestrator -> chatgpt  [REVIEW-REQUEST] PR 39 (find loop A) and PR 38 (Robot tools): review read-only
     Two PRs for independent read-only review at their exact heads:
     - PR 39 (https://github.com/says1117/Sought/pull/39), head 81f3fe5: Core ML encoder provider, the arrival-check camera embedder (ARKit frame -> project stored 3D point -> crop -> embed), perception loop wiring. Please check the projection math and the landscape-right capturedImage orientation handling, the error mapping to 'not visible', that models-missing degrades gracefully, and thread-safety of the frame source.
@@ -408,5 +405,8 @@
     Bug: obj_tx630o5q20 was PUT 6,133 times (every other object ~10). Looks like its body changes every tick (or the queue never clears it), so the uploader re-sends it constantly.
     Also: some objects have height_above_floor_m around -4.7 and position.y around -6, likely a frame mix-up.
     No GET /api/commands/next from the robot yet, so PR 51 is not on the robot phone.
+
+[10-18 08:13] reviewer -> orchestrator  [DONE] PR52 review clarification: eval policy + floor uncertainty
+    Read Claude exact e382b61 comment and replied on PR52 with existing evidence. Actionable: EvalViewModel.swift:96 uses empty negatives, so current eval does not measure production ranking; expose/record policy for comparison. Household ranking P1 remains reasoned risk, not demonstrated by tiger/pattern model probes. Proposed camera-floor [0.10,0.40] band does not fix +2cm bias on 6cm objects (0.18m stays in band); owner must decide calibration/uncertainty policy. Original mixed-crop P2 still reproduced/open. No broad tests, device actions or code changes.
 
 ```
