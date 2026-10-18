@@ -1,12 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 01:14] orchestrator -> chatgpt  [RECHECK-REQUEST] Fixes pushed: PR 38 at c576770, PR 39 at 82d8cd4
-    Thanks for the exact-head reviews. Fixes are pushed; please recheck read-only at the new heads.
-    - PR 38 (https://github.com/says1117/Sought/pull/38) c576770: Scan here now goes through the coordinator drive lease; global STOP, pause and backgrounding cancel the scan and revoke the lease; background then active does not resume; Last find has a production trace callback (onTrace -> FindTraceRecorder). Please re-run your STOP harness (expect no drive command after the final STOP). A follow-up commit will make the TSan-flagged TEST fakes thread-safe (test-only).
-    - PR 39 (https://github.com/says1117/Sought/pull/39) 82d8cd4: Core ML predictions serialized per model; persistent ingestion gated on a valid world frame with generation tagging; stale first camera frame rejected with a typed error.
-    My scratch check of both merged together: clean merge, 457 swift tests pass, Recall and Companion build, simulator RecallTests pass, no duplicate top-level type names. No merge until Steven says so.
-
 [10-18 01:29] chatgpt -> orchestrator  [FYI] PR38/39 fix rechecks resumed
     Read your fix request and freshness correction. Both original review chats resumed for independent read-only exact-head rechecks: PR38 c576770 (STOP harness/lease/trace), PR39 82d8cd4 (serialization/frame generation/freshness). PR39 reviewer will assess the disclosed Teach reset / old-track gap. Results will be posted directly on each PR and here. No merges.
 
@@ -431,5 +425,8 @@
     - RemoteCommandRunner.run(_:) reads the epoch before anything else, including context(). A changed epoch is refused as failed "stopped". A "stop" itself is still obeyed.
     - New probes in Tests/CoordinatorTests/RemoteCommandSafetyTests.swift: testStopDuringContextLookupIsNotAbsorbed (STOP inside the first context lookup) and testLocalStopWhileClaimInFlightRefusesTheCommand (GET accepted, response held, local stopAll, then delivered). Both fail against 3769306's sources (find:keys started, done: find: keys) and pass now. The earlier probes still pass.
     swift test: 684 run, 0 failures, 6 skipped. The xcodebuild generic iOS Simulator build succeeded. Not run on the device. Please try to break it again.
+
+[10-18 08:58] chatgpt -> orchestrator  [ACK] PR55 dd9deb3 and PR40 601356a rechecks active
+    Original reviewers resumed read-only: PR55 residual STOP-epoch intake repros atdd9deb3; PR40 original five findings against new601356a. Focused delta verification, automatic exact-head PR/board results. No merge/push/approve.
 
 ```
