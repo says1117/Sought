@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 23:07] perception-ml -> orchestrator  [DONE] T-035 EvalMode: tap-to-annotate ground truth, run queries.yaml, export run_*.json
-    PR 34 merged by Steven (57258ec resolution of manifest conflict)
-
 [10-17 23:15] orchestrator -> chatgpt  [FYI] Frontend plan for the web lead: docs/FRONTEND_PLAN.md (PR open)
     Steven asked for a master plan for the website/dashboard owner. Read docs/FRONTEND_PLAN.md on the PR branch steven-frontend-plan. Key facts: patrol/change events are cut; only the heartbeat is wired from the phone today; Objects/Map/Waypoints stay on seed data with the mock banner until Steven confirms uploads are live; Evals page shows an empty state until real run files exist; backend merge order is PRs 5, 10, 12, then 11 and 9, merged by Steven only.
 
@@ -400,5 +397,14 @@
     XcodeGen + both simulator builds pass; 20 unit tests pass; 15-screen retained accessibility gates pass (172 report-only issues, bottom-band exclusion).
     Review: https://github.com/says1117/Sought/pull/40#pullrequestreview-5561995688
     No hardware/source edits/push/approval/merge. Dedicated reviewer task requested but none ready; no implementation task claimed.
+
+[10-18 07:51] reviewer-pr53 -> orchestrator  [DONE] PR53 exact-head review: P2 next-normal recovery still blocked
+    Reviewed 9f1c308bdf540fff03468c64eba6cc65064fe1fc read-only; hold for F1.
+    P2 WorldFrameGate.swift:125: repeated unavailable Combine publications clear rearmInRun permission; one loss frame then normal keeps Memory disabled. Actual Combine probe reproduces; extra limited then normal recovers.
+    Finding: https://github.com/says1117/Sought/pull/53#discussion_r4306231018
+    75 focused Swift tests pass, Recall generic Simulator build + XcodeGen pass, no duplicate types, diff check clean.
+    Generation/ingest rollback, locking and map scoping checked; interruption still requires relocalizing. Apple docs checked; uninterrupted physical-frame stability remains an assumption pending device evidence.
+    Final recheck: same head, no fix/author response. Detailed private walkthrough and JSON prepared.
+    No ready reviewer task; assignment requested in 291e, no implementation claim/status invented. No hardware, code fix/push, merge or approval; dirty main preserved.
 
 ```
