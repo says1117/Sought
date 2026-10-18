@@ -63,9 +63,19 @@ final class BackendRobotSource: RobotSource {
     /// Shown in Settings when the server cannot be reached or rejects the token.
     @Published var connectionProblem: String?
     @Published private(set) var serverIsMock = false
+    /// The server has no items yet (robot uploads, T-071): show the sample catalog, clearly labeled, with live status.
+    @Published private(set) var itemsAreSample = false
+    private lazy var sample = MockRobotSource(seedOnly: true)
 
-    override var isSample: Bool { serverIsMock }
-    override var sourceName: String { serverIsMock ? "Soughtbot server (sample data)" : "Soughtbot server" }
+    override var isSample: Bool { serverIsMock || itemsAreSample }
+    override var sampleLabel: String { itemsAreSample && !serverIsMock ? "SAMPLE ITEMS" : "SAMPLE DATA" }
+    override var sampleSpoken: String {
+        itemsAreSample && !serverIsMock ? "Items are sample data. Soughtbot\u{2019}s status is live." : super.sampleSpoken
+    }
+    override var showsSamplePlanWithLivePose: Bool { itemsAreSample && !serverIsMock }
+    override var sourceName: String {
+        serverIsMock ? "Soughtbot server (sample data)" : itemsAreSample ? "Soughtbot server (live status, sample items)" : "Soughtbot server"
+    }
     override var canComeToMe: Bool { false }   // needs POST /api/commands (board task T-070)
 
     private var loop: Task<Void, Never>?
@@ -148,6 +158,24 @@ final class BackendRobotSource: RobotSource {
             map = (snapshot.grid != nil || !waypoints.isEmpty) ? snapshot : nil
 
             let tracks = try await get("api/objects", as: [ObjectDTO].self)
+            if tracks.isEmpty && !serverIsMock {
+                // Nothing uploaded yet: keep the live status, borrow the labeled sample catalog and floor plan.
+                if !itemsAreSample {
+                    itemsAreSample = true
+                    objects = sample.objects
+                    findLog = sample.findLog
+                }
+                if snapshot.grid == nil {
+                    var plan = sample.map ?? snapshot
+                    plan.trail = map?.trail ?? []
+                    plan.waypoints = waypoints.isEmpty ? plan.waypoints : waypoints
+                    map = plan
+                }
+                isLoading = false
+                if connectionProblem?.hasPrefix("Connected") != true { connectionProblem = nil }
+                return
+            }
+            itemsAreSample = false
             let previous = Dictionary(uniqueKeysWithValues: objects.map { ($0.id, $0) })
             objects = tracks.map { t in
                 let near = snapshot.nearestWaypoint(x: t.position.x, z: t.position.z)

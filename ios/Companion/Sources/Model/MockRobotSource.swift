@@ -23,7 +23,8 @@ final class MockRobotSource: RobotSource {
     // A loop through the sample flat, in world meters (x right, z down on screen).
     private let route: [(Double, Double)] = [(-3.0, -1.0), (-1.0, -2.6), (0.6, -1.4), (2.4, -2.8), (3.6, -1.2), (3.8, 1.0), (1.8, 1.2), (-0.4, 0.2)]
 
-    override init() {
+    /// `seedOnly`: build the sample catalog and floor plan without the fake robot (used by the backend source).
+    init(seedOnly: Bool = false) {
         super.init()
         let now = Date()
         func ago(_ m: Double) -> Date { now.addingTimeInterval(-m * 60) }

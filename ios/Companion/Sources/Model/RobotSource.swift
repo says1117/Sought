@@ -30,6 +30,9 @@ class RobotSource: ObservableObject {
 
     /// True when anything shown is sample data. Drives the SAMPLE DATA banner.
     var isSample: Bool { true }
+    /// Badge words. "SAMPLE ITEMS" when the status is live but the catalog is still sample data.
+    var sampleLabel: String { "SAMPLE DATA" }
+    var sampleSpoken: String { "Sample data. This is not from the robot." }
     var sourceName: String { "Sample data" }
     /// Whether Call Soughtbot can reach the robot in this build.
     var canComeToMe: Bool { false }
@@ -41,6 +44,8 @@ class RobotSource: ObservableObject {
             Task { @MainActor in self?.now = Date() }
         }
     }
+
+    var showsSamplePlanWithLivePose: Bool { false }
 
     // Commands. Subclasses override.
     func start() {}
@@ -103,7 +108,9 @@ class RobotSource: ObservableObject {
     }
 
     /// Room the robot is in now, for the map widget label.
+    /// Nil when the floor plan is sample data but the robot's position is live: naming a sample room would be a claim.
     var currentRoom: String? {
+        if showsSamplePlanWithLivePose { return nil }
         guard let p = status.pose, let m = map else { return nil }
         return m.room(atX: p.x, z: p.z)?.name ?? m.nearestWaypoint(x: p.x, z: p.z)?.name.capitalized
     }

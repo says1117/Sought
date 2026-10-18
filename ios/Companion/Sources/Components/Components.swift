@@ -294,13 +294,13 @@ struct SampleBanner: View {
         if robot.isSample {
             HStack(spacing: 4) {
                 Image(systemName: "flask").font(SoughtFont.badge)
-                Text("SAMPLE DATA").font(SoughtFont.badge).tracking(0.6)
+                Text(robot.sampleLabel).font(SoughtFont.badge).tracking(0.6)
             }
             .foregroundStyle(p.onPrimary)
             .padding(.horizontal, 8).padding(.vertical, 4)
             .background(Capsule().fill(p.searching))
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Sample data. This is not from the robot.")
+            .accessibilityLabel(robot.sampleSpoken)
             .accessibilityIdentifier("sampleBanner")
         }
     }
