@@ -5,3 +5,4 @@ Pure Swift (Foundation + simd, no ARKit). `OccupancyGrid.integrate(DepthFrame)` 
 `snapshot()` exports the contract 2.7 shape (`resolution_m`, `origin`, `width`, `height`, `cells_b64`: 0 free, 1 unknown, 2 occupied_low, 3 occupied_high; row-major, row = z, col = x). `init?(snapshot:)` restores it.
 
 Targets needed (not added here): SwiftPM target `OccupancyGridCore` (path `ios/Recall/Sources/OccupancyGrid`, excluding README.md) and test target `OccupancyGridTests` (path `ios/Recall/Tests/OccupancyGridTests`, depends on `OccupancyGridCore`); in project.yml add the sources dir to the app target and the tests dir to the test target.
+`markTraversed(x:z:radius:)` marks the floor under the rover free (the camera cannot see its own footprint); occupied evidence still wins. Explore's live feed (`Sources/Explore/ExploreGridStore.swift`) uses it.

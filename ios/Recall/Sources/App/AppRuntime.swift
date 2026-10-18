@@ -26,12 +26,18 @@ final class AppRuntime: ObservableObject {
     let coordinator: RobotCoordinator
     // Robot tools accessors (find-loop B): the stored tracks, a Controller on the same drive path, the pose reader.
     let trackProvider: TrackProviding
+    /// Explore (flag-gated): live LiDAR grid + the coordinator's explore task. See the EXPLORE block in init.
+    let explore: ExploreRuntime
     var scanPoses: ExplorePoseSource { poseBox }
     /// Scan here drives only through the coordinator's drive lease and its serialized sink, so global STOP,
-    /// pause and backgrounding revoke it exactly like a coordinator task.
+    /// pause and backgrounding revoke it exactly like a coordinator task. Its turns in place skip the 35 cm
+    /// forward stops but hold on the ESP32 close flags, missing sonar and stale readings (see TurnGuard).
     func makeScanController() -> Controller {
-        Controller(poses: poseBox, sink: LeasedDriveSink(base: driveSink, lease: driveLease), guardState: { [cache] in cache.guardState() })
+        Controller(poses: poseBox, sink: LeasedDriveSink(base: driveSink, lease: driveLease),
+                   guardState: { [cache] in cache.guardState() }, turnGuard: { [cache] in cache.turnGuardState() })
     }
+    /// Live forward-guard text for the Scan here screen.
+    func guardReadout() -> String { cache.readout() }
     /// Start preconditions for a scan, and the lease it drives under. Registers the scan for runtime cancellation.
     func makeScanGate() -> ScanHereGate {
         LeaseScanGate(lease: driveLease, coordinatorBusy: { [coordinator] in coordinator.isBusy || coordinator.hasPending },
@@ -49,9 +55,12 @@ final class AppRuntime: ObservableObject {
     private let poseBox = PoseSnapshotBox()
     private var poseSubscription: AnyCancellable?
     private var mappingSubscription: AnyCancellable?
+    /// Adopts a map Teach just saved (id, frame generation read before the save). Set in init.
+    private var adoptSavedMap: ((_ mapId: String, _ generation: Int?) -> Void)?
     private var storageWarningSpoken = false
     private let heartbeatSource = CoordinatorHeartbeatSource()
     private var heartbeat: HeartbeatPublisher?
+    private var uploader: BackendUploader?          // T-071 backend uploads (see the T-071 block in init)
     private var sensorTimer: Timer?
     private var perception: PerceptionLoop?
     private var scheduler = PerceptionScheduler()
@@ -99,11 +108,17 @@ final class AppRuntime: ObservableObject {
         self.driveLease = lease
         var wiring = CoordinatorWiring(
             poses: poseBox, drive: sink,
-            guardState: { cache.guardState() }, waypointStore: waypoints, trackStore: tracks,
+            guardState: { cache.guardState() }, turnGuard: { cache.turnGuardState() }, waypointStore: waypoints, trackStore: tracks,
             encoders: encoders, speaker: SpeakerAdapter(speaker: speaker), features: features,
             waypointsPersistent: waypointsPersistent, frame: frameGate)
         wiring.lease = lease
         wiring.onFindTrace = { FindTraceRecorder.shared.record($0) }   // Robot tools 'Last find'
+        // EXPLORE (explore-wire branch) BEGIN: grid fed from LiDAR only when the flag is on; runs as a coordinator task.
+        let explore = ExploreRuntime(enabled: features.exploreEnabled, pose: pose, poses: poseBox,
+                                     speaker: SpeakerAdapter(speaker: speaker))
+        self.explore = explore
+        wiring.makeExplorer = explore.makeExplorer
+        // EXPLORE END
         let coordinator = wiring.makeCoordinator()
         self.coordinator = coordinator
         self.storageWarning = warning
@@ -123,12 +138,29 @@ final class AppRuntime: ObservableObject {
         let gate = frameGate
         // The saved map's id scopes remembered objects; tracks of any other map are deleted once this one is loaded.
         pose.onSessionStart = { loaded in
-            let id = loaded ? WorldMapStore(url: WorldMapStore.defaultURL()).currentMapId() : nil
-            gate.sessionStarted(loadedSavedMap: loaded, mapId: id)
+            let mapStore = WorldMapStore(url: WorldMapStore.defaultURL())
+            let id = loaded ? mapStore.currentMapId() : nil
+            gate.sessionStarted(loadedSavedMap: loaded, mapId: id, waypointCutoff: id.flatMap { mapStore.waypointCutoff(mapId: $0) })
             if let id { _ = try? tracks.purgeOtherMaps(keeping: id) }
         }
-        mappingSubscription = Publishers.CombineLatest(pose.$tracking, pose.$mapping)
-            .sink { gate.update(tracking: $0, mapping: $1) }
+        mappingSubscription = Publishers.CombineLatest3(pose.$tracking, pose.$mapping, pose.$trackingReason)
+            .sink { gate.update(tracking: $0, mapping: $1, relocalizing: $2 == "relocalizing") }
+        // Teach saved the running session's map: it is this frame, so use it now (no relaunch). If the session was
+        // already relocalized against the previous map, that map's objects are in the same frame and move over;
+        // otherwise they belong to a map that no longer exists on disk and go.
+        adoptSavedMap = { id, generation in
+            let mapStore = WorldMapStore(url: WorldMapStore.defaultURL())
+            guard let adopted = gate.adoptSavedMap(mapId: id, ifGeneration: generation) else {
+                // The frame changed during the save: the map is used from the next run. Nothing stored predates
+                // it safely, so refuse older waypoints against it.
+                mapStore.setWaypointCutoff(Date(), mapId: id)
+                Self.log.notice("Saved map not adopted: the AR session changed during the save")
+                return
+            }
+            mapStore.setWaypointCutoff(adopted.waypointCutoff, mapId: id)
+            if adopted.wasRelocalized { _ = try? tracks.retagMap(from: adopted.previousMapId, to: id) }
+            _ = try? tracks.purgeOtherMaps(keeping: id)
+        }
 
         let hb = heartbeatSource
         coordinator.onChange = { [weak self] status in
@@ -138,6 +170,14 @@ final class AppRuntime: ObservableObject {
         if let cfg = SyncConfig.fromBundle() {
             heartbeat = HeartbeatPublisher(transport: URLSessionTransport(config: cfg), provider: { hb.snapshot() })
         }
+        // BEGIN T-071 backend uploads: objects of the active map + waypoints, in the background (Sources/Sync).
+        if let cfg = SyncConfig.fromBundle() {
+            uploader = BackendUploader.make(config: cfg, databasePath: dbPath,
+                                            queuePath: dir.appendingPathComponent("sync-queue.sqlite").path,
+                                            mapId: { [frameGate] in frameGate.activeMapId })
+            uploader?.start()
+        }
+        // END T-071
     }
 
     /// Perception crops are CIImages; the Core ML image model takes preprocessed RGBA, so convert and embed one by one.
@@ -202,6 +242,15 @@ final class AppRuntime: ObservableObject {
         coordinator.endManualControl(tool)
     }
 
+    /// Frame generation, read by Teach before saving a map (see `mapSaved`).
+    var frameGeneration: Int { frameGate.generation }
+
+    /// Teach banner state: recognised, relocalizing (elapsed), rescan needed, or idle (no saved map in use).
+    func relocalizationState() -> RelocalizationState { frameGate.relocalizationState() }
+
+    /// Teach saved the current world map as `mapId`; `generation` is `frameGeneration` read before the save began.
+    func mapSaved(mapId: String, generation: Int?) { adoptSavedMap?(mapId, generation) }
+
     func pause() {
         stopEverything()
         heartbeat?.stop()
@@ -213,7 +262,9 @@ final class AppRuntime: ObservableObject {
         refreshSensors()
         guard let perception else { return }
         // Persistent memory is only written in the saved map's frame (see MemoryIngestor), so wait for it.
-        let note = perception.ingestor.canIngest ? "Memory fills while parked" : "Not recognised yet, not saving objects"
+        let note = perception.ingestor.canIngest ? "Memory fills while parked"
+            : frameGate.usesSavedMap ? "Room not recognised yet: look around, not saving objects"
+            : "No room map in use: Teach → Save map"
         if perceptionNote != note { perceptionNote = note }
         guard perception.ingestor.canIngest else { return }
         let ok = scheduler.decide(now: ProcessInfo.processInfo.systemUptime, robotStationary: link.isRobotStationary,
@@ -252,6 +303,20 @@ final class SensorCache {
         lock.lock(); let c = corridor, s = sonar, t = stamp; lock.unlock()
         if ProcessInfo.processInfo.systemUptime - t > Self.maxAgeS { return .stop }
         return GuardStateMapper.state(corridor: c, sonar: s)
+    }
+
+    /// Guard for Scan here's turns in place: drops the 35 cm forward stops, keeps the ESP32 close-range flags,
+    /// missing sonar and stale readings as holds (see TurnGuard).
+    func turnGuardState() -> GuardState {
+        lock.lock(); let s = sonar, t = stamp; lock.unlock()
+        let stale = ProcessInfo.processInfo.systemUptime - t > Self.maxAgeS
+        return TurnGuard.hold(sonar: s, stale: stale) == nil ? .clear : .stop
+    }
+
+    /// What the forward guard sees now, as text for the Scan here debug line.
+    func readout() -> String {
+        lock.lock(); let c = corridor, s = sonar, t = stamp; lock.unlock()
+        return GuardReadout.text(corridor: c, sonar: s, ageS: ProcessInfo.processInfo.systemUptime - t, staleAfterS: Self.maxAgeS)
     }
 }
 

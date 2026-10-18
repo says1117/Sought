@@ -18,6 +18,11 @@ struct KeywordPlanner: Planner {
         // Safety first: stop/halt as the leading word.
         if ["stop", "halt"].contains(words[0]) { return [.stop] }
 
+        // "come to me in the kitchen", "come to the kitchen": a taught place (come to me v2). Plain "come to me" stays v1.
+        if let place = remainder(of: text, afterAny: ["come to me in", "come to me at", "come to me by", "come to"]),
+           PlannerText.normalizeName(place) != "me" {
+            return [try ToolCall.comeToWaypoint(name: place).validated(against: context)]
+        }
         if text.contains("come here") || text.contains("come to me") { return [.comeToMe] }
         if text.contains("what changed") || text.contains("what has changed") { return [.whatChanged(since: nil)] }
 

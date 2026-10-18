@@ -9,7 +9,8 @@ struct TeachView: View {
     @ObservedObject var model: TeachViewModel
     @ObservedObject var link: DriveLink
     @ObservedObject var tracker: PoseTracker
-    let monitor: RelocalizationMonitor
+    /// The app's frame gate state (`AppRuntime.relocalizationState`): one source of truth with Memory.
+    let relocState: () -> RelocalizationState
     let hasSavedMap: Bool
     @State private var reloc: RelocalizationState = .idle
     @GestureState private var held: DriveIntent?
@@ -37,6 +38,9 @@ struct TeachView: View {
                 }
                 Button(model.isSaving ? "Saving map" : "Save map") { model.saveMap() }
                     .buttonStyle(.bordered).disabled(model.isSaving)
+                Text(arReadout)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(WorldMapSavePolicy.canSave(tracking: tracker.tracking, mapping: tracker.mapping) ? .green : .orange)
                 if let warning = model.storageWarning { Text(warning).font(.footnote).foregroundStyle(.orange) }
                 if !model.message.isEmpty { Text(model.message).font(.footnote) }
 
@@ -68,30 +72,48 @@ struct TeachView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase != .active { requireRelease = held != nil; model.stopDriving() }
         }
-        .onChange(of: tracker.tracking) { _, _ in reloc = monitor.update(tracking: tracker.tracking, mapping: tracker.mapping) }
-        .onChange(of: tracker.mapping) { _, _ in reloc = monitor.update(tracking: tracker.tracking, mapping: tracker.mapping) }
-        .onReceive(ticker) { _ in reloc = monitor.tick() }
+        .onChange(of: tracker.tracking) { _, _ in reloc = relocState() }
+        .onChange(of: model.isSaving) { _, _ in reloc = relocState() }
+        .onReceive(ticker) { _ in reloc = relocState() }
         .onAppear {
-            model.beginSession(hasSavedMap: hasSavedMap, monitor: monitor)
-            reloc = monitor.update(tracking: tracker.tracking, mapping: tracker.mapping)
+            model.beginSession(hasSavedMap: hasSavedMap)
+            reloc = relocState()
         }
         .onDisappear { model.stopDriving() }
     }
 
+    /// Live ARKit state next to Save map: saving needs normal tracking and a mapped or extending status.
+    private var arReadout: String {
+        let reason = tracker.trackingReason.isEmpty ? "" : " (\(tracker.trackingReason))"
+        return "Tracking \(tracker.tracking.rawValue)\(reason) · map \(tracker.mapping.rawValue)"
+    }
+
     @ViewBuilder private var relocBanner: some View {
         switch reloc {
-        case .idle, .relocalized: EmptyView()
+        case .relocalized:
+            Text("Room recognised: memory is on").font(.callout).foregroundStyle(.green)
+        case .idle:
+            Text("No room map in use: look around, then Save map to turn memory on").font(.callout).foregroundStyle(.orange)
         case .waiting(let t):
-            Text("Relocalizing: look around the room (\(Int(t)) s)").font(.callout).foregroundStyle(.orange)
+            VStack(spacing: 6) {
+                Text("Relocalizing: look around the room (\(Int(t)) s)").font(.callout).foregroundStyle(.orange)
+                // Saving needs normal tracking, which never comes while ARKit is still looking for the old map.
+                Text("Room changed or never recognised? Start fresh, scan, then Save map.").font(.caption)
+                freshTeachButton.buttonStyle(.bordered)
+            }
         case .rescanNeeded:
             VStack(spacing: 6) {
                 Text("Rescan needed").font(.headline).foregroundStyle(.red)
-                Button("Start fresh Teach") {
-                    monitor.startFreshTeach()
-                    reloc = .idle
-                    tracker.start(resetTracking: true)
-                }.buttonStyle(.borderedProminent)
+                freshTeachButton.buttonStyle(.borderedProminent)
             }
+        }
+    }
+
+    /// New ARKit run without the saved map. The gate goes to a fresh id; Save map then adopts this session.
+    private var freshTeachButton: some View {
+        Button("Start fresh Teach") {
+            tracker.start(resetTracking: true)
+            reloc = relocState()
         }
     }
 }
@@ -108,30 +130,31 @@ struct FallbackToolsMenu: View {
 }
 
 /// Owns the Teach objects for one presentation of the screen. Present it from the root screen's
-/// "Fallback tools" menu: `.sheet(isPresented:) { TeachContainer(link: link, tracker: pose) }`.
+/// "Fallback tools" menu: `.sheet(isPresented:) { TeachContainer(link: link, tracker: pose, runtime: runtime) }`.
 struct TeachContainer: View {
     @StateObject private var session: TeachSession
     @ObservedObject var link: DriveLink
     @ObservedObject var tracker: PoseTracker
+    let runtime: AppRuntime
 
-    init(link: DriveLink, tracker: PoseTracker) {
+    init(link: DriveLink, tracker: PoseTracker, runtime: AppRuntime) {
         self.link = link
         self.tracker = tracker
-        _session = StateObject(wrappedValue: TeachSession(link: link, tracker: tracker))
+        self.runtime = runtime
+        _session = StateObject(wrappedValue: TeachSession(link: link, tracker: tracker, runtime: runtime))
     }
 
     var body: some View {
-        TeachView(model: session.model, link: link, tracker: tracker, monitor: session.monitor,
+        TeachView(model: session.model, link: link, tracker: tracker, relocState: { [runtime] in runtime.relocalizationState() },
                   hasSavedMap: session.adapter.hasSavedMap)
     }
 }
 
 final class TeachSession: ObservableObject {
     let adapter: ARWorldMapAdapter
-    let monitor = RelocalizationMonitor()
     let model: TeachViewModel
 
-    init(link: DriveLink, tracker: PoseTracker) {
+    init(link: DriveLink, tracker: PoseTracker, runtime: AppRuntime) {
         let dir = WorldMapStore.defaultURL().deletingLastPathComponent()
         let store: WaypointStore
         let storageWarning: String?
@@ -143,6 +166,11 @@ final class TeachSession: ObservableObject {
             storageWarning = "Waypoint storage unavailable. New waypoints are temporary and will be lost when Teach closes."
         }
         adapter = ARWorldMapAdapter(tracker: tracker)
+        // Both run on the main queue: saveMap is a button action and the adapter calls back on main.
+        adapter.currentGeneration = { [weak runtime] in MainActor.assumeIsolated { runtime?.frameGeneration ?? -1 } }
+        adapter.onSaved = { [weak runtime] id, generation in
+            MainActor.assumeIsolated { runtime?.mapSaved(mapId: id, generation: generation) }
+        }
         model = TeachViewModel(store: store, driver: link, mapSaver: adapter, currentPose: { tracker.pose }, storageWarning: storageWarning)
     }
 }

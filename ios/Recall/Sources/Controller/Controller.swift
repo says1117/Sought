@@ -20,6 +20,7 @@ final class Controller {
     private let poses: PoseSource
     private let sink: DriveSink
     private let guardState: () -> GuardState
+    private let turnGuard: (() -> GuardState)?
     private let clock: () -> Double
     private let sleep: (Double) async -> Void
     private let stopLock = NSLock()
@@ -30,11 +31,14 @@ final class Controller {
     var stopEpoch: UInt64 { stopLock.lock(); defer { stopLock.unlock() }; return stopGeneration }
 
     /// `clock` returns seconds (monotonic); `sleep` waits that many seconds. Both are injectable for tests.
+    /// `turnGuard`: when set, rotateBy obeys it instead of `guardState` (see TickInput.turnGuardState).
     init(poses: PoseSource, sink: DriveSink,
          guardState: @escaping () -> GuardState = { .clear },
+         turnGuard: (() -> GuardState)? = nil,
          clock: @escaping () -> Double = { ProcessInfo.processInfo.systemUptime },
          sleep: @escaping (Double) async -> Void = { try? await Task.sleep(nanoseconds: UInt64($0 * 1_000_000_000)) }) {
-        self.poses = poses; self.sink = sink; self.guardState = guardState; self.clock = clock; self.sleep = sleep
+        self.poses = poses; self.sink = sink; self.guardState = guardState; self.turnGuard = turnGuard
+        self.clock = clock; self.sleep = sleep
     }
 
     /// Ends the current goTo/rotateBy at the next tick (also on task cancellation). Sends STOP immediately.
@@ -60,7 +64,8 @@ final class Controller {
         while true {
             if stopEpoch != startEpoch || Task.isCancelled { return .failed(.cancelled) }
             let s = poses.latest()
-            let out = session.tick(TickInput(pose: s.pose, tracking: s.tracking, guardState: guardState(), now: clock()))
+            let out = session.tick(TickInput(pose: s.pose, tracking: s.tracking, guardState: guardState(), now: clock(),
+                                               turnGuardState: turnGuard?()))
             if out.status != .running { return out.status }
             sink.drive(left: out.command.left, right: out.command.right)
             await sleep(1.0 / ControllerTuning.tickHz)

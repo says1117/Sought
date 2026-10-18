@@ -179,14 +179,14 @@ final class TrackStorageTests: XCTestCase {
         let g = WorldFrameGate()
         g.sessionStarted(loadedSavedMap: true)
         let g1 = g.generation
-        g.update(tracking: .normal, mapping: .mapped)
+        g.update(tracking: .limited, mapping: .limited, relocalizing: true); g.update(tracking: .normal, mapping: .mapped)
         XCTAssertTrue(g.relocalized); XCTAssertEqual(g.generation, g1, "relocalizing keeps the generation")
         g.update(tracking: .notAvailable, mapping: .notAvailable)
         XCTAssertGreaterThan(g.generation, g1, "losing tracking may re-anchor")
         let g2 = g.generation
         g.sessionStarted(loadedSavedMap: false)
         XCTAssertGreaterThan(g.generation, g2)
-        g.update(tracking: .normal, mapping: .mapped)
+        g.update(tracking: .limited, mapping: .limited, relocalizing: true); g.update(tracking: .normal, mapping: .mapped)
         let ing = MemoryIngestor(store: try! TrackStore(path: ":memory:"), frame: g)
         XCTAssertFalse(ing.canIngest, "fresh map session never writes the persistent store")
     }

@@ -147,6 +147,24 @@ public struct OccupancyGrid {
         return used
     }
 
+    /// Marks the floor under the rover as seen free: the camera cannot see its own footprint, but the rover is
+    /// standing on it. Occupied evidence still wins in `state` (precedence high, low, free).
+    public mutating func markTraversed(x: Float, z: Float, radius: Float) {
+        guard radius > 0, let c = cellIndex(x: x, z: z) else { return }
+        let rc = Int((radius / config.resolution).rounded(.up))
+        for dr in -rc...rc {
+            for dc in -rc...rc {
+                let col = c.col + dc, row = c.row + dr
+                guard col >= 0, col < config.width, row >= 0, row < config.height else { continue }
+                let center = cellCenter(col: col, row: row)
+                let dx = center.x - x, dz = center.z - z
+                guard dx * dx + dz * dz <= radius * radius else { continue }
+                let i = row * config.width + col
+                floorHits[i] = max(floorHits[i], config.freeHitThreshold)
+            }
+        }
+    }
+
     // MARK: Query / export
 
     public func state(col: Int, row: Int) -> CellState {

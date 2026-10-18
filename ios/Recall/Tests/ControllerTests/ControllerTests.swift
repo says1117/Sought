@@ -45,6 +45,38 @@ final class SimRover: PoseSource, DriveSink {
     }
 }
 
+/// Turn-only rover with command lag: a command takes effect `lagTicks` sends later, and turns fast (90 -> 135 deg/s).
+final class LaggedRover: PoseSource, DriveSink {
+    var yawDeg: Double
+    var time = 0.0
+    var reversals = 0
+    private var queue: [(Int, Int)] = []
+    private var applied = (0, 0)
+    private var lastDir = 0.0
+    let lagTicks = 2
+    let degPerSecPerUnit = 1.5
+    let deadband = 60
+
+    init(yawDeg: Double) { self.yawDeg = yawDeg }
+    func latest() -> (pose: Pose2D?, tracking: TrackingKind) { (Pose2D(x: 0, z: 0, yawDeg: yawDeg), .normal) }
+    func drive(left: Int, right: Int) { queue.append((left, right)) }
+    func stop() { queue.removeAll(); applied = (0, 0) }
+    func resetTurn() { reversals = 0; lastDir = 0 }
+
+    func advance(_ dt: Double) {
+        time += dt
+        if queue.count > lagTicks { applied = queue.removeFirst() }
+        func db(_ v: Int) -> Double { abs(v) < deadband ? 0 : Double(v) }
+        let w = (db(applied.1) - db(applied.0)) / 2 * degPerSecPerUnit
+        if w != 0 {
+            let dir: Double = w > 0 ? 1 : -1
+            if lastDir != 0 && dir != lastDir { reversals += 1 }
+            lastDir = dir
+        }
+        yawDeg = PoseMath.normalizeDegrees(yawDeg + w * dt)
+    }
+}
+
 final class ControllerTests: XCTestCase {
     private func dist(_ p: Pose2D, _ x: Double, _ z: Double) -> Double { ((p.x - x) * (p.x - x) + (p.z - z) * (p.z - z)).squareRoot() }
 
@@ -145,6 +177,43 @@ final class ControllerTests: XCTestCase {
         }
     }
 
+    func testRotateWithLagFinishesInsteadOfHunting() async {
+        // Fast turn plus two ticks of command lag, as on the rover: the old 5 deg window overshot and chased.
+        let sim = LaggedRover(yawDeg: 0)
+        let c = Controller(poses: sim, sink: sim, clock: { sim.time }, sleep: { sim.advance($0) })
+        for delta in [90.0, -90.0, 90.0, 90.0] {
+            sim.resetTurn()
+            let start = sim.yawDeg
+            let status = await c.rotateBy(delta)
+            XCTAssertEqual(status, .done, "by \(delta)")
+            let err = PoseMath.shortestDelta(from: sim.yawDeg, to: start + delta)
+            XCTAssertLessThan(abs(err), 35, "by \(delta): overshoot bounded")
+            XCTAssertEqual(sim.reversals, 0, "by \(delta): never reversed direction")
+        }
+    }
+
+    func testRotateFinishesWhenHeadingPassesTarget() {
+        var s = ControlSession(goal: .rotateBy(deg: 90))
+        func tick(_ t: Double, _ yaw: Double) -> TickOutput {
+            s.tick(TickInput(pose: Pose2D(x: 0, z: 0, yawDeg: yaw), tracking: .normal, guardState: .clear, now: t))
+        }
+        XCTAssertEqual(tick(0, 0).status, .running)
+        XCTAssertEqual(tick(0.1, 60).status, .running)
+        let o = tick(0.2, 104)                       // jumped 14 deg past the target, outside the 10 deg window
+        XCTAssertEqual(o.status, .done)
+        XCTAssertEqual(o.command, .zero)
+    }
+
+    func testRotateWrapIsNotMistakenForCrossing() {
+        // rotate +170: at the start err is +170; a brief -175 reading (wrong way, far from target) is not "passed".
+        var s = ControlSession(goal: .rotateBy(deg: 170))
+        func tick(_ t: Double, _ yaw: Double) -> TickOutput {
+            s.tick(TickInput(pose: Pose2D(x: 0, z: 0, yawDeg: yaw), tracking: .normal, guardState: .clear, now: t))
+        }
+        XCTAssertEqual(tick(0, 0).status, .running)
+        XCTAssertEqual(tick(0.1, -15).status, .running)   // err = 185 -> -175, far from target
+    }
+
     // MARK: done criterion
 
     func testDoneNeedsThreeConsecutiveTicks() {
@@ -165,6 +234,42 @@ final class ControllerTests: XCTestCase {
         let o = s.tick(TickInput(pose: Pose2D(x: 0, z: 0, yawDeg: 0), tracking: .normal, guardState: .stop, now: 0))
         XCTAssertEqual(o.command, .zero)
         XCTAssertEqual(o.status, .running)
+    }
+
+    func testRotateObeysGuardStopWithoutTurnGuard() {
+        var s = ControlSession(goal: .rotateBy(deg: 90))
+        let o = s.tick(TickInput(pose: Pose2D(x: 0, z: 0, yawDeg: 0), tracking: .normal, guardState: .stop, now: 0))
+        XCTAssertEqual(o.command, .zero)
+    }
+
+    func testTurnGuardClearLetsRotateTurnPastForwardStop() {
+        var s = ControlSession(goal: .rotateBy(deg: 90))
+        let o = s.tick(TickInput(pose: Pose2D(x: 0, z: 0, yawDeg: 0), tracking: .normal, guardState: .stop, now: 0,
+                                 turnGuardState: .clear))
+        XCTAssertLessThan(o.command.left, 0)       // left turn: left wheel back, right forward
+        XCTAssertGreaterThan(o.command.right, 0)
+    }
+
+    func testTurnGuardStopHoldsRotateEvenWhenForwardClear() {
+        var s = ControlSession(goal: .rotateBy(deg: 90))
+        let o = s.tick(TickInput(pose: Pose2D(x: 0, z: 0, yawDeg: 0), tracking: .normal, guardState: .clear, now: 0,
+                                 turnGuardState: .stop))
+        XCTAssertEqual(o.command, .zero)
+    }
+
+    func testTurnGuardDoesNotAffectGoTo() {
+        var s = ControlSession(goal: .goTo(x: 0, z: -3, stopDistance: 0.3))
+        let o = s.tick(TickInput(pose: Pose2D(x: 0, z: 0, yawDeg: 0), tracking: .normal, guardState: .stop, now: 0,
+                                 turnGuardState: .clear))
+        XCTAssertEqual(o.command, .zero)
+    }
+
+    func testControllerRotateCompletesWithForwardStopWhenTurnGuardClear() async {
+        let sim = SimRover(x: 0, z: 0, yawDeg: 0)
+        let c = Controller(poses: sim, sink: sim, guardState: { .stop }, turnGuard: { .clear },
+                           clock: { sim.time }, sleep: { sim.advance($0) })
+        let status = await c.rotateBy(90)
+        XCTAssertEqual(status, .done)
     }
 
     // MARK: failure paths

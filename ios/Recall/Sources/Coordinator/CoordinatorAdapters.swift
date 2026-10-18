@@ -60,7 +60,8 @@ final class StoreWaypointsAdapter: CoordinatorWaypoints {
     func lookup(_ name: String) -> CoordinatorWaypoint? {
         guard let w = try? store.waypoint(named: name) else { return nil }
         return CoordinatorWaypoint(name: w.name, x: w.x, z: w.z, yawDeg: w.yawDeg,
-                                   inCurrentFrame: frame.isInCurrentFrame(createdAt: w.createdAt))
+                                   inCurrentFrame: frame.isInCurrentFrame(createdAt: w.createdAt),
+                                   predatesMap: frame.predatesActiveMap(createdAt: w.createdAt))
     }
 
     func markHere(name: String) throws -> CoordinatorWaypoint {
@@ -207,6 +208,9 @@ struct CoordinatorWiring {
     var poses: PoseSource
     var drive: DriveSink
     var guardState: () -> GuardState
+    /// Guard for the coordinator's turns in place (find's final facing turn). nil = turns obey `guardState`.
+    /// The app passes Scan here's turn guard (SensorCache.turnGuardState); goTo always obeys `guardState`.
+    var turnGuard: (() -> GuardState)? = nil
     var waypointStore: WaypointStore
     var trackStore: TrackProviding
     var encoders: EncoderProvider
@@ -224,13 +228,15 @@ struct CoordinatorWiring {
     var onFindTrace: ((FindTrace) -> Void)? = nil
     /// The drive lease the coordinator and any other motion producer (Scan here) share. Defaults to a fresh one.
     var lease = DriveLease()
+    /// Builds the explore task on the coordinator's Controller (ExploreRuntime.makeExplorer). nil = UnwiredExplorer.
+    /// The coordinator still refuses explore unless `features.exploreEnabled`.
+    var makeExplorer: ((Controller) -> CoordinatorExploring)? = nil
 
     /// `drive` must be a serialized sink (see `SerialDriveSink`) and `poses` a snapshot reader
     /// (see `PoseSnapshotBox`): the coordinator and Controller run off the main thread.
     func makeCoordinator() -> RobotCoordinator {
         let lease = self.lease
-        let controller = Controller(poses: poses, sink: LeasedDriveSink(base: drive, lease: lease), guardState: guardState,
-                                    clock: controllerClock, sleep: controllerSleep)
+        let controller = makeController()
         let driver = ControllerApproachDriver(controller: controller, poses: poses)
         let finder = FindRunnerAdapter(tracks: trackStore, encoders: encoders, driver: driver, speaker: speaker, frame: frame,
                                        onTrace: onFindTrace, stopMotion: { controller.stop() })
@@ -238,11 +244,19 @@ struct CoordinatorWiring {
         cfg.features = features
         return RobotCoordinator(
             dependencies: CoordinatorDependencies(
-                explorer: UnwiredExplorer(), finder: finder, comer: UnwiredComeToMe(),
+                explorer: makeExplorer?(controller) ?? UnwiredExplorer(), finder: finder, comer: UnwiredComeToMe(),
                 navigator: ControllerNavigator(controller: controller),
                 waypoints: StoreWaypointsAdapter(store: waypointStore, poses: poses, isPersistent: waypointsPersistent, frame: frame),
                 drive: DriveStopAdapter(sink: drive), speaker: speaker, clock: clock,
-                pose: ControllerPoseAdapter(source: poses), lease: lease, frame: frame),
+                pose: ControllerPoseAdapter(source: poses), lease: lease, frame: frame,
+                taught: StoreTaughtPlacesAdapter(store: waypointStore, frame: frame),
+                legs: ControllerLegDriver(controller: controller, poses: poses)),
             config: cfg)
+    }
+
+    /// The coordinator's Controller: drives under the shared lease; goTo obeys `guardState`, rotateBy `turnGuard`.
+    func makeController() -> Controller {
+        Controller(poses: poses, sink: LeasedDriveSink(base: drive, lease: lease), guardState: guardState,
+                   turnGuard: turnGuard, clock: controllerClock, sleep: controllerSleep)
     }
 }

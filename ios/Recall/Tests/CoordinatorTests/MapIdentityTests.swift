@@ -69,7 +69,7 @@ final class MapIdentityTests: XCTestCase {
         let gate = WorldFrameGate()
         let store = try TrackStore(path: ":memory:", scope: { gate.activeMapId })
         gate.sessionStarted(loadedSavedMap: true, mapId: "map-A")
-        gate.update(tracking: .normal, mapping: .mapped)
+        gate.update(tracking: .limited, mapping: .limited, relocalizing: true); gate.update(tracking: .normal, mapping: .mapped)
         let ing = MemoryIngestor(store: store, frame: gate)
         XCTAssertEqual(try ing.ingest([mapObs(0, [1, 0, 0, 0])]), .init(matched: 0, created: 1))
         XCTAssertEqual(try store.allTracks().count, 1)
@@ -79,12 +79,27 @@ final class MapIdentityTests: XCTestCase {
         XCTAssertNotEqual(fresh, "map-A")
         XCTAssertTrue(try store.allTracks().isEmpty, "old map's tracks are hidden")
         XCTAssertTrue(try ing.ingest([mapObs(0, [1, 0, 0, 0])]).rejected, "not recognised yet: nothing is written")
-        gate.update(tracking: .normal, mapping: .mapped)
+        gate.update(tracking: .limited, mapping: .limited, relocalizing: true); gate.update(tracking: .normal, mapping: .mapped)
         XCTAssertFalse(gate.relocalized, "no saved map to recognise")
 
         gate.sessionStarted(loadedSavedMap: true, mapId: "map-A")   // the real map comes back
         XCTAssertEqual(try store.allTracks().count, 1, "A's tracks are visible again, unchanged")
         XCTAssertNotEqual(gate.activeMapId, fresh)
+    }
+
+    func testAdoptingAMapSavedWhileRelocalizedMovesTheTracksOver() throws {
+        let gate = WorldFrameGate()
+        let store = try TrackStore(path: ":memory:", scope: { gate.activeMapId })
+        gate.sessionStarted(loadedSavedMap: true, mapId: "map-A")
+        gate.update(tracking: .limited, mapping: .limited, relocalizing: true); gate.update(tracking: .normal, mapping: .mapped)
+        let ing = MemoryIngestor(store: store, frame: gate)
+        XCTAssertEqual(try ing.ingest([mapObs(0, [1, 0, 0, 0])]), .init(matched: 0, created: 1))
+        let adopted = try XCTUnwrap(gate.adoptSavedMap(mapId: "map-B", ifGeneration: gate.generation))
+        XCTAssertTrue(adopted.wasRelocalized)
+        XCTAssertEqual(try store.retagMap(from: adopted.previousMapId, to: "map-B"), 1)
+        XCTAssertEqual(try store.purgeOtherMaps(keeping: "map-B"), 0)
+        XCTAssertEqual(try store.allTracks().count, 1, "A's objects are in B's frame and stay visible")
+        XCTAssertEqual(try ing.ingest([mapObs(0, [1, 0, 0, 0])]), .init(matched: 1, created: 0), "memory keeps filling")
     }
 
     func testIngestAssociatesOnlyWithTheActiveMapsTracks() throws {
@@ -171,7 +186,7 @@ final class MapIdentityTests: XCTestCase {
         let gate = WorldFrameGate()
         let store = try TrackStore(path: ":memory:", scope: { gate.activeMapId })
         gate.sessionStarted(loadedSavedMap: true, mapId: "map-A")
-        gate.update(tracking: .normal, mapping: .mapped)
+        gate.update(tracking: .limited, mapping: .limited, relocalizing: true); gate.update(tracking: .normal, mapping: .mapped)
         let ing = MemoryIngestor(store: store, frame: gate)
         let resetDone = DispatchSemaphore(value: 0)
         var resetBlockedDuringIngest = false

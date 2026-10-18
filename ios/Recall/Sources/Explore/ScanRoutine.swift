@@ -33,6 +33,12 @@ protocol ExplorePoseSource: AnyObject {
 
 protocol ExploreGridSource: AnyObject {
     func currentMap() -> ExploreMap
+    /// nil when the map is fresh enough to plan on; otherwise a short spoken reason (empty, stale...).
+    func readiness() -> String?
+}
+
+extension ExploreGridSource {
+    func readiness() -> String? { nil }
 }
 
 protocol WaypointSink: AnyObject {

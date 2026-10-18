@@ -12,16 +12,29 @@ public enum ModelAsset: String, CaseIterable {
     var isModel: Bool { rawValue.hasSuffix(".mlmodelc") }
     /// The uncompiled package the converter writes (`ml/conversion/convert.py`), accepted in Application Support.
     var packageName: String? { isModel ? String(rawValue.dropLast("mlmodelc".count)) + "mlpackage" : nil }
+
+    /// File name to look for under `config`. The raw values are the MobileCLIP-S0 defaults; the two models take
+    /// their names from the config, the tokenizer files never change.
+    public func fileName(for config: ModelConfig) -> String {
+        switch self {
+        case .textModel: return config.textModel + ".mlmodelc"
+        case .imageModel: return config.imageModel + ".mlmodelc"
+        case .vocab, .merges: return rawValue
+        }
+    }
 }
 
 public struct ModelLocatorError: Error, Equatable, CustomStringConvertible {
     public let missing: [ModelAsset]
+    /// The file names that were looked for, in the order of `missing` (config-specific; defaults to the raw values).
+    public let missingNames: [String]
     public let searched: [String]
     /// Extra facts, e.g. "found MobileCLIP_S0_Text.mlpackage but compiling it failed: ...".
     public let details: [String]
 
-    public init(missing: [ModelAsset], searched: [String], details: [String] = []) {
+    public init(missing: [ModelAsset], searched: [String], details: [String] = [], missingNames: [String]? = nil) {
         self.missing = missing; self.searched = searched; self.details = details
+        self.missingNames = missingNames ?? missing.map(\.rawValue)
     }
 
     /// Short sentence for the robot to say aloud.
@@ -29,13 +42,15 @@ public struct ModelLocatorError: Error, Equatable, CustomStringConvertible {
         "I can't search by name yet because my vision models aren't installed on this phone."
     }
     public var description: String {
-        "Missing \(missing.map(\.rawValue).joined(separator: ", ")); searched \(searched.joined(separator: ", ")). "
+        "Missing \(missingNames.joined(separator: ", ")); searched \(searched.joined(separator: ", ")). "
         + (details.isEmpty ? "" : details.joined(separator: " ") + " ")
-        + "Produce them with ml/conversion/install_models.sh (see ios/Recall/Sources/MLEncoders/README.md)."
+        + "Install the model folder with ml/conversion/install_models.sh (it must contain both .mlpackage/.mlmodelc models, "
+        + "vocab.json, merges.txt and, for a non-MobileCLIP model, model_config.json; see ml/conversion/README.md)."
     }
 }
 
 public struct ModelLocations: Equatable {
+    public let config: ModelConfig
     public let textModel: URL
     public let imageModel: URL
     public let tokenizerDirectory: URL
@@ -44,7 +59,8 @@ public struct ModelLocations: Equatable {
 }
 
 /// Finds the (uncommitted) compiled models and tokenizer files. Each asset is resolved independently, searching in order:
-///   1. the app bundle root (where Xcode puts `MobileCLIP_S0_*.mlmodelc` compiled from a bundled `.mlpackage`, and
+///   (`model_config.json` is found the same way and names the models; absent = MobileCLIP-S0 defaults)
+///   1. the app bundle root (where Xcode puts `<model>.mlmodelc` compiled from a bundled `.mlpackage`, and
 ///      flattened resources such as `vocab.json`)
 ///   2. the app bundle's subfolders, recursively (folder references)
 ///   3. `Application Support/Recall/Models/`: `.mlmodelc`, `vocab.json`, `merges.txt`, and also a raw `.mlpackage`,
@@ -78,22 +94,37 @@ public struct ModelLocator {
     /// Where compiled copies of Application Support packages are cached.
     var compiledCacheDirectory: URL? { applicationSupport?.appendingPathComponent("Compiled", isDirectory: true) }
 
-    /// Finds an asset that needs no compiling (bundle root, bundle subfolders, Application Support).
-    public func locate(_ asset: ModelAsset) -> URL? {
-        let name = asset.rawValue as NSString
+    /// Finds an asset that needs no compiling (bundle root, bundle subfolders, Application Support), under the
+    /// MobileCLIP-S0 default name. Use `locate(_:config:)` for a configured model.
+    public func locate(_ asset: ModelAsset) -> URL? { locate(fileName: asset.rawValue) }
+
+    public func locate(_ asset: ModelAsset, config: ModelConfig) -> URL? { locate(fileName: asset.fileName(for: config)) }
+
+    func locate(fileName: String) -> URL? {
+        let name = fileName as NSString
         for b in bundles {
             if let u = b.url(forResource: name.deletingPathExtension, withExtension: name.pathExtension),
                fileManager.fileExists(atPath: u.path) { return u }
             guard let root = b.resourceURL else { continue }
-            let direct = root.appendingPathComponent(asset.rawValue)
+            let direct = root.appendingPathComponent(fileName)
             if fileManager.fileExists(atPath: direct.path) { return direct }
-            if let u = findRecursively(asset.rawValue, under: root) { return u }
+            if let u = findRecursively(fileName, under: root) { return u }
         }
         if let dir = applicationSupport {
-            let u = dir.appendingPathComponent(asset.rawValue)
+            let u = dir.appendingPathComponent(fileName)
             if fileManager.fileExists(atPath: u.path) { return u }
         }
         return nil
+    }
+
+    /// Reads `model_config.json` (same search order as the models). Absent -> MobileCLIP-S0 defaults. Present but
+    /// unreadable or invalid -> throws `ModelConfigError` (never silently falls back, which would feed a 224 px
+    /// model 256 px images).
+    public func loadConfig() throws -> ModelConfig {
+        guard let url = locate(fileName: ModelConfig.fileName) else { return .mobileClipS0 }
+        let data: Data
+        do { data = try Data(contentsOf: url) } catch { throw ModelConfigError(reason: "cannot read \(url.path): \(error.localizedDescription)") }
+        return try ModelConfig.parse(data)
     }
 
     private func findRecursively(_ filename: String, under root: URL) -> URL? {
@@ -108,11 +139,12 @@ public struct ModelLocator {
 
     /// Compiles `Application Support/.../X.mlpackage` once and returns the cached `.mlmodelc`; nil if there is no
     /// package. A cached copy is reused while it is at least as new as the package. Throws if compiling fails.
-    func compiledFromPackage(_ asset: ModelAsset) throws -> URL? {
-        guard let pkgName = asset.packageName, let dir = applicationSupport, let cacheDir = compiledCacheDirectory else { return nil }
+    func compiledFromPackage(fileName: String) throws -> URL? {
+        guard fileName.hasSuffix(".mlmodelc"), let dir = applicationSupport, let cacheDir = compiledCacheDirectory else { return nil }
+        let pkgName = String(fileName.dropLast("mlmodelc".count)) + "mlpackage"
         let package = dir.appendingPathComponent(pkgName)
         guard fileManager.fileExists(atPath: package.path) else { return nil }
-        let cached = cacheDir.appendingPathComponent(asset.rawValue)
+        let cached = cacheDir.appendingPathComponent(fileName)
         func modified(_ u: URL) -> Date? { (try? fileManager.attributesOfItem(atPath: u.path))?[.modificationDate] as? Date }
         if fileManager.fileExists(atPath: cached.path), let c = modified(cached), let p = modified(package), c >= p { return cached }
         let tmp = try compiler(package)
@@ -123,20 +155,23 @@ public struct ModelLocator {
     }
 
     public func locateAll() throws -> ModelLocations {
+        let config = try loadConfig()
         var found: [ModelAsset: URL] = [:]
         var missing: [ModelAsset] = []
         var details: [String] = []
         for a in ModelAsset.allCases {
-            if let u = locate(a) { found[a] = u; continue }
-            do { if let u = try compiledFromPackage(a) { found[a] = u; continue } }
-            catch { details.append("Found \(a.packageName ?? "") but compiling it failed: \(error).") }
+            let name = a.fileName(for: config)
+            if let u = locate(fileName: name) { found[a] = u; continue }
+            do { if let u = try compiledFromPackage(fileName: name) { found[a] = u; continue } }
+            catch { details.append("Found \(name.replacingOccurrences(of: ".mlmodelc", with: ".mlpackage")) but compiling it failed: \(error).") }
             missing.append(a)
         }
         guard missing.isEmpty, let t = found[.textModel], let i = found[.imageModel],
               let v = found[.vocab], let m = found[.merges] else {
             let searched = bundles.compactMap { $0.resourceURL?.path } + [applicationSupport?.path].compactMap { $0 }
-            throw ModelLocatorError(missing: missing, searched: searched, details: details)
+            throw ModelLocatorError(missing: missing, searched: searched, details: details,
+                                    missingNames: missing.map { $0.fileName(for: config) })
         }
-        return ModelLocations(textModel: t, imageModel: i, tokenizerDirectory: v.deletingLastPathComponent(), vocab: v, merges: m)
+        return ModelLocations(config: config, textModel: t, imageModel: i, tokenizerDirectory: v.deletingLastPathComponent(), vocab: v, merges: m)
     }
 }

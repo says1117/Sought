@@ -27,6 +27,7 @@ struct RobotToolsView: View {
                 Text("Scan here").tag(0)
                 Text("Last find").tag(1)
                 Text("Memory").tag(2)
+                if runtime.features.exploreEnabled { Text("Explore").tag(3) }
             }
             .pickerStyle(.segmented)
             .padding()
@@ -34,6 +35,7 @@ struct RobotToolsView: View {
                 switch tab {
                 case 0: scanSection
                 case 1: findSection
+                case 3: ExplorePreviewSection(runtime: runtime)
                 default: memorySection
                 }
             }
@@ -76,6 +78,12 @@ struct RobotToolsView: View {
             .buttonStyle(.borderedProminent)
             .disabled(scan.state.isRunning)
             .accessibilityHint("Turns the robot in four steps of 90 degrees, pausing to look at each")
+            // Debug: what the forward obstacle guard sees. The "Scan turns" line is the TurnGuard policy.
+            TimelineView(.periodic(from: .now, by: 0.25)) { _ in
+                Text(runtime.guardReadout())
+                    .font(.system(.footnote, design: .monospaced)).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
         .padding()
     }

@@ -359,7 +359,7 @@ final class MLEncodersTests: XCTestCase {
     }
 
     /// Writes Swift outputs for tools/preproc_reference.py to compare against PIL. Set RECALL_PREPROC_DIR to the
-    /// directory produced by `preproc_reference.py make`.
+    /// directory produced by `preproc_reference.py make`; RECALL_PREPROC_SIZE (default 256) must match its --size.
     func testMeasureAgainstPILReference() throws {
         #if canImport(ImageIO)
         guard let dir = ProcessInfo.processInfo.environment["RECALL_PREPROC_DIR"] else {
@@ -382,10 +382,11 @@ final class MLEncodersTests: XCTestCase {
             let ref = try Data(contentsOf: u.deletingPathExtension().appendingPathExtension("ref.rgb"))
             func rgb(_ r: RawImage) -> Data { Data(stride(from: 0, to: r.rgba.count, by: 4).flatMap { [r.rgba[$0], r.rgba[$0 + 1], r.rgba[$0 + 2]] }) }
             func mae(_ a: Data, _ b: Data) -> Double { zip(a, b).reduce(0.0) { $0 + abs(Double($1.0) - Double($1.1)) } / Double(a.count) }
-            let new = rgb(ImagePreprocessing.prepare(raw)), old = rgb(ml32LegacyBilinear(raw))
+            let size = Int(ProcessInfo.processInfo.environment["RECALL_PREPROC_SIZE"] ?? "") ?? ImagePreprocessing.inputSize
+            let new = rgb(ImagePreprocessing.prepare(raw, size: size)), old = rgb(ml32LegacyBilinear(raw, size: size))
             try new.write(to: URL(fileURLWithPath: dir).appendingPathComponent("\(name).swift_new.rgb"))
             try old.write(to: URL(fileURLWithPath: dir).appendingPathComponent("\(name).swift_old.rgb"))
-            print("PREPROC \(name): MAE old(bilinear)=\(String(format: "%.3f", mae(old, ref))) new(PIL port)=\(String(format: "%.3f", mae(new, ref)))")
+            print("PREPROC size=\(size) \(name): MAE old(bilinear)=\(String(format: "%.3f", mae(old, ref))) new(PIL port)=\(String(format: "%.3f", mae(new, ref)))")
         }
         #else
         throw XCTSkip("ImageIO unavailable")
