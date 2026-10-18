@@ -28,8 +28,14 @@ Tests: `Tests/SyncTests`. `LiveBackendSmokeTests` runs against a real backend wh
 ## Remote commands (CommandPoller)
 
 Only when a backend is configured, and only between `AppRuntime.start()` and `pause()`, `CommandPoller` GETs
-`/api/commands/next` every 2 s (204 = nothing queued). A claimed command is acked `running`, its text runs through
-`RemoteCommandRunner` (Sources/Coordinator: keyword STOP first, then the find bar's planner, then the coordinator),
-and it is acked `done` with the result or `failed` with the reason. A busy robot (task running or pending, manual
-tool open, another remote command in progress) answers `failed` / `busy` and never queues motion; a "stop" always
-runs `stopAll()`. Network errors back off 2, 4, 8 ... 30 s.
+`/api/commands/next` every 2 s (204 = nothing queued; a claim marks the command `running` on the server). A claimed
+command's text runs at once through `RemoteCommandRunner` (Sources/Coordinator: keyword STOP first, then the find
+bar's planner, then `RobotCoordinator.executeRemote`). The `running` ack and then the final `done` (only on a real
+success) or `failed` ack are sent alongside and never gate motion, so a "stop" brakes without a network round trip.
+A busy robot (task running, pending or still stopping, manual tool open, another remote command in progress)
+answers `failed` / `busy`; the coordinator re-checks that atomically and never queues remote motion. Any stop
+(remote, local, pause, a manual tool opening) invalidates every remote command claimed before it (the stop epoch is
+read before GET /next is sent and carried with the command, so a stop during the claim also counts; such a command is
+acked `failed` / `stopped`), and `pause()`
+cancels claimed work and drops a claim still in flight (acked `failed`, best effort). Network errors back off
+2, 4, 8 ... 30 s.

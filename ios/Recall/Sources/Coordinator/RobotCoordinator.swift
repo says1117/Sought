@@ -19,6 +19,8 @@ import Foundation
 ///   new motion is refused until `endManualControl`.
 /// - Tracking not normal for more than 1 s cancels the motion task and reports "need a rescan" (blocked).
 /// - Reported failures become `blocked`; a thrown error becomes `error` and is rethrown to the caller.
+/// - Remote commands use `executeRemote`: admitted atomically or refused as busy, never queued, refused after
+///   any stop since the command was claimed (`stopGeneration`), and `done` only on a real success.
 final class RobotCoordinator {
     private final class Request {
         let id = UUID()
@@ -35,6 +37,8 @@ final class RobotCoordinator {
         var cancelEpoch: UInt64?
         var drainWatch: Task<Void, Never>?
         var result: Result<Void, Error>?
+        /// How it ended, set once at its terminal transition (read by remote callers; nil means it never reported).
+        var outcome: CoordinatorCallOutcome?
         var waiters: [CheckedContinuation<Void, Error>] = []
         init(kind: CoordinatorTaskKind, label: String, run: @escaping () async throws -> CoordinatorTaskResult,
              cancel: @escaping () -> Void) {
@@ -52,6 +56,7 @@ final class RobotCoordinator {
     private var pending: Request?
     private var _status = CoordinatorStatus.idle
     private var _trace: [CoordinatorTraceEntry] = []
+    private var _stopGeneration: UInt64 = 0
 
     /// Synchronous, serialized status notification; may re-enter (e.g. STOP). Keep it brief;
     /// dispatch UI updates asynchronously and never synchronously wait on another thread.
@@ -82,43 +87,58 @@ final class RobotCoordinator {
     func execute(_ call: ToolCall) async throws {
         // Local STOP must reach the brake before tracing or any lifecycle lock.
         if case .stop = call { stopAll(); return }
+        _ = try await dispatch(call, remote: nil)
+    }
+
+    /// Remote commands. `generation` is `stopGeneration` read when the command was claimed: any stop since then
+    /// (remote or local, pause, a manual tool opening) refuses the call. Motion is admitted atomically, refused
+    /// (`busy`) when a task is running, pending or still stopping or a manual tool is open, and never queued.
+    /// `done` only on a real success. Throws only what a runner throws (or caller cancellation).
+    func executeRemote(_ call: ToolCall, generation: UInt64) async throws -> CoordinatorCallOutcome {
+        if case .stop = call { stopAll(); return .done("Stopped.") }
+        return try await dispatch(call, remote: generation)
+    }
+
+    /// Bumped by every `stopAll` (and so by pause and opening a manual tool).
+    var stopGeneration: UInt64 { synchronized { _stopGeneration } }
+
+    /// `remote` is the remote caller's claimed stop generation; nil for the find bar and local callers.
+    private func dispatch(_ call: ToolCall, remote: UInt64?) async throws -> CoordinatorCallOutcome {
         record("request", call.toolName)
         switch call {
         case .stop:
             stopAll()
+            return .done("Stopped.")
         case .say(let text):
+            if let stale = staleRemote(remote, call.toolName) { return stale }
             deps.speaker.say(text)
+            return .done(text)
         case .markWaypoint(let name):
-            markWaypoint(name)
+            return markWaypoint(name, remote: remote)
         case .explore(let minutes):
-            guard config.features.exploreEnabled else { refuseDisabled("explore", "Sorry, exploring is turned off in this build."); return }
-            try await submit(makeRequest(.explore, "explore", { [deps] in try await deps.explorer.explore(maxMinutes: minutes) },
-                                         { [deps] in deps.explorer.cancel() }))
+            guard config.features.exploreEnabled else { return refuseDisabled("explore", "Sorry, exploring is turned off in this build.") }
+            return try await submit(makeRequest(.explore, "explore", { [deps] in try await deps.explorer.explore(maxMinutes: minutes) },
+                                                { [deps] in deps.explorer.cancel() }), remote: remote)
         case .findObject(let description):
-            try await submit(makeRequest(.find, "find: \(description)", { [deps] in try await deps.finder.find(description: description) },
-                                         { [deps] in deps.finder.cancel() }))
+            return try await submit(makeRequest(.find, "find: \(description)", { [deps] in try await deps.finder.find(description: description) },
+                                                { [deps] in deps.finder.cancel() }), remote: remote)
         case .comeToMe:
-            guard config.features.comeToMeEnabled else { refuseDisabled("come_to_me", "Sorry, coming to you is turned off in this build."); return }
-            try await submit(makeRequest(.comeToMe, "come to me", { [deps] in try await deps.comer.comeToMe() },
-                                         { [deps] in deps.comer.cancel() }))
+            guard config.features.comeToMeEnabled else { return refuseDisabled("come_to_me", "Sorry, coming to you is turned off in this build.") }
+            return try await submit(makeRequest(.comeToMe, "come to me", { [deps] in try await deps.comer.comeToMe() },
+                                                { [deps] in deps.comer.cancel() }), remote: remote)
         case .comeToWaypoint(let name):
-            try await comeToMe(target: .waypointName(name), traced: true)
+            return try await comeToMe(target: .waypointName(name), traced: true, remote: remote)
         case .goToWaypoint(let name):
             guard let wp = deps.waypoints.lookup(name) else {
-                record("rejected", "unknown waypoint \(name)")
-                deps.speaker.say("I don't know a place called \(name).")
-                return
+                return refuse("rejected", "unknown waypoint \(name)", "I don't know a place called \(name).")
             }
             guard wp.inCurrentFrame || (deps.frame.relocalized && !wp.predatesMap) else {
-                record("refused", "go to \(wp.name): saved map not relocalized")
-                deps.speaker.say(CoordinatorConfig.notRecognisedSpoken)
-                return
+                return refuse("refused", "go to \(wp.name): saved map not relocalized", CoordinatorConfig.notRecognisedSpoken)
             }
-            try await submit(makeRequest(.goToWaypoint, "go to: \(wp.name)", { [deps] in try await deps.navigator.goTo(wp) },
-                                         { [deps] in deps.navigator.cancel() }))
+            return try await submit(makeRequest(.goToWaypoint, "go to: \(wp.name)", { [deps] in try await deps.navigator.goTo(wp) },
+                                                { [deps] in deps.navigator.cancel() }), remote: remote)
         case .checkRoute, .startPatrol, .whatChanged:
-            record("unsupported", call.toolName)
-            deps.speaker.say("I can't do that yet.")
+            return refuse("unsupported", call.toolName, "I can't do that yet.")
         }
     }
 
@@ -128,14 +148,13 @@ final class RobotCoordinator {
     /// Refusals (unknown place, not relocalized, map mismatch, outside the taught area) are spoken and return
     /// normally; the outcome is in `trace` and `status`. Throws only what a runner throws (or caller cancellation).
     func comeToMe(target: ComeToMeTarget) async throws {
-        try await comeToMe(target: target, traced: false)
+        _ = try await comeToMe(target: target, traced: false, remote: nil)
     }
 
-    private func comeToMe(target: ComeToMeTarget, traced: Bool) async throws {
+    private func comeToMe(target: ComeToMeTarget, traced: Bool, remote: UInt64?) async throws -> CoordinatorCallOutcome {
         if !traced { record("request", "come_to_me \(target)") }
         guard config.features.comeToPlaceEnabled else {
-            refuseComeToMe("disabled by feature flag", "Sorry, coming to a place is turned off in this build.")
-            return
+            return refuseComeToMe("disabled by feature flag", "Sorry, coming to a place is turned off in this build.")
         }
         let all = deps.taught.places()
         let targetPlace: TaughtPlace
@@ -143,40 +162,59 @@ final class RobotCoordinator {
         switch target {
         case .waypointId(let id):
             guard let p = all.first(where: { $0.id == id }) else {
-                refuseComeToMe("unknown waypoint id \(id)", "I don't know that place."); return
+                return refuseComeToMe("unknown waypoint id \(id)", "I don't know that place.")
             }
             targetPlace = p; goal = (p.x, p.z, p.name)
         case .waypointName(let name):
             let key = PlannerText.normalizeName(name)
             guard let p = all.first(where: { PlannerText.normalizeName($0.name) == key }) else {
-                refuseComeToMe("unknown waypoint \(name)", "I don't know a place called \(name)."); return
+                return refuseComeToMe("unknown waypoint \(name)", "I don't know a place called \(name).")
             }
             targetPlace = p; goal = (p.x, p.z, p.name)
         case .pose(let x, let z, let mapId):
             guard deps.frame.relocalized else {
-                refuseComeToMe("pose: saved map not relocalized", CoordinatorConfig.notRecognisedSpoken); return
+                return refuseComeToMe("pose: saved map not relocalized", CoordinatorConfig.notRecognisedSpoken)
             }
             guard deps.frame.activeMapId == mapId else {
-                refuseComeToMe("pose: map \(mapId) is not the active map", ComeToPlaceRunner.mapMismatchSpoken); return
+                return refuseComeToMe("pose: map \(mapId) is not the active map", ComeToPlaceRunner.mapMismatchSpoken)
             }
             guard let near = all.min(by: { ComeToPlacePlanner.dist($0, (x, z)) < ComeToPlacePlanner.dist($1, (x, z)) }),
                   ComeToPlacePlanner.dist(near, (x, z)) <= config.comeToMe.poseMaxFromPlaceM else {
-                refuseComeToMe("pose: outside the taught area", ComeToPlaceRunner.poseOutsideSpoken); return
+                return refuseComeToMe("pose: outside the taught area", ComeToPlaceRunner.poseOutsideSpoken)
             }
             targetPlace = near; goal = (x, z, ComeToPlaceRunner.userLabel)
         }
         guard targetPlace.inCurrentFrame || deps.frame.relocalized else {
-            refuseComeToMe("\(targetPlace.name): saved map not relocalized", CoordinatorConfig.notRecognisedSpoken); return
+            return refuseComeToMe("\(targetPlace.name): saved map not relocalized", CoordinatorConfig.notRecognisedSpoken)
         }
         let settings = config.comeToMe
-        try await submit(makeRequest(.comeToMe, "come to: \(goal.label)", { [deps] in
+        return try await submit(makeRequest(.comeToMe, "come to: \(goal.label)", { [deps] in
             try await ComeToPlaceRunner.run(targetId: targetPlace.id, goal: goal, deps: deps, settings: settings)
-        }, { [deps] in deps.legs.cancel() }))
+        }, { [deps] in deps.legs.cancel() }), remote: remote)
     }
 
-    private func refuseComeToMe(_ why: String, _ spoken: String) {
-        record("refused", "come_to_me: \(why)")
-        deps.speaker.say(spoken)
+    private func refuseComeToMe(_ why: String, _ spoken: String) -> CoordinatorCallOutcome {
+        refuse("refused", "come_to_me: \(why)", spoken)
+    }
+
+    /// Record (and speak) a refusal; the same "event: detail" is the call's failed outcome.
+    @discardableResult
+    private func refuse(_ event: String, _ detail: String, _ spoken: String?) -> CoordinatorCallOutcome {
+        record(event, detail)
+        if let spoken { deps.speaker.say(spoken) }
+        return .failed("\(event): \(detail)")
+    }
+
+    /// A remote call whose claim predates a stop (or whose caller was cancelled) must not act. Nil when current.
+    private func staleRemote(_ remote: UInt64?, _ what: String) -> CoordinatorCallOutcome? {
+        synchronized { staleRemoteLocked(remote, what) }
+    }
+
+    private func staleRemoteLocked(_ remote: UInt64?, _ what: String) -> CoordinatorCallOutcome? {
+        guard let remote else { return nil }
+        if Task.isCancelled { return refuse("cancelled", "\(what): remote command cancelled", nil) }
+        if _stopGeneration != remote { return refuse("stopped", "\(what): a stop came first", nil) }
+        return nil
     }
 
     /// Stop always wins. Synchronous. Safe with nothing running.
@@ -185,9 +223,11 @@ final class RobotCoordinator {
         deps.lease.revoke()
         deps.drive.stop()
         synchronized {
+            _stopGeneration &+= 1   // remote commands claimed before this stop can no longer dispatch
             let victim = active
             let hadPending = pending != nil
             pending = nil
+            if let victim { end(victim, .failed("stop: cancelled \(victim.label)")) }
             cancel(victim)
             record("stop", "cancelled \(victim?.label ?? "nothing")\(hadPending ? ", dropped pending" : "")")
             publish(.idle)
@@ -224,6 +264,7 @@ final class RobotCoordinator {
             active = nil
             pending = nil
             record("drain-timeout", "\(req.label) did not return within \(config.drainTimeoutS) s; released")
+            end(req, .failed("drain-timeout: \(req.label)"))
             if _status.state != .blocked && _status.state != .error { publish(.idle) }
             deps.speaker.say("I stopped, but the last task did not finish cleanly. I'm ready for a new request.")
             finishRequest(req, .success(()))
@@ -244,9 +285,13 @@ final class RobotCoordinator {
         synchronized { record("manual-end", tool) }
     }
 
-    private func refuseDisabled(_ what: String, _ spoken: String) {
-        record("refused", "\(what): disabled by feature flag")
-        deps.speaker.say(spoken)
+    private func refuseDisabled(_ what: String, _ spoken: String) -> CoordinatorCallOutcome {
+        refuse("refused", "\(what): disabled by feature flag", spoken)
+    }
+
+    /// The first terminal outcome wins (a stop's reason is kept over the runner's later late-return).
+    private func end(_ req: Request, _ outcome: CoordinatorCallOutcome) {
+        if req.outcome == nil { req.outcome = outcome }
     }
 
     /// Resolve the request's awaiting caller exactly once (runner returned, or drain timeout).
@@ -285,15 +330,16 @@ final class RobotCoordinator {
         }
     }
 
-    private func submit(_ req: Request) async throws {
+    private func submit(_ req: Request, remote: UInt64?) async throws -> CoordinatorCallOutcome {
         try await withTaskCancellationHandler {
-            let worker: Task<Void, Error>? = try synchronized {
+            let (worker, refused): (Task<Void, Error>?, CoordinatorCallOutcome?) = try synchronized {
                 try Task.checkCancellation()
+                if remote != nil { return admitRemote(req, remote) }
                 if deps.lease.manualHeld {
                     record("refused", "\(req.label): manual control is open")
                     deps.speaker.say("A manual control screen is open. Close it first, then ask me again.")
                 } else if active == nil {
-                    return start(req)
+                    return (start(req), nil)
                 } else if active?.cancelled == true {
                     record("refused", "\(req.label): previous task still stopping")
                     deps.speaker.say("I'm still stopping. Please try again once I've stopped.")
@@ -306,10 +352,11 @@ final class RobotCoordinator {
                     record("refused", "\(req.label): pending slot full")
                     deps.speaker.say("I'm busy and already have something waiting. Say stop first.")
                 }
-                return nil
+                return (nil, .busy(req.label))
             }
-            guard worker != nil else { return }
+            guard worker != nil else { return refused ?? .busy(req.label) }
             try await awaitCompletion(req)
+            return synchronized { req.outcome } ?? .failed("no-outcome: \(req.label) ended without a result")
         } onCancel: {
             self.synchronized {
                 if self.pending === req {
@@ -328,6 +375,20 @@ final class RobotCoordinator {
         }
     }
 
+    /// Remote motion: start now or refuse, in one transition with the lock held. Never takes the pending slot,
+    /// so nothing a remote caller asked for can start later behind a local task. Not spoken: the remote
+    /// caller reports it, and the robot may be busy talking to someone nearby.
+    private func admitRemote(_ req: Request, _ remote: UInt64?) -> (Task<Void, Error>?, CoordinatorCallOutcome?) {
+        if let stale = staleRemoteLocked(remote, req.label) { return (nil, stale) }
+        let why: String
+        if deps.lease.manualHeld { why = "manual control is open" }
+        else if let busy = active { why = busy.cancelled ? "previous task still stopping" : "busy with \(busy.label)" }
+        else if let waiting = pending { why = "busy, \(waiting.label) is waiting" }
+        else { return (start(req), nil) }
+        record("refused", "remote \(req.label): \(why)")
+        return (nil, .busy("\(req.label): \(why)"))
+    }
+
     /// Reserve and create the owned task in the same transition. Called with the lock held.
     private func start(_ req: Request) -> Task<Void, Error> {
         active = req
@@ -339,43 +400,41 @@ final class RobotCoordinator {
         return worker
     }
 
-    private func markWaypoint(_ name: String) {
-        synchronized { markWaypointLocked(name) }
+    private func markWaypoint(_ name: String, remote: UInt64?) -> CoordinatorCallOutcome {
+        synchronized { staleRemoteLocked(remote, "mark \(name)") ?? markWaypointLocked(name) }
     }
 
-    private func markWaypointLocked(_ name: String) {
+    private func markWaypointLocked(_ name: String) -> CoordinatorCallOutcome {
         let busy = active
         if let busy {
-            record("refused", "mark \(name): busy with \(busy.label)")
-            deps.speaker.say("I'm moving right now. Stop me first, then I can save this spot.")
-            return
+            return refuse("refused", "mark \(name): busy with \(busy.label)", "I'm moving right now. Stop me first, then I can save this spot.")
         }
         guard deps.pose.tracking() == .normal else {
-            record("refused", "mark \(name): tracking not normal")
-            deps.speaker.say("I can't save a spot until I know where I am. I need a rescan.")
-            return
+            return refuse("refused", "mark \(name): tracking not normal", "I can't save a spot until I know where I am. I need a rescan.")
         }
         do {
             let wp = try deps.waypoints.markHere(name: name)
             if deps.waypoints.isPersistent {
                 record("marked", wp.name)
                 deps.speaker.say("Saved this spot as \(wp.name).")
+                return .done("marked: \(wp.name)")
             } else {
                 record("marked-temporary", wp.name)
                 deps.speaker.say("Saved this spot as \(wp.name), but only until the app closes. Storage is not working, so it will not be remembered.")
+                return .done("marked-temporary: \(wp.name)")
             }
         } catch {
-            record("error", "mark \(name): \(error)")
-            deps.speaker.say("I couldn't save that spot.")
+            return refuse("error", "mark \(name): \(error)", "I couldn't save that spot.")
         }
     }
 
     private func runActive(_ req: Request) async throws {
         let canRun = synchronized { () -> Bool in
             guard active === req else { return false }
-            guard !req.cancelled, !Task.isCancelled else { active = nil; return false }
+            guard !req.cancelled, !Task.isCancelled else { active = nil; end(req, .failed("cancelled: \(req.label)")); return false }
             guard deps.pose.tracking() == .normal else {
                 req.cancelled = true
+                end(req, .failed("blocked: \(req.label): \(CoordinatorConfig.rescanReason)"))
                 pending = nil
                 publish(CoordinatorStatus(state: .blocked, task: CoordinatorConfig.rescanReason))
                 deps.speaker.say("I can't start, I need a rescan.")
@@ -384,6 +443,7 @@ final class RobotCoordinator {
             }
             guard let token = deps.lease.grant() else {
                 pending = nil
+                end(req, .failed("refused: \(req.label): manual control is open"))
                 record("refused", "\(req.label): manual control is open")
                 deps.speaker.say("A manual control screen is open. Close it first, then ask me again.")
                 active = nil
@@ -392,7 +452,7 @@ final class RobotCoordinator {
             req.token = token
             publish(CoordinatorStatus(state: state(for: req.kind), task: req.label))
             // A re-entrant status callback can STOP before the runner has even been called.
-            guard !req.cancelled, !Task.isCancelled else { active = nil; return false }
+            guard !req.cancelled, !Task.isCancelled else { active = nil; end(req, .failed("cancelled: \(req.label)")); return false }
             record("start", req.label)
             req.started = true
             req.monitor = Task { [weak self] in await self?.watchTracking(req) }
@@ -412,6 +472,7 @@ final class RobotCoordinator {
             if req.cancelled {
                 active = nil
                 record("late-return", req.label)
+                end(req, .failed("cancelled: \(req.label)"))
                 return nil
             }
             // No successor can start while the old task or its final STOP is unwinding.
@@ -420,23 +481,28 @@ final class RobotCoordinator {
             switch outcome {
             case .success(.completed(let summary)):
                 record("done", "\(req.label)\(summary.map { ": \($0)" } ?? "")")
+                end(req, .done("done: \(req.label)\(summary.map { ": \($0)" } ?? "")"))
                 publish(.idle)
             case .success(.refused(let spoken)):
                 record("refused", "\(req.label): \(spoken)")
+                end(req, .failed("refused: \(req.label): \(spoken)"))
                 publish(.idle)
                 deps.speaker.say(spoken)
             case .success(.cancelled):
                 pending = nil
                 record("cancelled", req.label)
+                end(req, .failed("cancelled: \(req.label)"))
                 publish(.idle)
             case .success(.blocked(let reason)):
                 pending = nil
                 record("blocked", "\(req.label): \(reason)")
+                end(req, .failed("blocked: \(req.label): \(reason)"))
                 publish(CoordinatorStatus(state: .blocked, task: reason))
                 deps.speaker.say("I'm stuck: \(reason).")
             case .failure(let error):
                 pending = nil
                 record("error", "\(req.label): \(error)")
+                end(req, .failed("error: \(req.label): \(error)"))
                 publish(CoordinatorStatus(state: .error, task: "\(req.label) failed"))
                 deps.speaker.say("Something went wrong with \(req.label).")
                 thrown = error
@@ -477,6 +543,7 @@ final class RobotCoordinator {
             pending = nil
             cancel(req)
             record("tracking-lost", "cancelled \(req.label)")
+            end(req, .failed("tracking-lost: \(req.label): \(CoordinatorConfig.rescanReason)"))
             publish(CoordinatorStatus(state: .blocked, task: CoordinatorConfig.rescanReason))
             deps.speaker.say("I lost track of where I am. I need a rescan.")
         }

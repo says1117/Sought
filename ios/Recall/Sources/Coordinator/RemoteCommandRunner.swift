@@ -8,11 +8,13 @@ import SyncCore
 
 /// Runs a remote command's text the way the find bar does: offline keyword STOP first, then the planner
 /// (primary raced against a timeout, keyword grammar on any failure), then each tool call through the
-/// coordinator. The result is read from the coordinator's trace entries for this command.
+/// coordinator's remote entry point, which reports a structured outcome. `done` only on a real success.
 ///
-/// Remote commands never queue motion: if a task is running or pending, a manual tool is open, or another
-/// remote command is still being handled, the command is refused with `CommandPoller.busy`. A stop is
-/// obeyed at any time and goes straight to `stopAll()`.
+/// Remote commands never queue motion: if a task is running or pending, a manual tool is open, the robot is
+/// still stopping, or another remote command is still being handled, the command is refused with
+/// `CommandPoller.busy`. The coordinator re-checks that atomically at admission. A stop is obeyed at any time
+/// and goes straight to `stopAll()`, which also invalidates every remote command claimed before it (one still
+/// planning cannot start afterwards).
 final class RemoteCommandRunner: CommandRunning {
     private let planner: Planner
     private let fallback: Planner
@@ -22,18 +24,24 @@ final class RemoteCommandRunner: CommandRunning {
     private let lock = NSLock()
     private var handling = false
 
-    /// Trace events that end a remote command as failed (see RobotCoordinator `record` calls).
-    static let failureEvents: Set<String> = ["refused", "rejected", "unsupported", "blocked", "error", "cancelled",
-                                             "late-return", "drain-timeout", "stop"]
-
     init(planner: Planner, fallback: Planner = KeywordPlanner(), coordinator: RobotCoordinator,
          plannerTimeout: TimeInterval = 3, context: @escaping () -> PlannerContext = { PlannerContext() }) {
         self.planner = planner; self.fallback = fallback; self.coordinator = coordinator
         self.plannerTimeout = plannerTimeout; self.context = context
     }
 
+    func stopEpoch() -> UInt64 { coordinator.stopGeneration }
+
+    /// A command that arrived just now (find-bar style callers, tests): its epoch is read before anything else.
     func run(_ text: String) async -> CommandOutcome {
+        await run(text, claimedAt: coordinator.stopGeneration)
+    }
+
+    /// `generation` was read before the command was claimed: any stop since then (during the claim, the context
+    /// lookup, planning, or between calls) refuses every call this command would dispatch.
+    func run(_ text: String, claimedAt generation: UInt64) async -> CommandOutcome {
         if (try? KeywordPlanner.parse(text, context: context()))?.contains(.stop) == true { return stop() }
+        guard coordinator.stopGeneration == generation else { return .failed(CommandPoller.stopped) }
         guard claim() else { return .failed(CommandPoller.busy) }
         defer { release() }
 
@@ -42,26 +50,18 @@ final class RemoteCommandRunner: CommandRunning {
             return .failed("I did not understand that. Try: find my keys, go to the kitchen, or stop.")
         }
         if calls.contains(.stop) { return stop() }
-        // Re-check after planning: a local request may have started meanwhile. Never queue behind it.
-        if coordinator.isBusy || coordinator.hasPending || coordinator.manualControlOpen { return .failed(CommandPoller.busy) }
 
         var results: [String] = []
         for call in calls {
-            let mark = coordinator.trace.count
-            do { try await coordinator.execute(call) } catch {
+            let outcome: CoordinatorCallOutcome
+            do { outcome = try await coordinator.executeRemote(call, generation: generation) } catch {
                 return .failed("Could not do \(call.toolName): \(error)")
             }
-            let entries = coordinator.trace.dropFirst(mark).filter { $0.event != "request" && $0.event != "start" }
-            if let bad = entries.first(where: { Self.failureEvents.contains($0.event) }) {
-                return .failed("\(bad.event): \(bad.detail)")
+            switch outcome {
+            case .done(let text): results.append(text)
+            case .busy: return .failed(CommandPoller.busy)
+            case .failed(let why): return .failed(why)
             }
-            if case .say(let spoken) = call { results.append(spoken); continue }
-            if let queued = entries.first(where: { $0.event == "queued" }) {
-                // Only reachable if a local task slipped in between the busy check and execute.
-                results.append("queued: \(queued.detail)")
-                continue
-            }
-            results.append(entries.last.map { "\($0.event): \($0.detail)" } ?? call.toolName)
         }
         return .done(results.joined(separator: "; "))
     }

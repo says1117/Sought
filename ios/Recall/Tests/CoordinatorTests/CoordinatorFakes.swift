@@ -84,7 +84,9 @@ final class CoordTestWaypoints: CoordinatorWaypoints {
     var marked: [String] = []
     var markError: Error?
     var isPersistent = true
-    func lookup(_ name: String) -> CoordinatorWaypoint? { known[name.lowercased()] }
+    /// Runs inside `lookup`, before the coordinator admits the request (interleaving tests).
+    var onLookup: ((String) -> Void)?
+    func lookup(_ name: String) -> CoordinatorWaypoint? { onLookup?(name); return known[name.lowercased()] }
     func markHere(name: String) throws -> CoordinatorWaypoint {
         if let markError { throw markError }
         marked.append(name)
