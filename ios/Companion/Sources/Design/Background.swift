@@ -1,11 +1,11 @@
 import SwiftUI
 
 // App background. One system, four ideas (Isaac picked A + B + C + D, E as an alternative renderer):
-//   A  blueprint grid + fine grain, a nod to the robot's 5 cm floor map
+//   A  blueprint grid on the Map tab only (Isaac: too busy on Home) + fine grain everywhere
 //   B  color pools drift on slow 20-30 s loops
 //   C  the robot's state tints the scene: calm when resting, cyan when busy, a hint of amber when stuck
 //   D  each tab has its own color mix and crossfades when you switch
-//   E  `-bgMesh YES`: the same moods drawn with a MeshGradient (iOS 18+) instead of blurred pools
+//   E  default: the same moods drawn with a MeshGradient (iOS 18+); `-bgMesh NO` uses the blurred pools
 // Every color stays light enough that the text tokens keep their contrast. Reduce Motion stops the drift,
 // Reduce Transparency and High contrast fall back to the flat background.
 
@@ -66,7 +66,7 @@ struct SoughtBackground: View {
     @Environment(\.backgroundMood) private var mood
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @AppStorage("bgMesh") private var useMesh = false
+    @AppStorage("bgMesh") private var useMesh = true
 
     var body: some View {
         Group {
@@ -79,7 +79,8 @@ struct SoughtBackground: View {
                     } else {
                         PoolBackground(mood: mood, animate: !reduceMotion)
                     }
-                    BlueprintTexture(color: p.text)
+                    // Grid only where it means something (the map); grain everywhere to stop gradient banding.
+                    BlueprintTexture(color: p.text, grid: mood.tab == .map)
                 }
                 .animation(.easeInOut(duration: 0.9), value: mood)
             }
@@ -94,6 +95,7 @@ struct SoughtBackground: View {
 
 struct BlueprintTexture: View {
     var color: Color
+    var grid = true
 
     var body: some View {
         Canvas { ctx, size in
@@ -111,8 +113,10 @@ struct BlueprintTexture: View {
                 if y.truncatingRemainder(dividingBy: major) == 0 { majorPath.addLines(line) } else { minorPath.addLines(line) }
                 y += minor
             }
-            ctx.stroke(minorPath, with: .color(color.opacity(0.035)), lineWidth: 0.5)
-            ctx.stroke(majorPath, with: .color(color.opacity(0.06)), lineWidth: 0.75)
+            if grid {
+                ctx.stroke(minorPath, with: .color(color.opacity(0.035)), lineWidth: 0.5)
+                ctx.stroke(majorPath, with: .color(color.opacity(0.06)), lineWidth: 0.75)
+            }
             // Grain: a fixed seed so it never shimmers between frames.
             var rng = SeededRandom(seed: 7)
             let count = Int(size.width * size.height / 90)

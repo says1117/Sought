@@ -47,6 +47,7 @@ struct TrackedObject: Identifiable, Equatable {
     var firstSeen: Date
     var lastSeen: Date
     var sightings: Int
+    var persistence: Double? = nil   // 0...1 from the contract: how reliably it is seen in this spot
     var history: [HistoryPoint]
     // App side, derived or user set
     var whereText: String        // "By the front door"; from the nearest waypoint when real
@@ -135,4 +136,16 @@ struct FindProgress: Equatable {
     var query: String
     var phase: FindPhase
     var match: TrackedObject?
+}
+
+extension TrackedObject {
+    /// Plain words for persistence. Nil persistence (not reported) says nothing about certainty.
+    var certaintyWord: String {
+        guard let p = persistence else { return "Seen here" }
+        switch p {
+        case 0.7...: return "Usually here"
+        case 0.4..<0.7: return "Seen here a few times"
+        default: return "Recently moved"
+        }
+    }
 }

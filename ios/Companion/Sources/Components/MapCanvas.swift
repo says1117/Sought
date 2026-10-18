@@ -4,6 +4,13 @@ import SwiftUI
 // Draws the occupancy grid when the robot sends one, otherwise the room outlines (SAMPLE). Then the dotted trail,
 // waypoints, optional object pins and the robot with its signal glow.
 
+struct MapLayers: Equatable {
+    var items = true
+    var trail = true
+    var spots = true
+    var fadeByCertainty = true
+}
+
 struct MapCanvas: View {
     let map: MapSnapshot
     let robot: Pose2D?
@@ -14,6 +21,13 @@ struct MapCanvas: View {
     var onPin: ((TrackedObject) -> Void)? = nil
     /// Widget mode: fill the width and keep this point vertically centered (clamped to the map).
     var fillWidth = false
+    var layers = MapLayers()
+    /// Room in focus: other rooms dim. Nil means all rooms.
+    var focusRoom: String? = nil
+    /// Item counts drawn under room names (Map tab).
+    var roomCounts: [String: Int] = [:]
+    /// Counter-scale for markers when the whole canvas is zoomed with scaleEffect, so pins stay the same size.
+    var markerScale: CGFloat = 1
     @Environment(\.palette) private var p
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pulse = false
@@ -24,35 +38,50 @@ struct MapCanvas: View {
             ZStack(alignment: .topLeading) {
                 Canvas { ctx, _ in
                     if let g = map.grid { drawGrid(g, tf, &ctx) } else { drawRooms(tf, &ctx) }
-                    drawTrail(tf, &ctx)
-                    for w in map.waypoints {
-                        let pt = tf.point(w.x, w.z)
-                        ctx.fill(Path(ellipseIn: CGRect(x: pt.x - 3.5, y: pt.y - 3.5, width: 7, height: 7)), with: .color(p.surface))
-                        ctx.stroke(Path(ellipseIn: CGRect(x: pt.x - 3.5, y: pt.y - 3.5, width: 7, height: 7)),
-                                   with: .color(p.mapPath.opacity(0.4)), lineWidth: 2)
+                    if layers.trail { drawTrail(tf, &ctx) }
+                    if layers.spots {
+                        for w in map.waypoints {
+                            let pt = tf.point(w.x, w.z)
+                            let r = 3.5 * markerScale
+                            let c = CGRect(x: pt.x - r, y: pt.y - r, width: r * 2, height: r * 2)
+                            ctx.fill(Path(ellipseIn: c), with: .color(p.surface))
+                            ctx.stroke(Path(ellipseIn: c), with: .color(p.mapPath.opacity(0.5)), lineWidth: 2 * markerScale)
+                        }
                     }
                 }
                 if showLabels && map.grid == nil {
                     ForEach(map.rooms) { r in
-                        Text(r.name.uppercased()).font(SoughtFont.findIt).tracking(0.8).foregroundStyle(p.text.opacity(0.8))
-                            .position(tf.point((r.minX + r.maxX) / 2, r.maxZ - 0.3))
-                            .accessibilityHidden(true)
+                        VStack(spacing: 0) {
+                            Text(r.name.uppercased()).font(SoughtFont.findIt).tracking(0.8)
+                            if let n = roomCounts[r.name] { Text("\(n) \(n == 1 ? "item" : "items")").font(SoughtFont.cardMeta) }
+                        }
+                        .foregroundStyle(p.text.opacity(focusRoom == nil || focusRoom == r.name ? 0.85 : 0.35))
+                        .scaleEffect(markerScale)
+                        .position(tf.point((r.minX + r.maxX) / 2, r.maxZ - 0.35))
+                        .accessibilityHidden(true)
                     }
                 }
-                ForEach(pins) { o in
-                    let pt = tf.point(o.x, o.z)
-                    Button { onPin?(o) } label: {
-                        PhotoView(photo: o.photo)
-                            .frame(width: 28, height: 28)
-                            .clipShape(Circle())
-                            .overlay(Circle().stroke(highlight == o.id ? p.found : p.surface, lineWidth: 2.5))
-                            .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
-                            .frame(width: 44, height: 44)
+                if layers.items {
+                    ForEach(pins) { o in
+                        let pt = tf.point(o.x, o.z)
+                        let sel = highlight == o.id
+                        let certain = layers.fadeByCertainty ? (0.45 + 0.55 * (o.persistence ?? 1)) : 1
+                        Button { onPin?(o) } label: {
+                            PhotoView(photo: o.photo)
+                                .frame(width: sel ? 38 : 28, height: sel ? 38 : 28)
+                                .clipShape(Circle())
+                                .overlay(Circle().stroke(sel ? p.found : p.surface, lineWidth: sel ? 3 : 2.5))
+                                .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
+                                .opacity(sel ? 1 : certain)
+                                .frame(width: 44, height: 44)
+                        }
+                        .buttonStyle(.plain)
+                        .scaleEffect(markerScale)
+                        .position(pt)
+                        .zIndex(sel ? 2 : 1)
+                        .accessibilityLabel("\(o.label), \(o.whereText.lowercased()). \(o.certaintyWord).")
+                        .accessibilityHint("Double tap for a summary.")
                     }
-                    .buttonStyle(.plain)
-                    .position(pt)
-                    .accessibilityLabel("\(o.label), \(o.whereText.lowercased())")
-                    .accessibilityHint("Double tap for details.")
                 }
                 if let r = robot {
                     let pt = tf.point(r.x, r.z)
@@ -64,10 +93,15 @@ struct MapCanvas: View {
                                 .scaleEffect(pulse ? 1.15 : 0.9)
                             Circle().stroke(p.signal.opacity(0.45), lineWidth: 1.5).frame(width: 34, height: 34)
                         }
+                        // Heading wedge. Contract yaw: 0 points to -z (up on screen), counter-clockwise positive.
+                        Triangle().fill(p.mapPath).frame(width: 10, height: 8).offset(y: -13)
+                            .rotationEffect(.degrees(-r.yawDeg))
                         Circle().fill(p.mapPath).frame(width: 14, height: 14)
                             .overlay(Circle().stroke(.white, lineWidth: 2.5))
                     }
+                    .scaleEffect(markerScale)
                     .position(pt)
+                    .zIndex(3)
                     .accessibilityElement()
                     .accessibilityLabel("Soughtbot")
                     .animation(reduceMotion ? nil : .easeInOut(duration: 1.6), value: r)
@@ -83,8 +117,9 @@ struct MapCanvas: View {
         ctx.fill(Path(roundedRect: outer, cornerRadius: 6), with: .color(p.surface))
         for r in map.rooms {
             let rect = tf.rect(r.minX, r.minZ, r.maxX, r.maxZ).insetBy(dx: 3, dy: 3)
-            ctx.fill(Path(roundedRect: rect, cornerRadius: 3), with: .color(p.mapRoom.opacity(0.6)))
-            ctx.stroke(Path(roundedRect: rect, cornerRadius: 3), with: .color(p.mapWall), lineWidth: 2.5)
+            let on = focusRoom == nil || focusRoom == r.name
+            ctx.fill(Path(roundedRect: rect, cornerRadius: 3), with: .color(on && focusRoom != nil ? p.signal.opacity(0.08) : p.mapRoom.opacity(on ? 0.6 : 0.3)))
+            ctx.stroke(Path(roundedRect: rect, cornerRadius: 3), with: .color(p.mapWall.opacity(on ? 1 : 0.45)), lineWidth: 2.5 * markerScale)
         }
     }
 
@@ -140,5 +175,14 @@ struct MapCanvas: View {
             let a = point(x0, z0), b = point(x1, z1)
             return CGRect(x: a.x, y: a.y, width: b.x - a.x, height: b.y - a.y)
         }
+    }
+}
+
+struct Triangle: Shape {
+    func path(in r: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: r.midX, y: r.minY)); p.addLine(to: CGPoint(x: r.maxX, y: r.maxY)); p.addLine(to: CGPoint(x: r.minX, y: r.maxY))
+        p.closeSubpath()
+        return p
     }
 }

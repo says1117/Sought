@@ -66,6 +66,7 @@ struct RootView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(SoughtBackground())
             .safeAreaInset(edge: .bottom, spacing: 0) { SoughtTabBar(selection: $router.tab) }
+            .overlay(alignment: .top) { StatusBarScrim() }
         .environment(\.palette, palette)
         .environment(\.backgroundMood, mood)
         .preferredColorScheme(settings.highContrast ? .dark : .light)
@@ -90,5 +91,22 @@ struct RootView: View {
             UIAccessibility.post(notification: .announcement, argument: StatusCopy.spoken(robot.status, now: robot.now))
         default: break
         }
+    }
+}
+
+/// Frosted strip behind the clock and battery so content scrolled under the status bar never fights them.
+struct StatusBarScrim: View {
+    @Environment(\.palette) private var p
+    var body: some View {
+        GeometryReader { g in
+            Rectangle().fill(.ultraThinMaterial)
+                .overlay(p.isHighContrast ? p.background : Color(hex: 0xDFEEF1, alpha: 0.65))
+                .mask(LinearGradient(stops: [.init(color: .black, location: 0.7), .init(color: .clear, location: 1)],
+                                     startPoint: .top, endPoint: .bottom))
+                .frame(height: g.safeAreaInsets.top + 14)
+                .ignoresSafeArea(edges: .top)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 }

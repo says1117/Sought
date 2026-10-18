@@ -31,7 +31,8 @@ final class MockRobotSource: RobotSource {
             var history = [HistoryPoint(t: ago(minAgo), x: x, z: z)]
             if let m = movedFrom { history.insert(HistoryPoint(t: ago(m.2), x: m.0, z: m.1), at: 0) }
             return TrackedObject(id: id, label: label, description: nil, x: x, z: z, firstSeen: ago(max(minAgo, movedFrom?.2 ?? 0) + 30),
-                                 lastSeen: ago(minAgo), sightings: 3 + sought, history: history, whereText: whereText, room: room,
+                                 lastSeen: ago(minAgo), sightings: 3 + sought,
+                                 persistence: movedFrom != nil ? 0.3 : essential ? 0.9 : min(0.95, 0.55 + 0.08 * Double(sought)), history: history, whereText: whereText, room: room,
                                  photo: .asset("photo_\(photo)"), isEssential: essential, timesSought: sought)
         }
         objects = [
