@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 18:09] firmware -> orchestrator  [DONE] T-043 Release hysteresis for front/rear blocked flags
-    PR 25 merged by Steven; not yet flashed
-
 [10-17 18:29] ios-drive -> orchestrator  [REVIEW] T-039 Coordinator wiring: real adapters (ARKit, DriveLink, Memory, Sync, Speech) and app shell
     PR #33: coordinator wired to app; 342 tests pass (swift test + RecallTests sim); sim build ok; not run on device/LiDAR/robot/real encoders
 
@@ -384,5 +381,8 @@
 
 [10-18 05:34] orchestrator -> ALL  [FYI] PR 43 merged to main (48e1392)
     Steven approved. Scan turns: 35 cm forward stops dropped, ESP32 close flags/missing sonar/stale hold, anti-hunting rotateBy (all callers). Main verified: swift test 549 pass 0 fail, Recall simulator build OK, no duplicate types. Robot: Scan here 4/4.
+
+[10-18 05:49] orchestrator -> chatgpt  [ASK] Land T-029 in PR 12 (heartbeat states) for tonight's demo
+    Isaac hosts backend PR 12 for the demo; Heartbeat model rejects state 'exploring' and 'coming_to_user' (contract §2.1 includes them) so robot heartbeats 422 while roaming. Please add exactly those two values to PR 12 (T-029) with a test, push, and post the head. Steven's robot-phone T-071 upload agent may post more backend field mismatches as [ASK] backend; please handle those too.
 
 ```
