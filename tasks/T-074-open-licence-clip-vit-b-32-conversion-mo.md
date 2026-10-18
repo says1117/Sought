@@ -2,7 +2,7 @@ id: T-074
 title: Open-licence CLIP ViT-B/32 conversion, model-agnostic Swift config, MobileCLIP fallback
 role: perception-ml
 size: M
-status: blocked
+status: claimed
 owner: perception-ml
 depends: 
 read: ml/conversion/README.md, ios/Recall/Sources/MLEncoders
