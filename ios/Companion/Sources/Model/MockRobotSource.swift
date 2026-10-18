@@ -1,0 +1,226 @@
+import Foundation
+import SwiftUI
+import UIKit
+
+// SAMPLE DATA. Objects, photos and times come from the Figma Item Log so the app matches the design.
+// A fake heartbeat ticks every 2 s and walks the robot through the rooms so the status line and map are visibly alive.
+// isSample is always true here, which shows the SAMPLE DATA banner on every screen.
+
+@MainActor
+final class MockRobotSource: RobotSource {
+    override var isSample: Bool { true }
+    override var sourceName: String { "Sample data (no robot)" }
+    override var canComeToMe: Bool { true }
+
+    private var heartbeat: Timer?
+    private var findTask: Task<Void, Never>?
+    private var comeTask: Task<Void, Never>?
+    private var routeIndex = 0
+    private var routeT = 0.0
+    private var battery = 0.82
+    private var stateClock = 0
+
+    // A loop through the sample flat, in world meters (x right, z down on screen).
+    private let route: [(Double, Double)] = [(-3.0, -1.0), (-1.0, -2.6), (0.6, -1.4), (2.4, -2.8), (3.6, -1.2), (3.8, 1.0), (1.8, 1.2), (-0.4, 0.2)]
+
+    /// `seedOnly`: build the sample catalog and floor plan without the fake robot (used by the backend source).
+    init(seedOnly: Bool = false) {
+        super.init()
+        let now = Date()
+        func ago(_ m: Double) -> Date { now.addingTimeInterval(-m * 60) }
+        func obj(_ id: String, _ label: String, _ photo: String, _ whereText: String, _ room: String, _ x: Double, _ z: Double,
+                 _ minAgo: Double, essential: Bool = false, sought: Int = 0, movedFrom: (Double, Double, Double)? = nil,
+                 firstSeenMin: Double = 26 * 60) -> TrackedObject {
+            var history = [HistoryPoint(t: ago(minAgo), x: x, z: z)]
+            if let m = movedFrom { history.insert(HistoryPoint(t: ago(m.2), x: m.0, z: m.1), at: 0) }
+            return TrackedObject(id: id, label: label, description: nil, x: x, z: z, firstSeen: ago(max(firstSeenMin, minAgo, movedFrom?.2 ?? 0)),
+                                 lastSeen: ago(minAgo), sightings: 3 + sought,
+                                 persistence: movedFrom != nil ? 0.3 : essential ? 0.9 : min(0.95, 0.55 + 0.08 * Double(sought)), history: history, whereText: whereText, room: room,
+                                 photo: .asset("photo_\(photo)"), isEssential: essential, timesSought: sought)
+        }
+        objects = [
+            // The sandals' last move is 2 hours old, matching "Slippers moved to front door · 2 hours ago" on Home.
+            { var o = obj("obj_sample0001", "Brown Sandals", "sandals", "By the front door", "Hallway", 4.2, 1.4, 12, sought: 4,
+                          movedFrom: (-2.0, -0.5, 150)); o.history[1].t = Date().addingTimeInterval(-120 * 60)
+              o.description = "brown leather slippers"; return o }(),
+            obj("obj_sample0002", "White Chair", "chair", "In the kitchen", "Kitchen", 2.2, -1.6, 15),
+            obj("obj_sample0003", "Laundry Basket", "laundry", "In the living room", "Living Room", -3.2, -3.0, 20),
+            obj("obj_sample0004", "Metal Water Bottle", "bottle", "Under the table", "Kitchen", 2.0, -0.9, 13, essential: true,
+                movedFrom: (-1.5, -2.2, 95)),
+            obj("obj_sample0005", "Router", "router", "By the sofa", "Living Room", -2.6, -3.4, 16, essential: true),
+            obj("obj_sample0006", "Trash Can", "trash", "In the kitchen", "Kitchen", 4.4, -3.4, 19, essential: true),
+            obj("obj_sample0007", "Red Umbrella", "umbrella", "In the living room", "Living Room", -0.6, -0.6, 15, sought: 5),
+            obj("obj_sample0008", "Fridge", "fridge", "In the kitchen", "Kitchen", 4.5, -2.4, 18, sought: 3),
+            obj("obj_sample0009", "Fan", "fan", "In the kitchen", "Kitchen", 1.5, -3.5, 41, sought: 2),
+            obj("obj_sample0010", "Sofa", "sofa", "In the living room", "Living Room", -2.0, -3.5, 17),
+            obj("obj_sample0011", "Lamp", "lamp", "In the living room", "Living Room", -3.6, -1.8, 21, firstSeenMin: 62),
+            obj("obj_sample0012", "Coffee Table", "coffeetable", "In the living room", "Living Room", -1.8, -2.0, 31),
+        ]
+        map = MapSnapshot(
+            rooms: [Room(name: "Living Room", minX: -4, minZ: -4, maxX: 1, maxZ: 0.6),
+                    Room(name: "Kitchen", minX: 1, minZ: -4, maxX: 5, maxZ: -0.2),
+                    Room(name: "Hallway", minX: 1, minZ: -0.2, maxX: 5, maxZ: 2),
+                    Room(name: "Bedroom", minX: -4, minZ: 0.6, maxX: 1, maxZ: 2)],
+            waypoints: [Waypoint(id: "wpt_sample_door", name: "front door", x: 4.4, z: 1.5),
+                        Waypoint(id: "wpt_sample_sofa", name: "sofa", x: -2.2, z: -3.0),
+                        Waypoint(id: "wpt_sample_table", name: "kitchen table", x: 2.1, z: -1.0),
+                        Waypoint(id: "wpt_sample_kitchen", name: "kitchen", x: 3.2, z: -2.2)],
+            grid: nil, trail: [], updatedAt: now)
+        liveFrame = UIImage(named: "photo_liveview")   // SAMPLE frame from the Figma
+        findLog = [FindRecord(query: "car keys", objectId: nil, found: false, at: ago(26 * 60)),
+                   FindRecord(query: "red umbrella", objectId: "obj_sample0007", found: true, at: ago(25))]
+        robotLog = [RobotLogEntry(text: "Soughtbot got stuck by the sofa", at: ago(40))]
+        // `-mockUnnamed YES`: two sightings arrive the way the robot sends them today (no label, no photo).
+        if UserDefaults.standard.bool(forKey: "mockUnnamed") {
+            for id in ["obj_sample0001", "obj_sample0011"] where localNames[id] == nil {
+                if let i = objects.firstIndex(where: { $0.id == id }) {
+                    objects[i].label = "Unnamed item"; objects[i].needsName = true; objects[i].photo = .none
+                    objects[i].description = nil
+                    objects[i].whereText = id == "obj_sample0001" ? "Near the front door" : "Near the sofa"
+                    objects[i].firstSeen = Date().addingTimeInterval(-3 * 60)
+                }
+            }
+        }
+        for (id, n) in localNames { if let i = objects.firstIndex(where: { $0.id == id }) { objects[i].label = n; objects[i].needsName = false } }
+        // Screenshot hook: `-seedPins YES` shows two example pins (kept in memory, never saved).
+        if UserDefaults.standard.bool(forKey: "seedPins") {
+            pins = [UserPin(id: "pin_sample_remote", label: "TV remote", note: "Under the blue cushion", x: -2.0, z: -2.6,
+                            place: "On the sofa", room: "Living Room", createdAt: ago(2 * 24 * 60), photo: nil),
+                    UserPin(id: "pin_sample_keys", label: "Spare keys", note: nil, x: 4.1, z: 1.2,
+                            place: "By the front door", room: "Hallway", createdAt: ago(5 * 60), photo: nil)]
+        }
+        status = RobotStatus(state: .exploring, task: nil, battery: battery, pose: Pose2D(x: route[0].0, z: route[0].1, yawDeg: 0),
+                             lastHeartbeat: now)
+    }
+
+    override func stop() {
+        super.stop()
+        heartbeat?.invalidate(); findTask?.cancel(); comeTask?.cancel()
+    }
+
+    override func start() {
+        guard heartbeat == nil else { return }
+        // Mimic the first fetch so the loading placeholders are visible. `-mockLoadDelay 5` holds them longer.
+        let delay = UserDefaults.standard.object(forKey: "mockLoadDelay") != nil ? UserDefaults.standard.double(forKey: "mockLoadDelay") : 0.9
+        isLoading = delay > 0
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            withAnimation(Motion.spring) { self.isLoading = false }
+        }
+        heartbeat = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.tick() }
+        }
+    }
+
+    private func tick() {
+        stateClock += 1
+        battery = max(0.15, battery - 0.0005)
+        var s = status
+        s.lastHeartbeat = Date()
+        s.battery = battery
+        // Only wander when no find or come-to-me owns the robot.
+        if find == nil || find.map({ if case .driving = $0.phase { return false }; return true }) == true,
+           s.state == .exploring || s.state == .idle {
+            s.state = (stateClock % 20) < 15 ? .exploring : .idle
+            if s.state == .exploring { advance(&s) }
+        }
+        // Screenshot hook: `-mockState blocked` pins the sample robot to one state.
+        if let forced = UserDefaults.standard.string(forKey: "mockState"), let st = RobotState(rawValue: forced) { s.state = st }
+        status = s
+    }
+
+    private func advance(_ s: inout RobotStatus) {
+        routeT += 0.25
+        if routeT >= 1 { routeT = 0; routeIndex = (routeIndex + 1) % route.count }
+        let a = route[routeIndex], b = route[(routeIndex + 1) % route.count]
+        let p = Pose2D(x: a.0 + (b.0 - a.0) * routeT, z: a.1 + (b.1 - a.1) * routeT,
+                       yawDeg: atan2(-(b.0 - a.0), -(b.1 - a.1)) * 180 / .pi)
+        s.pose = p
+        if var m = map {
+            m.trail.append(p)
+            if m.trail.count > 14 { m.trail.removeFirst(m.trail.count - 14) }
+            map = m
+        }
+    }
+
+    // MARK: Find (mock walk through the states)
+
+    override func startFind(_ query: String, match: TrackedObject?) {
+        findTask?.cancel()
+        let id = "cmd_sample\(Int.random(in: 100_000...999_999))"
+        find = FindProgress(id: id, query: query, phase: .searching, match: match)
+        status.state = .finding
+        status.task = "find: \(match?.label.lowercased() ?? query)"
+        findTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            guard let self, !Task.isCancelled else { return }
+            guard let match else {
+                self.find?.phase = .notFound; self.status.state = .idle; self.status.task = nil; return
+            }
+            if let i = self.objects.firstIndex(where: { $0.id == match.id }) { self.objects[i].timesSought += 1 }
+            var d = 3.4
+            while d > 1.0 {
+                self.find?.phase = .driving(distanceM: d)
+                self.status.pose = Pose2D(x: match.x + d * 0.6, z: match.z + d * 0.8, yawDeg: 0)
+                try? await Task.sleep(nanoseconds: 700_000_000)
+                if Task.isCancelled { return }
+                d = max(1.0, ((d - 0.3) * 10).rounded() / 10)   // 0.3 m per step, stops 1 m short
+            }
+            self.find?.phase = .arrived
+            self.status.state = .idle
+            self.status.task = nil
+        }
+    }
+
+    override func cancelFind() {
+        findTask?.cancel()
+        super.cancelFind()
+        status.state = .idle
+        status.task = nil
+    }
+
+    /// Drives the sample robot toward the spot and stops about 1 m short, as the plan describes.
+    override func comeToMe(to target: ComeTarget) {
+        comeTask?.cancel()
+        status.state = .comingToUser
+        status.task = "come to me: \(target.name)"
+        come = ComeProgress(target: target, phase: .going(distanceM: nil))
+        comeTask = Task { [weak self] in
+            guard let self else { return }
+            var p = self.status.pose ?? Pose2D(x: 0, z: 0, yawDeg: 0)
+            try? await Task.sleep(nanoseconds: 800_000_000)
+            while !Task.isCancelled {
+                let dx = target.x - p.x, dz = target.z - p.z
+                let d = hypot(dx, dz)
+                self.come?.phase = .going(distanceM: (max(0, d - 1) * 10).rounded() / 10)
+                if d <= 1.05 { break }
+                let step = min(0.35, d - 1)
+                p = Pose2D(x: p.x + dx / d * step, z: p.z + dz / d * step, yawDeg: atan2(-dx, -dz) * 180 / .pi)
+                self.status.pose = p
+                try? await Task.sleep(nanoseconds: 600_000_000)
+            }
+            guard !Task.isCancelled else { return }
+            self.come?.phase = .arrived
+            self.status.state = .idle
+            self.status.task = nil
+        }
+    }
+
+    override func cancelComeToMe() {
+        comeTask?.cancel()
+        super.cancelComeToMe()
+        status.state = .idle
+        status.task = nil
+    }
+
+    /// Walks a command through queued, running, done on sample data. Find and Come to me keep their own walks above.
+    override func sendCommand(_ text: String, onUpdate: @escaping (RobotCommand) -> Void = { _ in }) async throws -> RobotCommand {
+        var cmd = RobotCommand(id: "cmd_sample\(Int.random(in: 100_000...999_999))", text: text, created_at: nil, status: .queued, result: nil)
+        onUpdate(cmd)
+        try await Task.sleep(nanoseconds: 800_000_000)
+        cmd.status = .running; onUpdate(cmd)
+        try await Task.sleep(nanoseconds: 1_500_000_000)
+        cmd.status = .done; cmd.result = "Sample: Soughtbot would run \u{201C}\(text)\u{201D}."; onUpdate(cmd)
+        return cmd
+    }
+}

@@ -1,0 +1,401 @@
+import Foundation
+import Security
+import UIKit
+
+// Real data from the Recall backend (docs/03_CONTRACTS.md section 2; routes in backend PR 12):
+//   GET /api/robot/status   heartbeat + "online"           every 2 s
+//   GET /api/objects        object tracks                   every 10 s
+//   GET /api/waypoints      taught places (names rooms)     every 10 s
+//   GET /api/map            occupancy snapshot              every 10 s
+//   GET /api/metadata       {"mock": true} when the server is serving seed data -> SAMPLE DATA badge stays on
+//   GET /media/{id}.jpg     thumbnails (public, no token)
+//   POST /api/commands, GET /api/commands/{id}   find and come-to-me go to the robot's planner (section 2.9, CommandClient)
+// A server without the command route answers 404, and the find falls back to where Soughtbot last saw the item.
+
+struct BackendConfig: Equatable {
+    var baseURL: URL
+    var token: String
+
+    /// Settings first (typed in on the phone), then Info.plist (filled from the gitignored Secrets.xcconfig, the same
+    /// keys the robot app uses). Placeholders count as not configured.
+    static func current() -> BackendConfig? {
+        let typed = UserDefaults.standard.string(forKey: "backendURL")
+        let info = Bundle.main.infoDictionary ?? [:]
+        let urlString = (typed?.isEmpty == false ? typed : info["BACKEND_BASE_URL"] as? String) ?? ""
+        // Launch argument `-backendToken` is for simulator testing only (argument values are never saved).
+        let token = Keychain.read("backendToken") ?? UserDefaults.standard.string(forKey: "backendToken")
+            ?? (info["RECALL_TOKEN"] as? String) ?? ""
+        guard let url = clean(urlString), !token.isEmpty, token != "change-me", !token.hasPrefix("$(") else { return nil }
+        return BackendConfig(baseURL: url, token: token)
+    }
+
+    static func clean(_ s: String) -> URL? {
+        let t = s.trimmingCharacters(in: .whitespaces)
+        guard !t.isEmpty, !t.contains("example.com"), let u = URL(string: t),
+              let scheme = u.scheme, scheme == "https" || scheme == "http", u.host != nil else { return nil }
+        return u
+    }
+}
+
+/// Tiny Keychain wrapper for the backend token.
+enum Keychain {
+    static func read(_ key: String) -> String? {
+        let q: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrAccount as String: key,
+                                kSecReturnData as String: true, kSecMatchLimit as String: kSecMatchLimitOne]
+        var out: AnyObject?
+        guard SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess, let d = out as? Data else { return nil }
+        return String(data: d, encoding: .utf8)
+    }
+
+    static func write(_ key: String, _ value: String) {
+        let base: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrAccount as String: key]
+        SecItemDelete(base as CFDictionary)
+        guard !value.isEmpty else { return }
+        var add = base
+        add[kSecValueData as String] = Data(value.utf8)
+        SecItemAdd(add as CFDictionary, nil)
+    }
+}
+
+@MainActor
+final class BackendRobotSource: RobotSource {
+    let config: BackendConfig
+    /// Shown in Settings when the server cannot be reached or rejects the token.
+    @Published var connectionProblem: String?
+    @Published private(set) var serverIsMock = false
+    /// The server has no items yet (robot uploads, T-071): show the sample catalog, clearly labeled, with live status.
+    @Published private(set) var itemsAreSample = false
+    private lazy var sample = MockRobotSource(seedOnly: true)
+    private var borrowedFinds: [FindRecord] = []
+
+    override var isSample: Bool { serverIsMock || itemsAreSample }
+    override var sampleLabel: String { itemsAreSample && !serverIsMock ? "Sample items" : "Sample" }
+    override var sampleSpoken: String {
+        itemsAreSample && !serverIsMock ? "Items are sample data. Soughtbot\u{2019}s status is live." : super.sampleSpoken
+    }
+    override var showsSamplePlanWithLivePose: Bool { itemsAreSample && !serverIsMock }
+    override var sourceName: String {
+        serverIsMock ? "Soughtbot server (sample data)" : itemsAreSample ? "Soughtbot server (live status, sample items)" : "Soughtbot server"
+    }
+    override var canComeToMe: Bool { true }   // POST /api/commands "go to <taught spot>"
+
+    private var loop: Task<Void, Never>?
+    private var photos: [String: Data] = [:]
+    private var photoRequests: Set<String> = []
+    private var waypoints: [Waypoint] = []
+    /// Robot positions from heartbeats, drawn as the explored path (the robot sends no floor plan yet).
+    private var explored: [ExploredPoint] = ExploredStore.load()
+    private var exploredDirty = 0
+    private let commands: CommandClient
+    private var findTask: Task<Void, Never>?
+    private var comeTask: Task<Void, Never>?
+
+    init(config: BackendConfig) {
+        self.config = config
+        self.commands = CommandClient(config: config)
+        super.init()
+        isLoading = true
+    }
+
+    override func start() {
+        guard loop == nil else { return }
+        loop = Task { [weak self] in
+            var tick = 0
+            while !Task.isCancelled {
+                guard let self else { return }
+                await self.refreshStatus()
+                if tick % 5 == 0 { await self.refreshWorld() }
+                tick += 1
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+            }
+        }
+    }
+
+    override func stop() { super.stop(); loop?.cancel(); loop = nil; findTask?.cancel(); comeTask?.cancel() }
+
+    // MARK: Fetching
+
+    private func get<T: Decodable>(_ path: String, as: T.Type) async throws -> T {
+        var req = URLRequest(url: config.baseURL.appending(path: path))
+        req.setValue("Bearer \(config.token)", forHTTPHeaderField: "Authorization")
+        req.timeoutInterval = 5
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+        if code == 401 { throw BackendError.unauthorized }
+        if code == 404 { throw BackendError.notYet }
+        guard (200..<300).contains(code) else { throw BackendError.http(code) }
+        return try Self.decoder.decode(T.self, from: data)
+    }
+
+    enum BackendError: Error { case unauthorized, notYet, http(Int) }
+
+    private func refreshStatus() async {
+        do {
+            let hb = try await get("api/robot/status", as: HeartbeatDTO.self)
+            var s = status
+            s.state = RobotState(rawValue: hb.state) ?? .idle
+            s.task = hb.task
+            s.battery = hb.phone_battery
+            s.pose = hb.pose.map { Pose2D(x: $0.x, z: $0.z, yawDeg: $0.yaw_deg ?? 0) }
+            // The server says whether the last heartbeat is under 10 s old; keep its time so "last seen" is honest.
+            s.lastHeartbeat = hb.online ? Date() : (hb.t ?? s.lastHeartbeat)
+            status = s
+            if let p = s.pose, hb.online, !itemsAreSample {
+                if ExploredStore.append(ExploredPoint(x: p.x, z: p.z), to: &explored) {
+                    exploredDirty += 1
+                    if exploredDirty >= 10 { ExploredStore.save(explored); exploredDirty = 0 }
+                }
+            }
+            if let p = s.pose, var m = map {
+                if m.trail.last != p { m.trail.append(p); if m.trail.count > 14 { m.trail.removeFirst(m.trail.count - 14) } }
+                if !itemsAreSample { m.explored = explored }
+                map = m
+            }
+            connectionProblem = nil
+        } catch BackendError.notYet {
+            connectionProblem = "Connected. Soughtbot has not checked in yet."
+        } catch {
+            note(error)
+        }
+    }
+
+    private func refreshWorld() async {
+        if let meta = try? await get("api/metadata", as: MetadataDTO.self) { serverIsMock = meta.mock ?? false }
+        do {
+            let wps = (try? await get("api/waypoints", as: [WaypointDTO].self)) ?? []
+            waypoints = wps.map { Waypoint(id: $0.id, name: $0.name, x: $0.pose.x, z: $0.pose.z) }
+            var snapshot = map ?? MapSnapshot(rooms: [], waypoints: [], grid: nil, trail: [], updatedAt: Date())
+            if let m = try? await get("api/map", as: MapDTO.self) {
+                snapshot.grid = m.grid
+                snapshot.updatedAt = m.updated_at ?? snapshot.updatedAt
+            }
+            snapshot.waypoints = waypoints
+            snapshot.explored = explored
+            map = (snapshot.grid != nil || !waypoints.isEmpty || !explored.isEmpty) ? snapshot : nil
+
+            let tracks = try await get("api/objects", as: [ObjectDTO].self)
+            if tracks.isEmpty && !serverIsMock {
+                // Nothing uploaded yet: keep the live status, borrow the labeled sample catalog and floor plan.
+                if !itemsAreSample {
+                    itemsAreSample = true
+                    objects = sample.objects
+                    borrowedFinds = sample.findLog
+                    findLog = borrowedFinds + findLog
+                }
+                if snapshot.grid == nil {
+                    var plan = sample.map ?? snapshot
+                    plan.trail = map?.trail ?? []
+                    plan.waypoints = waypoints.isEmpty ? plan.waypoints : waypoints
+                    map = plan
+                }
+                isLoading = false
+                if connectionProblem?.hasPrefix("Connected") != true { connectionProblem = nil }
+                return
+            }
+            if itemsAreSample {
+                // Real items arrived: drop the borrowed sample history so it can't pass as a robot report (F3).
+                findLog.removeAll { borrowedFinds.contains($0) }
+                borrowedFinds = []
+            }
+            itemsAreSample = false
+            let previous = Dictionary(uniqueKeysWithValues: objects.map { ($0.id, $0) })
+            objects = tracks.map { t in
+                let near = snapshot.nearestWaypoint(x: t.position.x, z: t.position.z)
+                let nearName = near.flatMap { hypot($0.x - t.position.x, $0.z - t.position.z) < 2.5 ? $0.name : nil }
+                var o = TrackedObject(
+                    id: t.id, label: displayName(t), description: t.description,
+                    x: t.position.x, z: t.position.z, firstSeen: t.first_seen ?? Date(), lastSeen: t.last_seen ?? Date(),
+                    sightings: t.sightings ?? 1, persistence: t.persistence,
+                    history: (t.history ?? []).compactMap { h in h.t.map { HistoryPoint(t: $0, x: h.x, z: h.z) } },
+                    whereText: nearName.map { "Near the \($0.lowercased())" } ?? "In the mapped area",
+                    room: nearName?.capitalized,
+                    photo: t.media_id.flatMap { photos[$0] }.map { .jpeg($0) } ?? .none)
+                o.needsName = localNames[t.id] == nil && robotLabel(t) == nil
+                // User choices live on the phone.
+                if let old = previous[t.id] { o.isEssential = old.isEssential; o.timesSought = old.timesSought }
+                return o
+            }
+            for t in tracks { if let id = t.media_id, photos[id] == nil { fetchPhoto(id, for: t.id) } }
+            if var m = map { m.anchors = objects.map { ExploredPoint(x: $0.x, z: $0.z) }; map = m }
+            isLoading = false
+            if connectionProblem?.hasPrefix("Connected") != true { connectionProblem = nil }
+        } catch {
+            note(error)
+            isLoading = false
+        }
+    }
+
+    /// The robot has no labeler yet (label "" / label_source "none"): use the person's own name for it, if any.
+    private func robotLabel(_ t: ObjectDTO) -> String? {
+        (t.label_source == "none" || t.label.trimmingCharacters(in: .whitespaces).isEmpty) ? nil : t.label
+    }
+
+    private func displayName(_ t: ObjectDTO) -> String {
+        (localNames[t.id] ?? robotLabel(t))?.capitalizedFirst ?? "Unnamed item"
+    }
+
+    private func fetchPhoto(_ mediaId: String, for objectId: String) {
+        guard !photoRequests.contains(mediaId) else { return }
+        photoRequests.insert(mediaId)
+        Task { [weak self] in
+            guard let self else { return }
+            let url = self.config.baseURL.appending(path: "media/\(mediaId).jpg")
+            guard let (data, resp) = try? await URLSession.shared.data(from: url),
+                  (resp as? HTTPURLResponse)?.statusCode == 200, UIImage(data: data) != nil else {
+                self.photoRequests.remove(mediaId); return
+            }
+            self.photos[mediaId] = data
+            if let i = self.objects.firstIndex(where: { $0.id == objectId }) { self.objects[i].photo = .jpeg(data) }
+        }
+    }
+
+    private func note(_ error: Error) {
+        switch error {
+        case BackendError.unauthorized: connectionProblem = "The server refused the token. Check it in Settings."
+        case BackendError.http(let c): connectionProblem = "The server answered with an error (\(c))."
+        default: connectionProblem = "Can\u{2019}t reach Soughtbot\u{2019}s server."
+        }
+    }
+
+    // MARK: Commands
+
+    override func sendCommand(_ text: String, onUpdate: @escaping (RobotCommand) -> Void = { _ in }) async throws -> RobotCommand {
+        try await commands.run(text, onUpdate: onUpdate)
+    }
+
+    /// Sends "find <item>" and follows the command: queued, running, then the robot's own result words.
+    override func startFind(_ query: String, match: TrackedObject?) {
+        findTask?.cancel()
+        let text = Self.findText(query: query, match: match)
+        find = FindProgress(id: "cmd_pending", query: query, phase: .queued, match: match)
+        findTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let cmd = try await self.sendCommand(text) { [weak self] c in
+                    guard let self, var f = self.find, f.phase != .cancelled else { return }
+                    f.id = c.id
+                    if c.status == .queued { f.phase = .queued }
+                    if c.status == .running { f.phase = .driving(distanceM: nil) }
+                    self.find = f
+                }
+                guard !Task.isCancelled else { return }
+                let said = cmd.result?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                self.find?.phase = .reported(result: said.isEmpty ? "Soughtbot finished." : said)
+            } catch CommandError.notAvailable {
+                // Older server without the command route: say where it was last seen, as before.
+                guard !Task.isCancelled else { return }
+                self.find?.phase = match == nil ? .notFound : .remembered
+            } catch let e as CommandError {
+                guard !Task.isCancelled else { return }
+                // A transport problem says nothing about the robot: it may still be driving, so keep Stop.
+                self.find?.phase = Self.isTransportProblem(e) ? .lostContact(reason: e.message) : .failed(reason: e.message)
+            } catch {}   // cancelled
+        }
+    }
+
+    /// Network, timeout and server errors leave the command's real state unknown; failed/busy come from the robot.
+    static func isTransportProblem(_ e: CommandError) -> Bool {
+        switch e { case .network, .timeout, .http: return true; default: return false }
+    }
+
+    /// "find red umbrella" for a known item; the person's own words when they already start with find / where.
+    static func findText(query: String, match: TrackedObject?) -> String {
+        if let m = match, !m.needsName, !m.isPin { return "find \(m.label.lowercased())" }
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lower = q.lowercased()
+        return ["find ", "where is ", "where are ", "where\u{2019}s ", "where's "].contains { lower.hasPrefix($0) } ? q : "find \(q)"
+    }
+
+    override func cancelFind() {
+        let wasRunning: Bool = {
+            switch find?.phase { case .queued?, .searching?, .driving?, .lostContact?: return true; default: return false }
+        }()
+        findTask?.cancel(); findTask = nil
+        super.cancelFind()
+        if wasRunning { sendStop() }
+    }
+
+    /// Sends "come to <taught spot>", which the planner maps to Come-to-place (taught routes, stops about 1 m short).
+    /// "go to" would be plain go-to-waypoint navigation that stops 0.3 m away (review F1).
+    override func comeToMe(to target: ComeTarget) {
+        comeTask?.cancel()
+        come = ComeProgress(target: target, phase: .going(distanceM: nil))
+        let text = Self.comeCommand(target, waypoints: waypoints)
+        comeTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let cmd = try await self.sendCommand(text)
+                guard !Task.isCancelled, self.come?.phase != .cancelled else { return }
+                let said = cmd.result?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                self.come?.result = said.isEmpty ? nil : said
+                self.come?.phase = .arrived
+            } catch let e as CommandError {
+                guard !Task.isCancelled, self.come?.phase != .cancelled else { return }
+                self.come?.phase = Self.isTransportProblem(e) ? .lostContact(reason: e.message) : .failed(reason: e.message)
+            } catch {}   // cancelled
+        }
+    }
+
+    static func comeCommand(_ target: ComeTarget, waypoints: [Waypoint]) -> String {
+        "come to the \(placeName(target, waypoints: waypoints))"
+    }
+
+    /// The taught name the robot knows ("kitchen table"), not the sheet's spoken form ("the kitchen table").
+    static func placeName(_ target: ComeTarget, waypoints: [Waypoint]) -> String {
+        if let id = target.waypointId, let w = waypoints.first(where: { $0.id == id }) { return w.name }
+        let n = target.name.trimmingCharacters(in: .whitespaces)
+        return n.lowercased().hasPrefix("the ") ? String(n.dropFirst(4)) : n
+    }
+
+    override func cancelComeToMe() {
+        let wasGoing: Bool = {
+            switch come?.phase { case .going?, .lostContact?: return true; default: return false }
+        }()
+        comeTask?.cancel(); comeTask = nil
+        super.cancelComeToMe()
+        if wasGoing { sendStop() }
+    }
+
+    /// The contract has no cancel route; the planner treats a leading "stop" as stop now.
+    private func sendStop() {
+        let client = commands
+        Task { _ = try? await client.send("stop") }
+    }
+
+    // MARK: Decoding
+
+    static let decoder: JSONDecoder = {
+        let d = JSONDecoder()
+        let frac = ISO8601DateFormatter(); frac.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let plain = ISO8601DateFormatter()
+        d.dateDecodingStrategy = .custom { dec in
+            let s = try dec.singleValueContainer().decode(String.self)
+            if let x = frac.date(from: s) ?? plain.date(from: s) { return x }
+            throw DecodingError.dataCorrupted(.init(codingPath: dec.codingPath, debugDescription: "bad date \(s)"))
+        }
+        return d
+    }()
+}
+
+// Wire shapes (snake_case as sent). Optional where the contract allows the field to be missing.
+private struct PoseDTO: Decodable { var x: Double; var z: Double; var yaw_deg: Double? }
+private struct HeartbeatDTO: Decodable {
+    var t: Date?; var state: String; var task: String?; var pose: PoseDTO?; var phone_battery: Double?; var online: Bool
+}
+private struct MetadataDTO: Decodable { var mock: Bool? }
+private struct WaypointDTO: Decodable { var id: String; var name: String; var pose: PoseDTO }
+private struct PositionDTO: Decodable { var x: Double; var y: Double?; var z: Double }
+private struct HistoryDTO: Decodable { var t: Date?; var x: Double; var z: Double }
+private struct ObjectDTO: Decodable {
+    var id: String; var label: String; var label_source: String?; var description: String?; var position: PositionDTO
+    var first_seen: Date?; var last_seen: Date?; var sightings: Int?; var persistence: Double?
+    var media_id: String?; var history: [HistoryDTO]?
+}
+private struct MapDTO: Decodable {
+    struct Origin: Decodable { var x: Double; var z: Double }
+    var resolution_m: Double; var origin: Origin; var width: Int; var height: Int; var cells_b64: String; var updated_at: Date?
+    var grid: OccupancyGrid? {
+        guard let d = Data(base64Encoded: cells_b64), d.count == width * height else { return nil }
+        return OccupancyGrid(resolution: resolution_m, originX: origin.x, originZ: origin.z, width: width, height: height, cells: [UInt8](d))
+    }
+}

@@ -1,0 +1,259 @@
+import SwiftUI
+
+// Top-down floor map. World x goes right and z goes down on screen (03_CONTRACTS section 0).
+// Draws the occupancy grid when the robot sends one, otherwise the room outlines (SAMPLE). Then the dotted trail,
+// waypoints, optional object pins and the robot with its signal glow.
+
+struct MapLayers: Equatable {
+    var items = true
+    var trail = true
+    var spots = true
+    var userPins = true
+    var fadeByCertainty = true
+}
+
+struct MapCanvas: View {
+    let map: MapSnapshot
+    let robot: Pose2D?
+    var pins: [TrackedObject] = []
+    var highlight: String? = nil
+    var showLabels = true
+    var active = true
+    var onPin: ((TrackedObject) -> Void)? = nil
+    /// Widget mode: fill the width and keep this point vertically centered (clamped to the map).
+    var fillWidth = false
+    var layers = MapLayers()
+    /// Room in focus: other rooms dim. Nil means all rooms.
+    var focusRoom: String? = nil
+    /// Item counts drawn under room names (Map tab).
+    var roomCounts: [String: Int] = [:]
+    /// Counter-scale for markers when the whole canvas is zoomed with scaleEffect, so pins stay the same size.
+    var markerScale: CGFloat = 1
+    @Environment(\.palette) private var p
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var pulse = false
+
+    var body: some View {
+        GeometryReader { geo in
+            let tf = Transform(bounds: map.bounds, size: geo.size, inset: 12, fillWidth: fillWidth, focusZ: robot?.z)
+            ZStack(alignment: .topLeading) {
+                Canvas { ctx, _ in
+                    if let g = map.grid { drawGrid(g, tf, &ctx) } else { drawRooms(tf, &ctx) }
+                    drawExplored(tf, &ctx)
+                    if layers.trail { drawTrail(tf, &ctx) }
+                    if layers.spots {
+                        for w in map.waypoints {
+                            let pt = tf.point(w.x, w.z)
+                            let r = 3.5 * markerScale
+                            let c = CGRect(x: pt.x - r, y: pt.y - r, width: r * 2, height: r * 2)
+                            ctx.fill(Path(ellipseIn: c), with: .color(p.surface))
+                            ctx.stroke(Path(ellipseIn: c), with: .color(p.mapPath.opacity(0.5)), lineWidth: 2 * markerScale)
+                        }
+                    }
+                }
+                if showLabels && map.grid == nil {
+                    ForEach(map.rooms) { r in
+                        VStack(spacing: 0) {
+                            Text(r.name.uppercased()).font(SoughtFont.findIt).tracking(0.8)
+                            if let n = roomCounts[r.name] { Text("\(n) \(n == 1 ? "item" : "items")").font(SoughtFont.cardTitle) }
+                        }
+                        .foregroundStyle(p.text.opacity(focusRoom == nil || focusRoom == r.name ? 1 : 0.4))
+                        .dynamicTypeSize(...DynamicTypeSize.large)   // drawn into the map; chips and list carry it at full size
+                        .scaleEffect(markerScale)
+                        .position(tf.point((r.minX + r.maxX) / 2, r.maxZ - 0.35))
+                        .accessibilityHidden(true)
+                    }
+                }
+                if layers.items || layers.userPins {
+                    ForEach(pins.filter { $0.isPin ? layers.userPins : layers.items }) { o in
+                        let pt = tf.point(o.x, o.z)
+                        let sel = highlight == o.id
+                        let certain = layers.fadeByCertainty ? (0.45 + 0.55 * (o.persistence ?? 1)) : 1
+                        Button { onPin?(o) } label: {
+                            Group {
+                                if o.isPin {
+                                    UserPinMarker(selected: sel).offset(y: -12)   // tip sits on the spot
+                                } else if case .none = o.photo {
+                                    // No photo yet (robot items): a small dot, so hundreds of them stay readable.
+                                    Circle().fill(sel ? p.found : p.mapPath.opacity(o.needsName ? 0.55 : 0.85))
+                                        .frame(width: sel ? 16 : 9, height: sel ? 16 : 9)
+                                        .overlay(Circle().stroke(.white, lineWidth: sel ? 2.5 : 1.5))
+                                } else {
+                                    PhotoView(photo: o.photo)
+                                        .frame(width: sel ? 38 : 28, height: sel ? 38 : 28)
+                                        .clipShape(Circle())
+                                        .overlay(Circle().stroke(sel ? p.found : p.surface, lineWidth: sel ? 3 : 2.5))
+                                        .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
+                                        .opacity(sel ? 1 : certain)
+                                }
+                            }
+                            .frame(width: 44, height: 44)
+                            // The whole 44 pt square takes taps and VoiceOver focus, even around a 9 pt dot (review F6).
+                            .contentShape(Rectangle())
+                            .contentShape(.accessibility, Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .scaleEffect(markerScale)
+                        .position(pt)
+                        .zIndex(sel ? 2 : 1)
+                        .accessibilityLabel("\(o.label), \(o.whereText.lowercased()). \(o.certaintyWord).")
+                        .accessibilityHint("Double tap for a summary.")
+                    }
+                }
+                if let r = robot {
+                    let pt = tf.point(r.x, r.z)
+                    ZStack {
+                        if active {
+                            Circle().fill(RadialGradient(colors: [p.signal.opacity(0.45), p.signal.opacity(0)], center: .center,
+                                                         startRadius: 0, endRadius: 28))
+                                .frame(width: 56, height: 56)
+                                .scaleEffect(pulse ? 1.15 : 0.9)
+                            Circle().stroke(p.signal.opacity(0.45), lineWidth: 1.5).frame(width: 34, height: 34)
+                        }
+                        // Heading wedge. Contract yaw: 0 points to -z (up on screen), counter-clockwise positive.
+                        Triangle().fill(p.mapPath).frame(width: 10, height: 8).offset(y: -13)
+                            .rotationEffect(.degrees(-r.yawDeg))
+                        Circle().fill(p.mapPath).frame(width: 14, height: 14)
+                            .overlay(Circle().stroke(.white, lineWidth: 2.5))
+                    }
+                    .scaleEffect(markerScale)
+                    .position(pt)
+                    .zIndex(3)
+                    .accessibilityHidden(true)   // the map container's label says where Soughtbot is
+                    .animation(reduceMotion ? nil : .easeInOut(duration: 1.6), value: r)
+                }
+            }
+        }
+        .onAppear { if !reduceMotion { withAnimation(.easeInOut(duration: 1.4).repeatForever()) { pulse = true } } }
+    }
+
+    private func drawRooms(_ tf: Transform, _ ctx: inout GraphicsContext) {
+        let b = map.bounds
+        let outer = tf.rect(b.minX, b.minZ, b.maxX, b.maxZ)
+        ctx.fill(Path(roundedRect: outer, cornerRadius: 14, style: .continuous), with: .color(p.surface))
+        for r in map.rooms {
+            let rect = tf.rect(r.minX, r.minZ, r.maxX, r.maxZ).insetBy(dx: 3, dy: 3)
+            let on = focusRoom == nil || focusRoom == r.name
+            ctx.fill(Path(roundedRect: rect, cornerRadius: 10, style: .continuous), with: .color(on && focusRoom != nil ? p.signal.opacity(0.08) : p.mapRoom.opacity(on ? 0.6 : 0.3)))
+            ctx.stroke(Path(roundedRect: rect, cornerRadius: 10, style: .continuous), with: .color(p.mapWall.opacity(on ? 1 : 0.45)), lineWidth: 2.5 * markerScale)
+        }
+    }
+
+    private func drawGrid(_ g: OccupancyGrid, _ tf: Transform, _ ctx: inout GraphicsContext) {
+        let b = map.bounds
+        ctx.fill(Path(tf.rect(b.minX, b.minZ, b.maxX, b.maxZ)), with: .color(p.surface))
+        let cell = CGFloat(g.resolution) * tf.scale
+        for row in 0..<g.height {
+            for col in 0..<g.width {
+                let v = g.cells[row * g.width + col]
+                guard v != 1 else { continue }
+                let pt = tf.point(g.originX + Double(col) * g.resolution, g.originZ + Double(row) * g.resolution)
+                let color: Color = v == 0 ? p.mapRoom : v == 2 ? p.mapWall.opacity(0.6) : p.mapWall
+                ctx.fill(Path(CGRect(x: pt.x, y: pt.y, width: cell + 0.5, height: cell + 0.5)), with: .color(color))
+            }
+        }
+    }
+
+    /// Where the robot has driven, as a soft band about the rover's width, so the apartment's shape builds up
+    /// as it moves. Breaks the stroke on jumps over 1.5 m so it never cuts across walls.
+    private func drawExplored(_ tf: Transform, _ ctx: inout GraphicsContext) {
+        guard map.explored.count > 1 else { return }
+        var path = Path()
+        var prev: ExploredPoint?
+        for e in map.explored {
+            let pt = tf.point(e.x, e.z)
+            if let pr = prev, hypot(pr.x - e.x, pr.z - e.z) < 1.5 { path.addLine(to: pt) } else { path.move(to: pt) }
+            prev = e
+        }
+        let width = max(6, CGFloat(0.45) * tf.scale)    // about the rover's footprint
+        ctx.stroke(path, with: .color(p.mapPath.opacity(0.16)),
+                   style: StrokeStyle(lineWidth: width, lineCap: .round, lineJoin: .round))
+        ctx.stroke(path, with: .color(p.mapPath.opacity(0.35)), style: StrokeStyle(lineWidth: 1, lineCap: .round, lineJoin: .round))
+    }
+
+    private func drawTrail(_ tf: Transform, _ ctx: inout GraphicsContext) {
+        var pts = map.trail.map { tf.point($0.x, $0.z) }
+        if let r = robot { pts.append(tf.point(r.x, r.z)) }
+        guard pts.count > 1 else { return }
+        var path = Path()
+        path.addLines(pts)
+        ctx.stroke(path, with: .linearGradient(Gradient(colors: [p.mapPath.opacity(0.2), p.mapPath]),
+                                               startPoint: pts.first!, endPoint: pts.last!),
+                   style: StrokeStyle(lineWidth: 2.5, lineCap: .round, dash: [2, 6]))
+    }
+
+    struct Transform {
+        let minX: Double, minZ: Double, scale: CGFloat, offset: CGPoint
+
+        init(bounds b: (minX: Double, minZ: Double, maxX: Double, maxZ: Double), size: CGSize, inset: CGFloat,
+             fillWidth: Bool = false, focusZ: Double? = nil) {
+            let w = max(0.1, b.maxX - b.minX), h = max(0.1, b.maxZ - b.minZ)
+            let fitW = (size.width - inset * 2) / CGFloat(w)
+            let s = fillWidth ? fitW : min(fitW, (size.height - inset * 2) / CGFloat(h))
+            minX = b.minX; minZ = b.minZ; scale = s
+            var y = (size.height - CGFloat(h) * s) / 2
+            if fillWidth, CGFloat(h) * s > size.height {
+                let fz = focusZ ?? (b.minZ + b.maxZ) / 2
+                y = size.height / 2 - CGFloat(fz - b.minZ) * s
+                y = min(inset, max(size.height - inset - CGFloat(h) * s, y))
+            }
+            offset = CGPoint(x: (size.width - CGFloat(w) * s) / 2, y: y)
+        }
+
+        func point(_ x: Double, _ z: Double) -> CGPoint {
+            CGPoint(x: offset.x + CGFloat(x - minX) * scale, y: offset.y + CGFloat(z - minZ) * scale)
+        }
+
+        /// Screen point back to world meters (pin placement).
+        func world(_ pt: CGPoint) -> (x: Double, z: Double) {
+            (minX + Double((pt.x - offset.x) / scale), minZ + Double((pt.y - offset.y) / scale))
+        }
+
+        func rect(_ x0: Double, _ z0: Double, _ x1: Double, _ z1: Double) -> CGRect {
+            let a = point(x0, z0), b = point(x1, z1)
+            return CGRect(x: a.x, y: a.y, width: b.x - a.x, height: b.y - a.y)
+        }
+    }
+}
+
+struct Triangle: Shape {
+    func path(in r: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: r.midX, y: r.minY)); p.addLine(to: CGPoint(x: r.maxX, y: r.maxY)); p.addLine(to: CGPoint(x: r.minX, y: r.maxY))
+        p.closeSubpath()
+        return p
+    }
+}
+
+/// Teardrop for a pin the person left. Round photos are things Soughtbot saw; the shape alone tells them apart,
+/// and labels say "Pinned by you" too.
+struct UserPinMarker: View {
+    var selected = false
+    @Environment(\.palette) private var p
+
+    var body: some View {
+        ZStack {
+            Teardrop().fill(selected ? p.found : p.call)
+                .overlay(Teardrop().stroke(.white, lineWidth: 2))
+                .frame(width: selected ? 28 : 22, height: selected ? 34 : 27)
+                .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
+            Image(systemName: "hand.point.up.left.fill").font(.system(size: selected ? 11 : 9, weight: .bold))
+                .foregroundStyle(.white).offset(y: selected ? -4 : -3)
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+struct Teardrop: Shape {
+    func path(in r: CGRect) -> Path {
+        var p = Path()
+        let w = r.width, cx = r.midX, top = r.minY, tip = CGPoint(x: cx, y: r.maxY)
+        let radius = w / 2
+        p.addArc(center: CGPoint(x: cx, y: top + radius), radius: radius, startAngle: .degrees(150), endAngle: .degrees(30), clockwise: false)
+        p.addQuadCurve(to: tip, control: CGPoint(x: cx + radius * 0.55, y: top + radius * 1.7))
+        p.addQuadCurve(to: CGPoint(x: cx + radius * cos(.pi * 150 / 180), y: top + radius + radius * sin(.pi * 150 / 180)),
+                       control: CGPoint(x: cx - radius * 0.55, y: top + radius * 1.7))
+        p.closeSubpath()
+        return p
+    }
+}

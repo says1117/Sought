@@ -108,6 +108,10 @@ targets:
     platform: iOS
     sources:
       - path: ../Companion/Sources
+        excludes: ["**/README.md"]
+      # Sought app resources: fonts (UIAppFonts), Figma icons and SAMPLE photos. Info.plist is set below, not copied.
+      - path: ../Companion/Resources
+        excludes: ["Info.plist", "Fonts/*.txt"]
       - path: Sources/ComeToMe/CompanionMessages.swift
       - path: Sources/ComeToMe/CompanionLink.swift
       - path: Sources/ComeToMe/NIRanging.swift
@@ -117,3 +121,31 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.recall.companion
         SWIFT_VERSION: "5.0"
         INFOPLIST_FILE: ../Companion/Resources/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    scheme:
+      testTargets: [CompanionTests, CompanionUITests]
+  CompanionTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: ../Companion/Tests
+    dependencies:
+      - target: Companion
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.recall.companion.tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Companion.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Companion
+        BUNDLE_LOADER: $(TEST_HOST)
+  CompanionUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: ../Companion/UITests
+    dependencies:
+      - target: Companion
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.recall.companion.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Companion

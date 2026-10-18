@@ -1,10 +1,13 @@
 import SwiftUI
 
-struct ContentView: View {
-    @ObservedObject var model: CompanionModel
+// Original T-028 companion screen, kept as a two-phone UWB test under Settings > For testing.
+struct ComeToMeTestView: View {
+    @StateObject private var model = CompanionModel()
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         VStack(spacing: 24) {
+            HStack { Spacer(); Button("Done") { model.cancel(); dismiss() }.font(.headline) }
             Text(statusText).font(.headline).multilineTextAlignment(.center).accessibilityIdentifier("status")
             Text(distanceText).font(.system(size: 48, weight: .semibold, design: .rounded)).monospacedDigit()
                 .accessibilityIdentifier("distance")
@@ -22,15 +25,16 @@ struct ContentView: View {
             }
         }
         .padding(24)
+        .onAppear { model.start() }
     }
 
     private var statusText: String {
         switch model.phase {
-        case .searching: return "Looking for the robot…"
-        case .connected: return "Connected to \(model.peerName ?? "robot")"
-        case .requested: return "Request sent, waiting for the robot"
-        case .approaching: return "Robot is coming"
-        case .arrived: return "Robot has arrived"
+        case .searching: return "Looking for Soughtbot"
+        case .connected: return "Connected to \(model.peerName ?? "Soughtbot")"
+        case .requested: return "Request sent, waiting for Soughtbot"
+        case .approaching: return "Soughtbot is coming"
+        case .arrived: return "Soughtbot has arrived"
         case let .failed(r): return "Stopped: \(r)"
         }
     }

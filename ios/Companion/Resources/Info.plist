@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDevelopmentRegion</key><string>en</string>
-	<key>CFBundleDisplayName</key><string>Recall Companion</string>
+	<key>CFBundleDisplayName</key><string>Sought</string>
 	<key>CFBundleExecutable</key><string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key><string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleName</key><string>$(PRODUCT_NAME)</string>
@@ -11,13 +11,28 @@
 	<key>CFBundleShortVersionString</key><string>1.0</string>
 	<key>CFBundleVersion</key><string>1</string>
 	<key>LSRequiresIPhoneOS</key><true/>
-	<key>UILaunchScreen</key><dict/>
+	<key>UILaunchScreen</key>
+	<dict><key>UIColorName</key><string>LaunchBackground</string></dict>
 	<key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationPortrait</string></array>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Geist-Light.ttf</string><string>Geist-Regular.ttf</string><string>Geist-Medium.ttf</string>
+		<string>Geist-SemiBold.ttf</string><string>Geist-Bold.ttf</string>
+		<string>JetBrainsMono-Medium.ttf</string><string>JetBrainsMono-Bold.ttf</string><string>JetBrainsMono-BoldItalic.ttf</string>
+	</array>
 	<key>NSNearbyInteractionUsageDescription</key>
-	<string>Measures the distance and direction to the Recall robot so it can drive to you.</string>
+	<string>Measures the distance and direction to Soughtbot so it can drive to you.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Finds and talks to the Recall robot on your local network and over Bluetooth.</string>
+	<string>Finds and talks to Soughtbot on your home network and over Bluetooth.</string>
 	<key>NSBonjourServices</key>
 	<array><string>_recall-ni._tcp</string><string>_recall-ni._udp</string></array>
+	<key>BACKEND_BASE_URL</key><string>$(BACKEND_BASE_URL)</string>
+	<key>RECALL_TOKEN</key><string>$(RECALL_TOKEN)</string>
+	<key>NSAppTransportSecurity</key>
+	<dict><key>NSAllowsLocalNetworking</key><true/></dict>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Lets you say what you are looking for.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Turns what you say into a search for Soughtbot.</string>
 </dict>
 </plist>
