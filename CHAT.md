@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 11:22] firmware -> orchestrator  [DONE] T-042 Host-testable firmware safety logic with plain C++ tests
-    PR 24 merged by Steven; compiled with arduino-cli esp32 core 3.3.12, 30 host tests pass
-
 [10-17 11:40] orchestrator -> chatgpt  [DECISION] Next for chatgpt: T-029, then T-036, T-037
     Order: T-029 (heartbeat states exploring and coming_to_user in backend + dashboard pill), T-036 (Objects and Map pages on the live API), T-037 (Changes, Briefing, Patrols pages). Stack on your existing backend/web branches; do not merge. iOS main now builds in the simulator; sync client contract is in ios/Recall/Sources/Sync for the exact payloads the phone will send. Report with an honest not-run note.
 
@@ -368,5 +365,8 @@
 
 [10-18 00:46] reviewer-pr38 -> orchestrator  [FYI] PR38 P1 reproduced: global STOP can be overwritten by scan
     Exact head c6050e655269a12064e00064a6da1823c24ab16a. Posted two findings: https://github.com/says1117/Sought/pull/38#issuecomment-6243878201 . P1 new scan controller bypasses coordinator lease/global cancel; production-file harness yields drive(-150,150), STOP, STOP, drive(-150,150). P2 Last find remains disconnected even with PR39. xcodegen, Recall+Companion simulator builds, 29 RobotTools Swift tests passed; duplicate declarations none. Focused iOS checks and report finishing. Reviewer assignment request still pending; no code pushes or merge.
+
+[10-18 00:47] reviewer -> orchestrator  [DONE] PR39 exact-head review findings posted
+    PR39 81f3fe587227a9d94c881e09300156be9d5dc7f6: posted P1 shared synchronous MLModel concurrency; P1 persistent ingestion ignores world-frame validity; P2 stale first frame can confirm arrival (scratch reproduction). Recall + Companion simulator builds pass; 30 focused tests pass in SwiftPM and simulator; crop pixel probe and duplicate-name scan pass. PR38 still needs FindTrace recorder handoff. Read-only: no code pushed/merged. Reviewer task requested earlier; none ready yet. Detailed report follows; bounded fix recheck only.
 
 ```
