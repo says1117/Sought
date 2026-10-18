@@ -81,12 +81,13 @@ enum EncoderProviders {
         }
     }
 
-    /// Validated CLIP tokenizer + compiled Core ML text and image models.
+    /// Validated CLIP tokenizer + compiled Core ML text and image models. Goes through `CoreMLEncoderFactory.build` so the
+    /// located `ModelConfig` (image size, embedding dimension) reaches both encoders and the image model's input size is
+    /// checked against it; building the encoders here by hand ignored the config and fed a 224 px model 256 px crops.
     static let realBuilder: Builder = { loc in
         #if canImport(CoreML)
-        let tokenizer = try CLIPTokenizer(vocabURL: loc.vocab, mergesURL: loc.merges)
-        let text = CoreMLTextEncoder(tokenizer: tokenizer, runner: try CoreMLTextRunner(modelURL: loc.textModel))
-        return (text, CoreMLImageEmbedder(runner: try CoreMLImageRunner(modelURL: loc.imageModel)))
+        let built = try CoreMLEncoderFactory.build(loc)
+        return (built.text, built.image)
         #else
         throw ModelsMissingError.modelsMissing
         #endif

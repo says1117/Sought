@@ -1,0 +1,45 @@
+machine=macOS-27.0.1-arm64-arm-64bit arm64 coremltools=9.0 torch=2.7.0 compute_units=CPU_ONLY model_precision=fp16
+image synthetic-noise                      cosine(open_clip, coreml) = 0.999912
+image synthetic-gradient                   cosine(open_clip, coreml) = 0.999281
+image cat_dog_music.png                    cosine(open_clip, coreml) = 0.999790
+image cat_dog_music.png:centre-half        cosine(open_clip, coreml) = 0.998624
+image cat_dog_music.png:top-left-half      cosine(open_clip, coreml) = 0.999264
+image cat_dog_music.png:bottom-right-third cosine(open_clip, coreml) = 0.998963
+image cats.png                             cosine(open_clip, coreml) = 0.998856
+image cats.png:centre-half                 cosine(open_clip, coreml) = 0.999288
+image cats.png:top-left-half               cosine(open_clip, coreml) = 0.999158
+image cats.png:bottom-right-third          cosine(open_clip, coreml) = 0.998186
+image dog.jpg                              cosine(open_clip, coreml) = 0.999635
+image dog.jpg:centre-half                  cosine(open_clip, coreml) = 0.999641
+image dog.jpg:top-left-half                cosine(open_clip, coreml) = 0.999844
+image dog.jpg:bottom-right-third           cosine(open_clip, coreml) = 0.999498
+text  a cat                                cosine(open_clip, coreml) = 0.999943
+text  a tiger                              cosine(open_clip, coreml) = 0.999969
+text  a dog                                cosine(open_clip, coreml) = 0.999911
+text  a red mug                            cosine(open_clip, coreml) = 0.999956
+text  a set of keys                        cosine(open_clip, coreml) = 0.999971
+text  a laptop                             cosine(open_clip, coreml) = 0.999947
+text  a photo of a cat                     cosine(open_clip, coreml) = 0.999959
+text  a car engine                         cosine(open_clip, coreml) = 0.999973
+text  the blue backpack by the door        cosine(open_clip, coreml) = 0.999948
+text  a person playing music               cosine(open_clip, coreml) = 0.999977
+text  a remote control                     cosine(open_clip, coreml) = 0.999970
+text  a wooden chair                       cosine(open_clip, coreml) = 0.999979
+text  an empty room                        cosine(open_clip, coreml) = 0.999890
+text  a banana                             cosine(open_clip, coreml) = 0.999948
+image: n=14 min cosine = 0.998186 mean = 0.999281
+text: n=14 min cosine = 0.999890 mean = 0.999953
+
+Zero-shot sanity (Core ML image x Core ML text cosine), full-frame photos only:
+                             a cat      a tiger        a dog a car engine
+cat_dog_music.png            0.194        0.128        0.200        0.064
+cats.png                     0.237        0.180        0.153        0.087
+dog.jpg                      0.192        0.300        0.146        0.060
+
+Timing (arm64 Mac, macOS-27.0.1-arm64-arm-64bit, compute_units=CPU_ONLY, fp16, coremltools predict() incl. Python marshalling, 30 warm runs after 2 warm-ups; NOT phone numbers):
+image encoder median 6.2 ms p95 7.7 ms; text encoder median 4.5 ms p95 6.5 ms
+machine=macOS-27.0.1-arm64-arm-64bit arm64 coremltools=9.0 torch=2.7.0 compute_units=ALL model_precision=fp16
+image: n=14 min cosine = 0.999949 mean = 0.999992
+text: n=14 min cosine = 0.999999 mean = 0.999999
+Timing (arm64 Mac, macOS-27.0.1-arm64-arm-64bit, compute_units=ALL, fp16, coremltools predict() incl. Python marshalling, 30 warm runs after 2 warm-ups; NOT phone numbers):
+image encoder median 7.6 ms p95 11.3 ms; text encoder median 4.3 ms p95 5.0 ms
