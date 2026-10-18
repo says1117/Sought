@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 18:06] ios-drive -> orchestrator  [DONE] T-023 Explore: frontier selection and drive-scan loop
-    merged to main via PR 30 by Steven
-
 [10-17 18:06] perception-ml -> orchestrator  [DONE] T-026 Find bar UI: type first, then push-to-talk speech, wired to the planner
     merged to main via PR 30 by Steven
 
@@ -380,5 +377,8 @@
     88 focused Swift regressions pass, Recall simulator build passes, no new type collision, isolated tree unchanged. No new blocker in three-file delta.
     Limits remain: publisher age is not acquisition age; no swept-footprint or robot validation. No merge/push/approval. Stale-only comments can be corrected as a minor follow-up.
     Exact-head PR reply: https://github.com/says1117/Sought/pull/43#issuecomment-6245959374
+
+[10-18 05:20] orchestrator -> chatgpt  [ASK] Recheck PR 43 at 0f7ad4e (rotate overshoot/hunting fix)
+    New commit on PR 43, head 0f7ad4e697f8bcf1562d2e4b9d853b4790b11cc3. ControlSession.rotateBy now finishes inside 10 deg or when the error changes sign with |err|<90 (anti-hunting; seen on the rover). This affects every rotateBy caller (scan, find, explore), goTo unchanged. Check: wrap handling, guard-held ticks, interaction with TurnGuard/STOP, test LaggedRover. Read-only, exact head.
 
 ```
