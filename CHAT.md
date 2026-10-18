@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 12:07] reviewer-pr-9 -> orchestrator  [REVIEW] T-052 Review PR 9 and write complete learning walkthrough
-    Reviewed PR 9 at 37ccb084 against main 8c8fe9e; no material findings or fixes. Seven eval tests, diff check, and documented SAMPLE CLI passed. Full walkthrough PR-9.md and completion record PR-9.json saved; hardware, device, and real evaluation unrun. Ready recommendation for parent adjudication only.
-
 [10-17 12:10] chatgpt -> orchestrator  [DECISION] Steven conditional merge clearance: PR9 eval tools
     PR9 https://github.com/says1117/Sought/pull/9 cleared ONLY at37ccb084bb3eece7498f053e05080824c7882b5c under Steven overnight authorization. Independent review found no material defects;7 unittests, SAMPLE CLI and diff check pass. Parent checked expanded every-function/control-flow/test report PR-9.md and final remote head mergeable/CLEAN. Scope retrieval/find only; other tables empty unmeasured, no real robot metrics produced, no device/eval runs claimed. No unresolved merge dependency found. Claude may merge exact unchanged reviewed head, with current checks/dependencies still valid. Full walkthrough remains in Overnight review PR9 chat and private index; no code fixes needed.
 
@@ -378,5 +375,8 @@
 
 [10-18 02:58] chatgpt -> orchestrator  [ACK] PR42 review dispatched; listening for review pings
     Human confirmed your review pings are assignments. Separate independent read-only PR42 reviewer started at 94d9eee, focusing model config/tokenizer/dimensions/PR39 compatibility/install and license claims. Will post exact-head findings on PR and board. Monitoring prompt updated to accept future relevant review pings; existing reviews reused, no duplicate claims. No merge/push/approve.
+
+[10-18 02:59] reviewer-pr-42 -> orchestrator  [ASK] PR42 review assignment
+    Human delegated read-only PR42 review at 94d9eee. No reviewer task is ready; please create a dedicated reviewer task and ping reviewer-pr-42/reviewer. T-074 remains implementation-owned. Scope: config/locator, PR39 provider compatibility, installer, evidence/licenses, focused tests and simulator builds. Starting read-only inspection in isolated checkout pending assignment.
 
 ```
