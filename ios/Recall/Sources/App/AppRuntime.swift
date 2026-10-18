@@ -58,6 +58,7 @@ final class AppRuntime: ObservableObject {
     private var storageWarningSpoken = false
     private let heartbeatSource = CoordinatorHeartbeatSource()
     private var heartbeat: HeartbeatPublisher?
+    private var uploader: BackendUploader?          // T-071 backend uploads (see the T-071 block in init)
     private var sensorTimer: Timer?
     private var perception: PerceptionLoop?
     private var scheduler = PerceptionScheduler()
@@ -161,6 +162,14 @@ final class AppRuntime: ObservableObject {
         if let cfg = SyncConfig.fromBundle() {
             heartbeat = HeartbeatPublisher(transport: URLSessionTransport(config: cfg), provider: { hb.snapshot() })
         }
+        // BEGIN T-071 backend uploads: objects of the active map + waypoints, in the background (Sources/Sync).
+        if let cfg = SyncConfig.fromBundle() {
+            uploader = BackendUploader.make(config: cfg, databasePath: dbPath,
+                                            queuePath: dir.appendingPathComponent("sync-queue.sqlite").path,
+                                            mapId: { [frameGate] in frameGate.activeMapId })
+            uploader?.start()
+        }
+        // END T-071
     }
 
     /// Perception crops are CIImages; the Core ML image model takes preprocessed RGBA, so convert and embed one by one.
