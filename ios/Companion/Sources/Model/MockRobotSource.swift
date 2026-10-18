@@ -70,6 +70,18 @@ final class MockRobotSource: RobotSource {
         findLog = [FindRecord(query: "car keys", objectId: nil, found: false, at: ago(26 * 60)),
                    FindRecord(query: "red umbrella", objectId: "obj_sample0007", found: true, at: ago(25))]
         robotLog = [RobotLogEntry(text: "Soughtbot got stuck by the sofa", at: ago(40))]
+        // `-mockUnnamed YES`: two sightings arrive the way the robot sends them today (no label, no photo).
+        if UserDefaults.standard.bool(forKey: "mockUnnamed") {
+            for id in ["obj_sample0001", "obj_sample0011"] where localNames[id] == nil {
+                if let i = objects.firstIndex(where: { $0.id == id }) {
+                    objects[i].label = "Unnamed item"; objects[i].needsName = true; objects[i].photo = .none
+                    objects[i].description = nil
+                    objects[i].whereText = id == "obj_sample0001" ? "Near the front door" : "Near the sofa"
+                    objects[i].firstSeen = Date().addingTimeInterval(-3 * 60)
+                }
+            }
+        }
+        for (id, n) in localNames { if let i = objects.firstIndex(where: { $0.id == id }) { objects[i].label = n; objects[i].needsName = false } }
         // Screenshot hook: `-seedPins YES` shows two example pins (kept in memory, never saved).
         if UserDefaults.standard.bool(forKey: "seedPins") {
             pins = [UserPin(id: "pin_sample_remote", label: "TV remote", note: "Under the blue cushion", x: -2.0, z: -2.6,

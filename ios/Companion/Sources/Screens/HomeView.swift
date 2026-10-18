@@ -23,6 +23,7 @@ struct HomeView: View {
                 LazyVStack(alignment: .leading, spacing: Space.l, pinnedViews: [.sectionHeaders]) {
                     greeting
                     Section {
+                        NamePrompt()
                         MapWidget()
                             .onTapGesture { router.tab = .map }
                             .accessibilityAddTraits(.isButton)

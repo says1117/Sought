@@ -118,6 +118,13 @@ struct ItemDetailView: View {
                         fact("Seen", "\(item.sightings) \(item.sightings == 1 ? "time" : "times")")
                     }
                 }
+                if item.needsName {
+                    Button { router.nameRequest = [item.id] } label: {
+                        Label("Name it", systemImage: "pencil").font(SoughtFont.button)
+                            .foregroundStyle(p.onPrimary).frame(maxWidth: .infinity, minHeight: 56)
+                            .background(Capsule().fill(p.call))
+                    }
+                }
                 Button { router.find(item) } label: {
                     Label("Find it", systemImage: "magnifyingglass").font(SoughtFont.button)
                         .foregroundStyle(p.onPrimary).frame(maxWidth: .infinity, minHeight: 56)

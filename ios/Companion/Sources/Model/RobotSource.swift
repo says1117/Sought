@@ -23,6 +23,8 @@ class RobotSource: ObservableObject {
     @Published var robotLog: [RobotLogEntry] = []
     /// Pins the person left (saved on this iPhone, shared by every data source).
     @Published var pins: [UserPin] = PinStore.load()
+    /// Names the person gave to things Soughtbot saw without a label, by object id. Saved on this iPhone only.
+    @Published var localNames: [String: String] = (UserDefaults.standard.dictionary(forKey: "itemNames") as? [String: String]) ?? [:]
     /// True until the first data arrives. Screens show shimmering placeholders, not an empty state.
     @Published var isLoading = false
     /// Ticks so "N min ago" and the offline check refresh without new data.
@@ -99,6 +101,17 @@ class RobotSource: ObservableObject {
     var pinnedItems: [TrackedObject] { pins.sorted { $0.createdAt > $1.createdAt }.map(\.asItem) }
 
     func addPin(_ pin: UserPin) { pins.append(pin); PinStore.save(pins) }
+
+    /// Things Soughtbot saw that still need a name, newest first.
+    var unnamed: [TrackedObject] { objects.filter(\.needsName).sorted { $0.lastSeen > $1.lastSeen } }
+
+    func setName(_ name: String, for id: String) {
+        let clean = name.trimmingCharacters(in: .whitespacesAndNewlines).capitalizedFirst
+        guard !clean.isEmpty else { return }
+        localNames[id] = clean
+        UserDefaults.standard.set(localNames, forKey: "itemNames")
+        if let i = objects.firstIndex(where: { $0.id == id }) { objects[i].label = clean; objects[i].needsName = false }
+    }
     func removePin(id: String) { pins.removeAll { $0.id == id }; PinStore.save(pins) }
 
     /// Rooms in a stable order with their objects, for the Item Log.

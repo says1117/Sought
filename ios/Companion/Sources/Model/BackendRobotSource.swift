@@ -181,13 +181,14 @@ final class BackendRobotSource: RobotSource {
                 let near = snapshot.nearestWaypoint(x: t.position.x, z: t.position.z)
                 let nearName = near.flatMap { hypot($0.x - t.position.x, $0.z - t.position.z) < 2.5 ? $0.name : nil }
                 var o = TrackedObject(
-                    id: t.id, label: t.label.capitalizedFirst, description: t.description,
+                    id: t.id, label: displayName(t), description: t.description,
                     x: t.position.x, z: t.position.z, firstSeen: t.first_seen ?? Date(), lastSeen: t.last_seen ?? Date(),
                     sightings: t.sightings ?? 1, persistence: t.persistence,
                     history: (t.history ?? []).compactMap { h in h.t.map { HistoryPoint(t: $0, x: h.x, z: h.z) } },
-                    whereText: nearName.map { "Near the \($0.lowercased())" } ?? "Seen by Soughtbot",
+                    whereText: nearName.map { "Near the \($0.lowercased())" } ?? "In the mapped area",
                     room: nearName?.capitalized,
                     photo: t.media_id.flatMap { photos[$0] }.map { .jpeg($0) } ?? .none)
+                o.needsName = localNames[t.id] == nil && robotLabel(t) == nil
                 // User choices live on the phone.
                 if let old = previous[t.id] { o.isEssential = old.isEssential; o.timesSought = old.timesSought }
                 return o
@@ -199,6 +200,15 @@ final class BackendRobotSource: RobotSource {
             note(error)
             isLoading = false
         }
+    }
+
+    /// The robot has no labeler yet (label "" / label_source "none"): use the person's own name for it, if any.
+    private func robotLabel(_ t: ObjectDTO) -> String? {
+        (t.label_source == "none" || t.label.trimmingCharacters(in: .whitespaces).isEmpty) ? nil : t.label
+    }
+
+    private func displayName(_ t: ObjectDTO) -> String {
+        (localNames[t.id] ?? robotLabel(t))?.capitalizedFirst ?? "Unnamed item"
     }
 
     private func fetchPhoto(_ mediaId: String, for objectId: String) {
@@ -259,7 +269,7 @@ private struct WaypointDTO: Decodable { var id: String; var name: String; var po
 private struct PositionDTO: Decodable { var x: Double; var y: Double?; var z: Double }
 private struct HistoryDTO: Decodable { var t: Date?; var x: Double; var z: Double }
 private struct ObjectDTO: Decodable {
-    var id: String; var label: String; var description: String?; var position: PositionDTO
+    var id: String; var label: String; var label_source: String?; var description: String?; var position: PositionDTO
     var first_seen: Date?; var last_seen: Date?; var sightings: Int?; var persistence: Double?
     var media_id: String?; var history: [HistoryDTO]?
 }

@@ -122,6 +122,11 @@ struct RootView: View {
         .sheet(item: $router.detail) { o in
             ItemDetailView(itemId: o.id).heroDestination(router.heroID).background(SoughtBackground()).environment(\.palette, palette).environment(\.backgroundMood, mood).environment(\.heroNamespace, hero).presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: Binding(get: { router.nameRequest != nil }, set: { if !$0 { router.nameRequest = nil } })) {
+            NameItemsSheet(ids: router.nameRequest ?? []).background(SoughtBackground())
+                .environment(\.palette, palette).environment(\.backgroundMood, mood).environment(\.heroNamespace, hero)
+                .presentationDetents([.large]).presentationDragIndicator(.visible)
+        }
         .sheet(isPresented: $router.showComeToMe) {
             ComeToMeSheet().background(SoughtBackground()).environment(\.palette, palette).environment(\.backgroundMood, mood)
                 .presentationDetents([.large]).presentationDragIndicator(.visible)

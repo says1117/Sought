@@ -23,6 +23,8 @@ final class Router: ObservableObject {
     @Published var pinDraft: String?
     /// Come to me sheet (place picker, then progress).
     @Published var showComeToMe = false
+    /// Name these unnamed items, one after another.
+    @Published var nameRequest: [String]?
 
     func startPin(named name: String) {
         findRequest = nil

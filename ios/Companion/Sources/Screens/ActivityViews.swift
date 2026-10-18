@@ -235,6 +235,9 @@ struct MiniMoveMap: View {
                     Group {
                         if object.isPin {
                             UserPinMarker(selected: true).offset(y: -14)
+                        } else if case .none = object.photo {
+                            Circle().fill(p.mapPath).frame(width: 16, height: 16)
+                                .overlay(Circle().stroke(.white, lineWidth: 3)).overlay(Circle().stroke(p.found, lineWidth: 2).padding(-4))
                         } else {
                             PhotoView(photo: object.photo)
                                 .frame(width: 30, height: 30).clipShape(Circle())

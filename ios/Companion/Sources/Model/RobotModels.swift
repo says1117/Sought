@@ -57,6 +57,8 @@ struct TrackedObject: Identifiable, Equatable {
     var timesSought = 0
     /// Set when this item is a pin the person left, not something Soughtbot saw.
     var pin: PinInfo? = nil
+    /// The robot saw it but has no name for it (label_source "none"); the person names it in Sought.
+    var needsName = false
     var isPin: Bool { pin != nil }
 }
 

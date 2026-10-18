@@ -95,6 +95,26 @@ final class SoughtLogicTests: XCTestCase {
         XCTAssertEqual(source.items.last?.certaintyWord, "Pinned by you")
     }
 
+    // MARK: Naming what the robot found (no labeler on the robot yet)
+
+    func testUnnamedItemsReadAsSomethingAndBecomeSearchableOnceNamed() {
+        let source = RobotSource()
+        var o = item("obj_r1", "Unnamed item", firstSeenAgo: 600)
+        o.needsName = true
+        o.whereText = "Near the sofa"
+        source.objects = [o]
+        XCTAssertEqual(source.unnamed.map(\.id), ["obj_r1"])
+        let events = ActivityDeriver.events(objects: source.objects, map: nil, finds: [], robotLog: [], now: now)
+        XCTAssertEqual(events.first?.text, "Soughtbot noticed something near the sofa")
+        XCTAssertNil(source.bestMatch(for: "slippers"))
+        source.setName("slippers", for: "obj_r1")
+        XCTAssertEqual(source.objects.first?.label, "Slippers")
+        XCTAssertFalse(source.objects.first?.needsName ?? true)
+        XCTAssertEqual(source.bestMatch(for: "find my slippers")?.id, "obj_r1")
+        XCTAssertTrue(source.unnamed.isEmpty)
+        UserDefaults.standard.removeObject(forKey: "itemNames")
+    }
+
     // MARK: Pins
 
     func testPinPlaceNamesComeFromTaughtSpotsThenRooms() {

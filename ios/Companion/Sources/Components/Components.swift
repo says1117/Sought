@@ -202,6 +202,28 @@ struct FindItButton: View {
     }
 }
 
+/// "Name it" for things Soughtbot saw without a name. Same shape as Find it, signal-teal so it reads as a to-do.
+struct NameItButton: View {
+    let action: () -> Void
+    @Environment(\.palette) private var p
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: Space.s) {
+                Image(systemName: "pencil").font(.system(size: 11, weight: .bold))
+                Text("Name it").font(SoughtFont.findIt)
+            }
+            .foregroundStyle(p.onPrimary)
+            .frame(maxWidth: .infinity, minHeight: 22)
+            .background(Capsule().fill(p.call))
+            .padding(.vertical, 11)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.vertical, -11)
+    }
+}
+
 struct ItemCard: View {
     let item: TrackedObject
     var width: CGFloat = 169
@@ -228,7 +250,11 @@ struct ItemCard: View {
                 Text(item.isPin ? "\(item.whereText) · pinned \(StatusCopy.ago(item.lastSeen, now: robot.now))"
                                 : "\(item.whereText): \(StatusCopy.ago(item.lastSeen, now: robot.now))")
                     .font(SoughtFont.cardMeta).foregroundStyle(p.text).lineLimit(dts.isAccessibilitySize ? 5 : 2)
-                FindItButton { router.pendingHero = heroKey; onFind(item) }.padding(.top, Space.xs)
+                if item.needsName {
+                    NameItButton { router.nameRequest = [item.id] }.padding(.top, Space.xs)
+                } else {
+                    FindItButton { router.pendingHero = heroKey; onFind(item) }.padding(.top, Space.xs)
+                }
             }
             .frame(width: width - 11, alignment: .leading)
         }
@@ -319,7 +345,17 @@ struct ItemPhoto: View {
     @Environment(\.palette) private var p
 
     var body: some View {
-        if item.isPin, case .none = item.photo {
+        if !item.isPin, case .none = item.photo {
+            // Soughtbot has no picture of it yet.
+            RoundedRectangle(cornerRadius: radius, style: .continuous).fill(p.surface.opacity(0.85))
+                .overlay {
+                    VStack(spacing: 6) {
+                        Image(systemName: "eye").font(.title2).foregroundStyle(p.text.opacity(0.7))
+                        Text("No photo yet").font(SoughtFont.pillSmall).foregroundStyle(p.text)
+                    }
+                }
+                .accessibilityHidden(true)
+        } else if item.isPin, case .none = item.photo {
             RoundedRectangle(cornerRadius: radius, style: .continuous).fill(p.surface.opacity(0.85))
                 .overlay(UserPinMarker(selected: false).scaleEffect(1.6))
                 .overlay(alignment: .bottomLeading) {

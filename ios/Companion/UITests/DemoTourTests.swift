@@ -122,4 +122,33 @@ final class DemoTourTests: XCTestCase {
         app.swipeUp(velocity: .slow)
         pause(2)
     }
+
+    func test7_NameThenFind() {
+        launch(["-mockUnnamed", "YES"])
+        pause(2.5)
+        app.descendants(matching: .any).matching(identifier: "namePrompt").firstMatch.tap()
+        pause(2)
+        let field = app.textFields["Name for this item"]
+        field.tap()
+        field.typeText("Slippers")
+        pause(0.8)
+        button("Save name").tap()
+        pause(1.8)
+        let field2 = app.textFields["Name for this item"]
+        field2.tap()
+        field2.typeText("Desk lamp")
+        pause(0.8)
+        button("Save name").tap()
+        pause(1.8)
+        button("Done").tap()
+        pause(1.5)
+        let search = app.textFields["searchField"]
+        search.tap()
+        search.typeText("find my slippers\n")
+        pause(2.5)
+        app.buttons["confirmFind"].tap()
+        pause(13)
+        app.buttons["findDone"].tap()
+        pause(1.5)
+    }
 }

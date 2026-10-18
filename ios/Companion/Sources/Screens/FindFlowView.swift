@@ -83,7 +83,9 @@ struct FindFlowView: View {
 
     @ViewBuilder private var confirm: some View {
         if let m = request.match {
-            ItemPhoto(item: m, radius: Radius.card).aspectRatio(4 / 3, contentMode: .fit).softShadow()
+            if case .none = m.photo, !m.isPin {} else {
+                ItemPhoto(item: m, radius: Radius.card).aspectRatio(4 / 3, contentMode: .fit).softShadow()
+            }
             title("Looking for \(m.isPin ? m.label : m.label.lowercased())?")
             body(m.isPin ? "You pinned it \(m.whereText.lowercased()), \(StatusCopy.ago(m.lastSeen, now: robot.now))."
                          : "Last seen \(m.whereText.lowercased()), \(StatusCopy.ago(m.lastSeen, now: robot.now)).")
@@ -244,8 +246,11 @@ struct FindFlowView: View {
 
     // MARK: Pieces
 
-    private func photo(_ ph: PhotoRef) -> some View {
-        ShadedPhoto(photo: ph, shadeTo: 0.2, radius: Radius.card).aspectRatio(4 / 3, contentMode: .fit).softShadow()
+    /// No photo yet (robot items before thumbnails are uploaded): show nothing rather than an empty box.
+    @ViewBuilder private func photo(_ ph: PhotoRef) -> some View {
+        if case .none = ph { EmptyView() } else {
+            ShadedPhoto(photo: ph, shadeTo: 0.2, radius: Radius.card).aspectRatio(4 / 3, contentMode: .fit).softShadow()
+        }
     }
 
     private func title(_ s: String) -> some View {

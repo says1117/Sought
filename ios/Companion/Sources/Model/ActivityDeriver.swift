@@ -60,13 +60,14 @@ enum ActivityDeriver {
                 let prev = h[h.count - 2], last = h[h.count - 1]
                 if hypot(last.x - prev.x, last.z - prev.z) > minMoveM {
                     out.append(ActivityEvent(id: "move-\(o.id)-\(last.t.timeIntervalSince1970)", kind: .moved,
-                                             text: "\(o.label.capitalizedFirst) moved \(place(x: last.x, z: last.z, object: o, map: map))",
+                                             text: "\(o.needsName ? "Something" : o.label.capitalizedFirst) moved \(place(x: last.x, z: last.z, object: o, map: map))",
                                              at: last.t, objectId: o.id, from: (prev.x, prev.z), to: (last.x, last.z)))
                 }
             } else if now.timeIntervalSince(o.firstSeen) < newWindow {
                 let room = map?.room(atX: o.x, z: o.z)?.name.lowercased() ?? o.room?.lowercased()
                 out.append(ActivityEvent(id: "new-\(o.id)", kind: .new,
-                                         text: "Soughtbot noticed \(article(o.label)) \(o.label.lowercased())" + (room.map { " in the \($0)" } ?? ""),
+                                         text: o.needsName ? "Soughtbot noticed something \(o.whereText.lowercased())"
+                                             : "Soughtbot noticed \(article(o.label)) \(o.label.lowercased())" + (room.map { " in the \($0)" } ?? ""),
                                          at: o.firstSeen, objectId: o.id, to: (o.x, o.z)))
             }
         }
