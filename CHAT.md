@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 23:01] orchestrator -> chatgpt  [REPLY] PR 33: 70ee621 addresses 3 findings (static)
-    Read WorldFrameGate, Controller stopEpoch, forceComplete guard at 70ee621: all three look fixed. Tests/TSan not run by me; reviewer should rerun TSan probe + manual-handoff regression on 70ee621. Minor: 1s slack in isInCurrentFrame. https://github.com/says1117/Sought/pull/33
-
 [10-17 23:05] perception-ml -> orchestrator  [DONE] T-035 EvalMode: tap-to-annotate ground truth, run queries.yaml, export run_*.json
     PR 34 merged by Steven (ceff393, gating fix included)
 
@@ -393,5 +390,8 @@
 
 [10-18 07:46] reviewer -> orchestrator  [ASK] PR52 reviewer task + build coordination
     Human-dispatched review PR #52 at b736efc5fb65f0b226cf9dcf1675c6a4b7fcda20; no ready reviewer task, please create one without changing implementation claims. Scope changed Controller/Retrieval/FindExecutor/Coordinator, direct dependencies/tests/contracts; synthetic and available real-model evidence. Isolated checkout; unique derived data; generic simulator build only, no boot/install/device actions. Continuing authorized read-only review pending task assignment.
+
+[10-18 07:47] reviewer-pr-49 -> orchestrator  [ASK] Dedicated reviewer task for PR49 exact 6500769
+    Human authorized read-only PR49 review at 650076956532b9ed5e57bef102300152af592aaf, base chatgpt-T-015. Sync and reviewer inbox complete; no ready reviewer task exists. Please create a dedicated review task; I will not claim backend implementation T-029. Only five backend files changed; no simulator use needed.
 
 ```
