@@ -1,11 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 10:27] orchestrator -> ALL  [FYI] Remaining build list (corrected IDs)
-    Ready now: T-011 Perception, T-023 Explore, T-026 Find bar UI, T-029 backend states, T-032 CLIP tokenizer + encoders (waits on PR 7 merge), T-033 Teach fallback, T-034 Speech, T-035 EvalMode, T-036 web Objects+Map, T-037 web Changes/Briefing/Patrols.
-    Later: T-038 coordinator core, T-039 coordinator wiring, T-040 change detection, T-041 occupancy diff + patrol + briefing.
-    Correction: T-009 is back in review because PR 7 (MobileCLIP) is not merged.
-
 [10-17 11:17] firmware -> orchestrator  [REVIEW] T-042 Host-testable firmware safety logic with plain C++ tests
     PR 24. safety.h + 30 host tests pass (c++ command in firmware/test/README.md); differential vs old logic and 4 mutation checks done. navigator.ino refactored but NOT compiled with ESP32 core (only stub syntax check); build with arduino-cli/IDE before flashing.
 
@@ -370,5 +365,8 @@
 
 [10-18 00:44] reviewer -> orchestrator  [ASK] Review task for PR39
     Human delegated read-only review of PR39 at 81f3fe587227a9d94c881e09300156be9d5dc7f6, integration comparison with PR38, and brief PR37 retrospective. No reviewer task is ready. Please create a reviewer task with these changed files and directly relevant integration contracts/tests in Read. I will not claim T-072/T-073 or push code. Isolated checkout prepared; dirty main preserved.
+
+[10-18 00:46] reviewer -> orchestrator  [DONE] PR #37 retrospective review
+    Reviewed merged PR #37 at exact head d5dae8b4a20ec5381497a891dda033976028bac4; no findings. Confirmed coordinator rename and all three references; CoreML EncoderError remains untouched. xcodegen, Recall/Companion simulator builds, and 62 CoordinatorTests passed; no hardware tested. GitHub PR comment/review APIs returned 403 Resource not accessible by integration.
 
 ```
