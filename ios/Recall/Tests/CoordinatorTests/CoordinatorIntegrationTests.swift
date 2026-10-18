@@ -153,6 +153,46 @@ final class CoordinatorIntegrationTests: XCTestCase {
         XCTAssertEqual(ControllerResultMapper.result(.running), .blocked(reason: "The controller did not finish"))
     }
 
+    func testWaypointTimeoutIncludesGuardAndDistanceDiagnostics() async throws {
+        let robot = CoordSimRobot()
+        var time = 0.0
+        let controller = Controller(poses: robot, sink: robot, guardState: { .stop },
+                                    clock: { time }, sleep: { dt in time += dt })
+        let result = try await ControllerNavigator(controller: controller)
+            .goTo(CoordinatorWaypoint(name: "kitchen", x: 0, z: -4, inCurrentFrame: true))
+        guard case .blocked(let why) = result else { return XCTFail("expected blocked, got \(result)") }
+        XCTAssertTrue(why.hasPrefix("I couldn't get there in time"), why)
+        XCTAssertTrue(why.contains("fwd guard stop 100%"), why)
+        XCTAssertTrue(why.contains("wheels zero 100%"), why)
+        XCTAssertTrue(why.contains("dist 4.00→4.00 m (closest 4.00)"), why)
+        XCTAssertEqual(robot.movingCommands, 0, "diagnostics must not bypass the guard")
+        XCTAssertEqual(robot.allCommands.last?.left, 0)
+        XCTAssertEqual(robot.allCommands.last?.right, 0)
+    }
+
+    func testComeToPlaceLegTimeoutIncludesGuardAndDistanceDiagnostics() async throws {
+        let robot = CoordSimRobot()
+        var time = 0.0
+        let controller = Controller(poses: robot, sink: robot, guardState: { .stop },
+                                    clock: { time }, sleep: { dt in time += dt })
+        let result = try await ControllerLegDriver(controller: controller, poses: robot)
+            .drive(x: 0, z: -4, stopDistance: 1)
+        guard case .blocked(let why) = result else { return XCTFail("expected blocked, got \(result)") }
+        XCTAssertTrue(why.contains("fwd guard stop 100%"), why)
+        XCTAssertTrue(why.contains("dist 4.00→4.00 m (closest 4.00)"), why)
+        XCTAssertEqual(robot.movingCommands, 0)
+    }
+
+    func testControllerDiagnosticsPreserveSuccessAndCancellation() {
+        let stats = ControlRunStats(ticks: 1, zeroCommand: 1)
+        XCTAssertEqual(ControllerResultMapper.result(.done, stats: stats), .completed(summary: "arrived"))
+        XCTAssertEqual(ControllerResultMapper.result(.failed(.cancelled), stats: stats), .cancelled)
+        guard case .blocked(let why) = ControllerResultMapper.result(.failed(.trackingLost), stats: stats)
+        else { return XCTFail("expected tracking block") }
+        XCTAssertTrue(why.hasPrefix(CoordinatorConfig.rescanReason + " ("), why)
+        XCTAssertTrue(why.contains("1 ticks"), why)
+    }
+
     func testTypedFindDrivesThenSpeaksResult() async throws {
         let rig = try CoordIntegrationRig(encoders: CoordIntegrationRig.working())
         try await rig.coordinator.execute(.findObject(description: "blue backpack"))

@@ -30,7 +30,10 @@ enum ControllerTuning {
     static let kh = 2.0                         // PLACEHOLDER wheel units per deg of heading correction while driving
     static let doneMargin = 0.05                // plan: done when dist < stopDist + 0.05
     static let doneTicks = 3                    // plan: for 3 consecutive ticks
-    static let timeout = 30.0                   // plan: fail on 30 s timeout
+    static let timeout = 30.0                   // minimum goTo budget
+    static let goToSetupSeconds = 15.0          // PLACEHOLDER allowance for turning/settling
+    static let goToSecondsPerMeter = 12.0       // PLACEHOLDER, not measured travel speed
+    static let goToMaximumTimeout = 75.0        // leaves 15 s before the app's 90 s poll deadline
     static let trackingLossLimit = 1.0          // plan: stop if tracking != normal for > 1 s
     static let rotateToleranceDeg = 10.0        // rotateBy is done inside this (or once past the target). 5 hunted on the rover
     static let rotateTimeout = 15.0             // PLACEHOLDER
@@ -55,6 +58,14 @@ struct WheelCommand: Equatable {
 
 enum ControllerMath {
     static func clamp(_ v: Double, _ lo: Double, _ hi: Double) -> Double { max(lo, min(hi, v)) }
+
+    /// Fixed run budget from the first valid pose; remaining travel excludes the arrival stop distance.
+    static func goToTimeout(distance: Double, stopDistance: Double) -> Double {
+        guard distance.isFinite, stopDistance.isFinite else { return ControllerTuning.timeout }
+        let remaining = max(0, distance - max(0, stopDistance))
+        return clamp(ControllerTuning.goToSetupSeconds + ControllerTuning.goToSecondsPerMeter * remaining,
+                     ControllerTuning.timeout, ControllerTuning.goToMaximumTimeout)
+    }
 
     /// Contract convention: L = linear - angular, R = linear + angular, clamped to -255...255.
     /// (Same mapping as DriveProtocol.mix; kept local so this module has no dependency on the BLE module.)
@@ -120,6 +131,7 @@ struct ControlSession {
 
     let goal: Goal
     private var startTime: Double?
+    private var goToBudget: Double?
     private var trackingBadSince: Double?
     private var doneStreak = 0
     private var rotateTargetYaw: Double?
@@ -130,7 +142,7 @@ struct ControlSession {
 
     private var timeout: Double {
         if case .rotateBy = goal { return ControllerTuning.rotateTimeout }
-        return ControllerTuning.timeout
+        return goToBudget ?? ControllerTuning.timeout
     }
 
     mutating func tick(_ input: TickInput) -> TickOutput {
@@ -138,7 +150,8 @@ struct ControlSession {
         if startTime == nil { startTime = input.now }
 
         // Tracking loss: hold still immediately, fail after trackingLossLimit.
-        guard input.tracking == .normal, let pose = input.pose else {
+        guard input.tracking == .normal, let pose = input.pose,
+              pose.x.isFinite, pose.z.isFinite, pose.yawDeg.isFinite else {
             doneStreak = 0
             if trackingBadSince == nil { trackingBadSince = input.now }
             if input.now - trackingBadSince! > ControllerTuning.trackingLossLimit {
@@ -147,6 +160,11 @@ struct ControlSession {
             return TickOutput(command: .zero, status: .running)
         }
         trackingBadSince = nil
+
+        if goToBudget == nil, case .goTo(let x, let z, let stopDist) = goal {
+            goToBudget = ControllerMath.goToTimeout(
+                distance: ControllerMath.distance(pose: pose, targetX: x, targetZ: z), stopDistance: stopDist)
+        }
 
         if input.now - startTime! > timeout { return finish(.failed(.timeout)) }
 

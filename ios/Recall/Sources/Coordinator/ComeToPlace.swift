@@ -160,7 +160,8 @@ final class ControllerLegDriver: CoordinatorLegDriving {
     func drive(x: Double, z: Double, stopDistance: Double) async throws -> CoordinatorTaskResult {
         let epoch = controller.stopEpoch   // a cancel() from here on cancels this leg even if it lands before the loop starts
         try Task.checkCancellation()
-        return ControllerResultMapper.result(await controller.goTo(x: x, z: z, stopDistance: stopDistance, since: epoch))
+        let status = await controller.goTo(x: x, z: z, stopDistance: stopDistance, since: epoch)
+        return ControllerResultMapper.result(status, stats: controller.lastRun)
     }
     func cancel() { controller.stop() }
 }
