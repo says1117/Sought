@@ -24,3 +24,12 @@ builds no occupancy grid; `UploadSnapshot.media` / `.map` are ready for both.
 
 Tests: `Tests/SyncTests`. `LiveBackendSmokeTests` runs against a real backend when `RECALL_SMOKE_URL` and
 `RECALL_SMOKE_TOKEN` are set (local backend, fake token only). Without Xcode run `tools/swift_standin/run_sync_tests.sh`.
+
+## Remote commands (CommandPoller)
+
+Only when a backend is configured, and only between `AppRuntime.start()` and `pause()`, `CommandPoller` GETs
+`/api/commands/next` every 2 s (204 = nothing queued). A claimed command is acked `running`, its text runs through
+`RemoteCommandRunner` (Sources/Coordinator: keyword STOP first, then the find bar's planner, then the coordinator),
+and it is acked `done` with the result or `failed` with the reason. A busy robot (task running or pending, manual
+tool open, another remote command in progress) answers `failed` / `busy` and never queues motion; a "stop" always
+runs `stopAll()`. Network errors back off 2, 4, 8 ... 30 s.

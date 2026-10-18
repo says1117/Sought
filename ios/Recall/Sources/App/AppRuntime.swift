@@ -61,6 +61,7 @@ final class AppRuntime: ObservableObject {
     private let heartbeatSource = CoordinatorHeartbeatSource()
     private var heartbeat: HeartbeatPublisher?
     private var uploader: BackendUploader?          // T-071 backend uploads (see the T-071 block in init)
+    private var commandPoller: CommandPoller?       // remote commands from Sought (see the REMOTE COMMANDS block in init)
     private var sensorTimer: Timer?
     private var perception: PerceptionLoop?
     private var scheduler = PerceptionScheduler()
@@ -178,6 +179,13 @@ final class AppRuntime: ObservableObject {
             uploader?.start()
         }
         // END T-071
+        // BEGIN REMOTE COMMANDS: only with a backend configured. Polls /api/commands/next every 2 s while active
+        // (start/pause below); text goes through the find bar's planner and this coordinator. Busy -> acked failed.
+        commandPoller = CommandPoller.make(config: SyncConfig.fromBundle(), runner: RemoteCommandRunner(
+            planner: FallbackPlanner.make(), coordinator: coordinator, context: { [waypoints] in
+                PlannerContext(waypointNames: ((try? waypoints.waypoints()) ?? []).map(\.name))
+            }))
+        // END REMOTE COMMANDS
     }
 
     /// Perception crops are CIImages; the Core ML image model takes preprocessed RGBA, so convert and embed one by one.
@@ -218,6 +226,7 @@ final class AppRuntime: ObservableObject {
         RunLoop.main.add(t, forMode: .common)
         sensorTimer = t
         heartbeat?.start()
+        commandPoller?.start()
     }
 
     /// Stop button, backgrounding: brake and cancel the task. Safe to call any time.
@@ -254,6 +263,7 @@ final class AppRuntime: ObservableObject {
     func pause() {
         stopEverything()
         heartbeat?.stop()
+        commandPoller?.stop()
         sensorTimer?.invalidate()
         sensorTimer = nil
     }

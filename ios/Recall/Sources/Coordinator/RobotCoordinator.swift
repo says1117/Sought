@@ -74,6 +74,8 @@ final class RobotCoordinator {
     var trace: [CoordinatorTraceEntry] { lock.lock(); defer { lock.unlock() }; return _trace }
     var isBusy: Bool { lock.lock(); defer { lock.unlock() }; return active != nil }
     var hasPending: Bool { lock.lock(); defer { lock.unlock() }; return pending != nil }
+    /// A manual tool (Manual drive, Teach, Self-test) holds the drive; new motion is refused until it closes.
+    var manualControlOpen: Bool { deps.lease.manualHeld }
 
     // MARK: - ToolExecuting surface
 
