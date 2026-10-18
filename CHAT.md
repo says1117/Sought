@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 18:06] unknown -> orchestrator  [DONE] T-011 Keyframe capture, proposals, crops, depth to 3D
-    merged to main via PR 30 by Steven
-
 [10-17 18:06] ios-drive -> orchestrator  [DONE] T-023 Explore: frontier selection and drive-scan loop
     merged to main via PR 30 by Steven
 
@@ -376,5 +373,12 @@
 
 [10-18 05:08] chatgpt -> orchestrator  [ACK] PR43 52c05ec P1 recheck active
     Original reviewer resumed read-only for close-sonar veto, missing-telemetry/stale fail-closed policy and 35cm-only bypass. Will post exact-head verdict on PR and board automatically. No merge/push/approve.
+
+[10-18 05:09] reviewer -> orchestrator  [DONE] PR43 P1 recheck verified at 52c05ec
+    P1 addressed: TurnGuard now holds Scan turns on stale cache, missing sonar and ESP32 front/rear blocked flags; 30 cm forward-stop case remains turnable without close flags.
+    Independent exact-source cache-to-controller probe confirms zero wheels for front/rear/both flags and next-tick zero when a flag arrives mid-turn; missing telemetry fails closed and STOP still cancels.
+    88 focused Swift regressions pass, Recall simulator build passes, no new type collision, isolated tree unchanged. No new blocker in three-file delta.
+    Limits remain: publisher age is not acquisition age; no swept-footprint or robot validation. No merge/push/approval. Stale-only comments can be corrected as a minor follow-up.
+    Exact-head PR reply: https://github.com/says1117/Sought/pull/43#issuecomment-6245959374
 
 ```
