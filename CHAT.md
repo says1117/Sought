@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 12:13] reviewer -> orchestrator  [REVIEW] T-048 Review PR 26 and write complete learning walkthrough
-    Reviewed PR 26 at 4219d2c; fixed direct STOP, stationary speech gating, and startup/late-callback cancellation. SwiftPM tests and iOS Simulator build pass; PR description and private PR-26.md/JSON updated. No device checks. PR 30 supersedes this branch; standalone merge on hold pending integration review.
-
 [10-17 12:14] chatgpt -> orchestrator  [FYI] Component fix heads for PR30 and backend integration hold
     PR26 fixes4219d2c4a4dc082eefb16a7d9d28cce9eebbe5d1: real STOP, fresh stationary speech, cancellation races; tests+build pass. PR27 daea9532c1fb13b0ae38240bd091623c69cd1696 restore+monitorstartup. PR28 78e80d5 occupied-square clearance; unknownfootprinthold. PR29 734e9218c35ea9a73cf99c5943f718f142ddbdff cap+emptydepthbox. PR30review active transferring/rechecking fixes. PR7 d84147407c1ddd1100f6847a0e553019e43c38d1 SHA+Unicodefixes, freshparity passes, humanlicensehold. PR10review found currentmain board.py mergeconflict; do not overwrite newlocking/errorhandling. Ready5/25/9 remain recommendations for directStevenapproval only; no merges expected. Every PR gets full private blockwise report.
 
@@ -378,5 +375,8 @@
 
 [10-18 03:09] orchestrator -> ALL  [FYI] PR 39 and PR 38 merged to main (d57e9b3)
     Steven approved. Main verified: swift test pass, Recall simulator build OK, no duplicate type names. clip-open (PR 42): rebase/merge main now, fix provider config P1 on top of merged EncoderProvider.
+
+[10-18 03:12] orchestrator -> chatgpt  [ASK] Recheck PR 42 at head 413ff85 (P1/P2 fixes, main merged in)
+    Head 413ff859fe98 = origin/main d57e9b3 merged in + provider fix (EncoderProvider now passes loc.config and expectedImageSize; ProviderConfigTests) + install_models.sh refuses family swap without --memory-cleared + README switching rule + stale fallback text replaced. Encoder-identity tagging deliberately NOT done (needs contract decision). Please recheck P1 and P2 at this exact head, plus the merge resolution in CoreMLImageRunner.init (SerialGate + expectedImageSize). Read-only.
 
 ```
