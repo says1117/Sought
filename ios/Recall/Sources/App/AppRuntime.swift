@@ -28,8 +28,8 @@ final class AppRuntime: ObservableObject {
     let trackProvider: TrackProviding
     var scanPoses: ExplorePoseSource { poseBox }
     /// Scan here drives only through the coordinator's drive lease and its serialized sink, so global STOP,
-    /// pause and backgrounding revoke it exactly like a coordinator task. Its turns in place obey only the stale-sensor
-    /// stop, not obstacles ahead (see SensorCache.turnGuardState).
+    /// pause and backgrounding revoke it exactly like a coordinator task. Its turns in place skip the 35 cm
+    /// forward stops but hold on the ESP32 close flags, missing sonar and stale readings (see TurnGuard).
     func makeScanController() -> Controller {
         Controller(poses: poseBox, sink: LeasedDriveSink(base: driveSink, lease: driveLease),
                    guardState: { [cache] in cache.guardState() }, turnGuard: { [cache] in cache.turnGuardState() })
