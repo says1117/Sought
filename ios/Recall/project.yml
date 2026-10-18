@@ -90,6 +90,7 @@ targets:
       - path: Sources/ComeToMe/CompanionMessages.swift
       - path: Sources/ComeToMe/ApproachPlanner.swift
       - path: Sources/ComeToMe/ComeToMeRunner.swift
+      - path: Sources/ComeToMe/PairedApproachRunner.swift
       - path: Sources/ComeToMe/RangeSample.swift
       - path: Sources/Coordinator
       - path: Sources/RobotTools/ScanHere.swift

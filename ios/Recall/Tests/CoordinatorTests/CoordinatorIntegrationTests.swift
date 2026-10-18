@@ -239,7 +239,8 @@ final class CoordinatorIntegrationTests: XCTestCase {
     }
 
     func testExploreAndComeToMeRefusedWhenFlaggedOff() async throws {
-        let rig = try CoordIntegrationRig(encoders: CoordIntegrationRig.working())
+        let rig = try CoordIntegrationRig(encoders: CoordIntegrationRig.working(),
+                                            features: RecallFeatureFlags(comeToMeEnabled: false))
         try await rig.coordinator.execute(.explore(maxMinutes: 5))
         XCTAssertTrue(rig.speaker.said.last?.contains("exploring is turned off in this build") == true, "\(rig.speaker.said)")
         try await rig.coordinator.execute(.comeToMe)
@@ -248,7 +249,7 @@ final class CoordinatorIntegrationTests: XCTestCase {
         XCTAssertFalse(rig.coordinator.isBusy)
         XCTAssertEqual(rig.robot.movingCommands, 0)
         XCTAssertFalse(RecallFeatureFlags().exploreEnabled)
-        XCTAssertFalse(RecallFeatureFlags().comeToMeEnabled)
+        XCTAssertTrue(RecallFeatureFlags().comeToMeEnabled)
     }
 
     func testHeartbeatStateSequenceAndContractBody() async throws {

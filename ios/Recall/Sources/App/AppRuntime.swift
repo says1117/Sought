@@ -28,6 +28,7 @@ final class AppRuntime: ObservableObject {
     let trackProvider: TrackProviding
     /// Explore (flag-gated): live LiDAR grid + the coordinator's explore task. See the EXPLORE block in init.
     let explore: ExploreRuntime
+    let pairedPhone: PairedPhoneLink
     var scanPoses: ExplorePoseSource { poseBox }
     /// Scan here drives only through the coordinator's drive lease and its serialized sink, so global STOP,
     /// pause and backgrounding revoke it exactly like a coordinator task. Its turns in place skip the 35 cm
@@ -120,6 +121,18 @@ final class AppRuntime: ObservableObject {
         self.explore = explore
         wiring.makeExplorer = explore.makeExplorer
         // EXPLORE END
+        let pairedPhone = PairedPhoneLink()
+        self.pairedPhone = pairedPhone
+        let guidance = pairedPhone.guidance
+        let approachPoses = poseBox
+        let pairedComer = PairedComeToMeAdapter(ranging: guidance, isReady: { guidance.isEnabled },
+            makeMotion: {
+                PairedControllerMotion(poses: approachPoses, sink: LeasedDriveSink(base: sink, lease: lease),
+                                       guardState: { cache.guardState() }, turnGuard: { cache.turnGuardState() })
+            }, onStatus: { [weak pairedPhone] request, state, distance, reason in
+                Task { @MainActor in pairedPhone?.progress(request, state: state, distance: distance, reason: reason) }
+            })
+        wiring.makeComer = { pairedComer }
         // REMOTE TEACH BEGIN: move / turn / scan here / save map from remote commands, on the coordinator's Controller and
         // lease. Save map uses Teach's ARWorldMapAdapter and adopts the map through mapSaved (onSaved is set at the end of init).
         let teachMapSaver = ARWorldMapAdapter(tracker: pose)
@@ -134,6 +147,7 @@ final class AppRuntime: ObservableObject {
         // REMOTE TEACH END
         let coordinator = wiring.makeCoordinator()
         self.coordinator = coordinator
+        pairedPhone.bind(coordinator: coordinator, adapter: pairedComer)
         self.storageWarning = warning
 
         let embed = cropEmbedder ?? encoderSet.imageModel.map(Self.perceptionEmbedder)
@@ -262,6 +276,7 @@ final class AppRuntime: ObservableObject {
         sensorTimer = t
         heartbeat?.start()
         commandPoller?.start()
+        pairedPhone.resume()
     }
 
     /// Stop button, backgrounding: brake and cancel the task. Safe to call any time.
@@ -299,6 +314,7 @@ final class AppRuntime: ObservableObject {
     func mapSaved(mapId: String, generation: Int?) { adoptSavedMap?(mapId, generation) }
 
     func pause() {
+        pairedPhone.suspend()
         // Remote commands first, so nothing claimed before the pause can start after the brake below.
         commandPoller?.stop()
         stopEverything()
