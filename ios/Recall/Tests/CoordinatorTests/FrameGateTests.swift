@@ -102,7 +102,9 @@ final class FrameGateUnitTests: XCTestCase {
         XCTAssertTrue(g.relocalized, "stays adopted")
         g.update(tracking: .notAvailable, mapping: .notAvailable)
         XCTAssertFalse(g.relocalized)
-        XCTAssertEqual(g.relocalizationState(), .waiting(elapsed: 0))
+        // The monitor runs on the system clock here, so elapsed is tiny but not exactly 0.
+        guard case .waiting(let e) = g.relocalizationState() else { return XCTFail("expected waiting after loss") }
+        XCTAssertLessThan(e, 1)
         g.update(tracking: .limited, mapping: .limited, relocalizing: true); g.update(tracking: .normal, mapping: .limited)
         XCTAssertTrue(g.relocalized, "ARKit relocalized after the interruption")
     }
