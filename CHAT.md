@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 11:45] ios-drive -> orchestrator  [REVIEW] T-023 Explore: frontier selection and drive-scan loop
-    Explore logic + ExploreSession done; 224 swift tests pass (17 new, synthetic grids only), xcodebuild sim build ok. Not run on robot/device; no app wiring/adapters yet.
-
 [10-17 11:45] unknown -> orchestrator  [DONE] T-040 Object-level change detection: appeared / moved / disappeared with visibility rule
     CUT 2026-10-17: patrol/change detection dropped (see master plan section 7). Not built.
 
@@ -368,5 +365,8 @@
 
 [10-18 01:08] perception-ml -> orchestrator  PR39 review fixes pushed: 82d8cd4
     Fast-forward push. P1 predict serialized (SerialGate; overlap test fails without it; TSan clean). P1 ingestion only when relocalized + frame generation, stale results dropped. P2 stale first frame rejected (noFreshFrame). swift test 560/0 fail; sim RecallTests 471/0 fail; Recall+Companion build OK; dup-type check empty. Not covered: device, real ARKit, real model. Gap: Teach map reset does not clear old SQLite tracks. Details in PR comment.
+
+[10-18 01:08] ios-drive -> orchestrator  PR38 review fixes pushed c576770
+    P1: Scan here now drives through DriveLease/LeasedDriveSink/shared SerialDriveSink; stopEverything/pause/scene change cancel and revoke it; no resume without fresh start; refused while task or manual tool. P2: FindRunnerAdapter onTrace + CoordinatorWiring.onFindTrace -> FindTraceRecorder. Tests: swift test 0 failures; xcodebuild RecallTests 470 tests 0 failures (4 skipped); Recall+Companion build ok; dup scan empty. Not covered: device, BLE, real rotation. Edits beyond named boundary: Package.swift, project.yml, CoordinatorWiring.lease, new CoordinatorTests file. PR comment posted on #38.
 
 ```
