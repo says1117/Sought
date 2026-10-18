@@ -89,11 +89,12 @@ struct CoordIntegrationRig {
     let coordinator: RobotCoordinator
 
     init(encoders: EncoderProvider, features: RecallFeatureFlags = RecallFeatureFlags(),
-         unreachableTarget: Bool = false, frame: CoordinatorFrameValidity = TrustedFrame()) throws {
-        tracks = try TrackStore(path: ":memory:")
+         unreachableTarget: Bool = false, frame: CoordinatorFrameValidity = TrustedFrame(),
+         trackMapId: String = TrackStore.defaultMapId) throws {
+        tracks = try TrackStore(path: ":memory:", scope: { frame.activeMapId })
         waypoints = try WaypointStore(path: ":memory:")
         try tracks.upsert(Track(id: "obj_1", position: SIMD3(0, 0, unreachableTarget ? -500 : -2),
-                                embedding: [1, 0, 0, 0], sightings: 3, persistence: 0.8))
+                                embedding: [1, 0, 0, 0], sightings: 3, persistence: 0.8), mapId: trackMapId)
         try waypoints.addWaypoint(name: "kitchen", pose: Pose2D(x: 0, z: -1, yawDeg: 0))
         let ticks = CoordTickClock()
         var wiring = CoordinatorWiring(
@@ -165,8 +166,8 @@ final class CoordinatorIntegrationTests: XCTestCase {
     // Real adapters with a real gate: stored targets are refused until the saved map is recognised.
     func testStoredWaypointAndFindRefusedUntilRelocalizedThenAllowed() async throws {
         let gate = WorldFrameGate(now: { Date().addingTimeInterval(3600) })   // this frame began after the stored rows
-        let rig = try CoordIntegrationRig(encoders: CoordIntegrationRig.working(), frame: gate)
-        gate.sessionStarted(loadedSavedMap: true)
+        let rig = try CoordIntegrationRig(encoders: CoordIntegrationRig.working(), frame: gate, trackMapId: "map-A")
+        gate.sessionStarted(loadedSavedMap: true, mapId: "map-A")
         try await rig.coordinator.execute(.goToWaypoint(name: "kitchen"))
         try await rig.coordinator.execute(.findObject(description: "blue backpack"))
         XCTAssertEqual(rig.robot.movingCommands, 0, "no motion toward stored coordinates")

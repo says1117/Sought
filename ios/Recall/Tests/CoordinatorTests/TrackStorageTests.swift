@@ -76,10 +76,10 @@ final class TrackStorageTests: XCTestCase {
         try store.upsert(Track(id: "obj_ok", position: SIMD3(0, 0, 0), embedding: [1, 0, 0, 0]))
         // 16 bytes (a float32 4-vector) but dim 4 claims float16, and an 8-byte blob with dim 3.
         raw(path, """
-        INSERT INTO tracks (id,x,y,z,embedding,embedding_dim,sightings,persistence,last_seen,active)
-        VALUES ('obj_f32', 0,0,0, zeroblob(16), 4, 1, 0.3, '2026-01-01T00:00:00Z', 1),
-               ('obj_short', 0,0,0, zeroblob(8), 3, 1, 0.3, '2026-01-01T00:00:00Z', 1),
-               ('obj_nodim', 0,0,0, zeroblob(8), 0, 1, 0.3, '2026-01-01T00:00:00Z', 1)
+        INSERT INTO tracks (id,x,y,z,embedding,embedding_dim,sightings,persistence,last_seen,active,map_id)
+        VALUES ('obj_f32', 0,0,0, zeroblob(16), 4, 1, 0.3, '2026-01-01T00:00:00Z', 1, 'default'),
+               ('obj_short', 0,0,0, zeroblob(8), 3, 1, 0.3, '2026-01-01T00:00:00Z', 1, 'default'),
+               ('obj_nodim', 0,0,0, zeroblob(8), 0, 1, 0.3, '2026-01-01T00:00:00Z', 1, 'default')
         """)
         var logged: [String] = []
         store.onInvalidRow = { logged.append($0) }
@@ -132,5 +132,62 @@ final class TrackStorageTests: XCTestCase {
         XCTAssertEqual(scalar(path, "SELECT count(*) FROM audit WHERE col='embedding'"), 1)
         XCTAssertEqual(scalar(path, "SELECT count(*) FROM audit WHERE col='position'"), 1)
         XCTAssertGreaterThan(try XCTUnwrap(store.allTracks().first).position.x, 0)
+    }
+
+    // MARK: PR 39 review P1: ingestion respects the ARKit frame
+
+    private final class TrackFrameFake: CoordinatorFrameValidity {
+        var relocalized = false
+        var generation = 1
+        func isInCurrentFrame(createdAt isoTimestamp: String) -> Bool { false }
+    }
+
+    func testNewFrameObservationsAreRejectedAndStoreUntouched() throws {
+        let (store, path) = try auditedStore()
+        let frame = TrackFrameFake()                       // fresh map: not relocalized
+        let ing = MemoryIngestor(store: store, frame: frame)
+        XCTAssertFalse(ing.canIngest)
+        let s = try ing.ingest([obs(0, [1, 0, 0, 0]), obs(5, [0, 1, 0, 0])], generation: ing.generation)
+        XCTAssertTrue(s.rejected)
+        XCTAssertEqual(s.matched + s.created, 0)
+        XCTAssertEqual(try store.allTracks().count, 1)
+        XCTAssertEqual(scalar(path, "SELECT sightings FROM tracks WHERE id='obj_a'"), 3, "old track not updated by new-frame data")
+    }
+
+    func testRelocalizedFrameObservationsAreAccepted() throws {
+        let (store, _) = try auditedStore()
+        let frame = TrackFrameFake(); frame.relocalized = true
+        let ing = MemoryIngestor(store: store, frame: frame)
+        XCTAssertTrue(ing.canIngest)
+        let s = try ing.ingest([obs(0, [1, 0, 0, 0]), obs(5, [0, 1, 0, 0])], generation: ing.generation)
+        XCTAssertFalse(s.rejected)
+        XCTAssertEqual(s, .init(matched: 1, created: 1))
+    }
+
+    func testResultFromEarlierGenerationIsDroppedNotAssociated() throws {
+        let (store, _) = try auditedStore()
+        let frame = TrackFrameFake(); frame.relocalized = true
+        let ing = MemoryIngestor(store: store, frame: frame)
+        let captured = ing.generation
+        frame.generation += 1                              // session restarted / tracking lost and recovered in between
+        let s = try ing.ingest([obs(0, [1, 0, 0, 0])], generation: captured)
+        XCTAssertTrue(s.rejected)
+        XCTAssertEqual(try store.allTracks().first?.sightings, 3)
+    }
+
+    func testRealGateBumpsGenerationOnNewSessionAndLostTracking() {
+        let g = WorldFrameGate()
+        g.sessionStarted(loadedSavedMap: true)
+        let g1 = g.generation
+        g.update(tracking: .normal, mapping: .mapped)
+        XCTAssertTrue(g.relocalized); XCTAssertEqual(g.generation, g1, "relocalizing keeps the generation")
+        g.update(tracking: .notAvailable, mapping: .notAvailable)
+        XCTAssertGreaterThan(g.generation, g1, "losing tracking may re-anchor")
+        let g2 = g.generation
+        g.sessionStarted(loadedSavedMap: false)
+        XCTAssertGreaterThan(g.generation, g2)
+        g.update(tracking: .normal, mapping: .mapped)
+        let ing = MemoryIngestor(store: try! TrackStore(path: ":memory:"), frame: g)
+        XCTAssertFalse(ing.canIngest, "fresh map session never writes the persistent store")
     }
 }

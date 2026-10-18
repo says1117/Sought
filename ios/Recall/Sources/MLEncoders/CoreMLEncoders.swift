@@ -18,6 +18,18 @@ public enum EncoderError: Error, Equatable {
     case modelFailed(String)
 }
 
+/// Runs one closure at a time. `MLModel.prediction` must not be entered by two threads at once on the same model, and the
+/// perception loop (detached task) and the arrival check (find worker) share one image runner, so every Core ML runner
+/// owns one gate and takes it around each prediction. Blocking is fine: a prediction is tens of milliseconds.
+public final class SerialGate {
+    private let lock = NSLock()
+    public init() {}
+    public func run<T>(_ body: () throws -> T) rethrows -> T {
+        lock.lock(); defer { lock.unlock() }
+        return try body()
+    }
+}
+
 /// The only seam to Core ML. Real runners wrap `MLModel`; tests use fakes.
 public protocol TextModelRunning {
     /// `tokens` is exactly 77 ids (CLIPTokenizer output). Returns the raw model output.
@@ -94,6 +106,7 @@ import CoreVideo
 /// real (uncommitted) models. Input/output names match ml/conversion/convert.py: "tokens", "image", "embedding".
 public final class CoreMLTextRunner: TextModelRunning {
     private let model: MLModel
+    private let gate = SerialGate()
     public init(modelURL: URL, computeUnits: MLComputeUnits = .all) throws {
         let cfg = MLModelConfiguration(); cfg.computeUnits = computeUnits
         do { model = try MLModel(contentsOf: modelURL, configuration: cfg) }
@@ -103,7 +116,7 @@ public final class CoreMLTextRunner: TextModelRunning {
         do {
             let arr = try MLMultiArray(shape: [1, NSNumber(value: tokens.count)], dataType: .int32)
             for (i, t) in tokens.enumerated() { arr[i] = NSNumber(value: t) }
-            let out = try model.prediction(from: MLDictionaryFeatureProvider(dictionary: ["tokens": arr]))
+            let out = try gate.run { try model.prediction(from: MLDictionaryFeatureProvider(dictionary: ["tokens": arr])) }
             return Self.floats(out.featureValue(for: "embedding")?.multiArrayValue)
         } catch let e as EncoderError { throw e } catch { throw EncoderError.modelFailed("text predict: \(error)") }
     }
@@ -115,6 +128,7 @@ public final class CoreMLTextRunner: TextModelRunning {
 
 public final class CoreMLImageRunner: ImageModelRunning {
     private let model: MLModel
+    private let gate = SerialGate()
     public init(modelURL: URL, computeUnits: MLComputeUnits = .all) throws {
         let cfg = MLModelConfiguration(); cfg.computeUnits = computeUnits
         do { model = try MLModel(contentsOf: modelURL, configuration: cfg) }
@@ -136,7 +150,7 @@ public final class CoreMLImageRunner: ImageModelRunning {
         }
         CVPixelBufferUnlockBaseAddress(buf, [])
         do {
-            let out = try model.prediction(from: MLDictionaryFeatureProvider(dictionary: ["image": MLFeatureValue(pixelBuffer: buf)]))
+            let out = try gate.run { try model.prediction(from: MLDictionaryFeatureProvider(dictionary: ["image": MLFeatureValue(pixelBuffer: buf)])) }
             return CoreMLTextRunner.floats(out.featureValue(for: "embedding")?.multiArrayValue)
         } catch { throw EncoderError.modelFailed("image predict: \(error)") }
     }
