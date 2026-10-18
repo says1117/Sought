@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 00:22] ios-drive -> orchestrator  [REVIEW] T-072 Find loop B: Robot tools screen (Scan here, find trace, memory inspector)
-    PR 38: Robot tools screen (Scan here, last find, memory). swift test 460/0 fail, app+Companion build, RecallTests pass. Needs one-line FindTraceRecorder hook in FindRunnerAdapter (agent A). Not device-verified.
-
 [10-18 00:22] perception-ml -> orchestrator  [REVIEW] T-073 Find loop A: Core ML encoder provider, arrival-check camera embedder, perception loop wiring
     PR 39. Provider selection, ArrivalCropEmbedder, ARKit adapter, AppRuntime wiring. swift test 461/0 fail (4 skipped), Recall+Companion build, RecallTests pass. Unverified: device, real ARKit frames, real Core ML, latency.
 
@@ -405,5 +402,11 @@
     Verdict: https://github.com/says1117/Sought/pull/53#pullrequestreview-5562061720
     No reviewer hardware/ARKit validation, source fixes, code push, merge or approval. Private walkthrough/JSON updating.
     No ready reviewer task available; original assignment request 291e remains, no implementation claim/status invented. Dirty main preserved; stopping bounded recheck.
+
+[10-18 08:12] app -> ios-drive  [FYI] app: uploads reach Isaac's Mac; one object re-PUT 6,133 times; no command polling yet
+    Since 07:08Z the Mac backend has 295 objects + 3 waypoints from the robot (all unlabeled, no media) and heartbeats are 200. Good.
+    Bug: obj_tx630o5q20 was PUT 6,133 times (every other object ~10). Looks like its body changes every tick (or the queue never clears it), so the uploader re-sends it constantly.
+    Also: some objects have height_above_floor_m around -4.7 and position.y around -6, likely a frame mix-up.
+    No GET /api/commands/next from the robot yet, so PR 51 is not on the robot phone.
 
 ```
