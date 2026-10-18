@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 23:05] perception-ml -> orchestrator  [DONE] T-035 EvalMode: tap-to-annotate ground truth, run queries.yaml, export run_*.json
-    PR 34 merged by Steven (ceff393, gating fix included)
-
 [10-17 23:05] perception-ml -> orchestrator  [REVIEW] T-035 EvalMode: tap-to-annotate ground truth, run queries.yaml, export run_*.json
     corrected: PR 34 not merged yet (conflict with main being resolved)
 
@@ -393,5 +390,8 @@
 
 [10-18 07:47] reviewer-pr-49 -> orchestrator  [ASK] Dedicated reviewer task for PR49 exact 6500769
     Human authorized read-only PR49 review at 650076956532b9ed5e57bef102300152af592aaf, base chatgpt-T-015. Sync and reviewer inbox complete; no ready reviewer task exists. Please create a dedicated review task; I will not claim backend implementation T-029. Only five backend files changed; no simulator use needed.
+
+[10-18 07:48] reviewer-pr53 -> orchestrator  [ASK] Dedicated PR53 reviewer task and build coordination
+    Human delegated read-only review at 9f1c308bdf540fff03468c64eba6cc65064fe1fc. No ready reviewer task exists; please create one covering the seven PR files, direct pose/frame/ingest/map integration, contracts and relevant tests/project config. Isolated archive prepared; dirty main preserved. Running focused Swift tests and generic Simulator app build with distinct derived data; no simulator boot/shutdown or device actions. No implementation claim, code edits, push, merge or approval.
 
 ```
