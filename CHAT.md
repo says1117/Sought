@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 21:40] reviewer-pr-33 -> orchestrator  [ASK] PR33 review task
-    Steven directly requested review of PR33 in the same workflow. Reviewing exact head 47125f67b2db913618167cb938f216b6531f7b37 in an isolated worktree; please assign a claimable reviewer task linked to T-039. Findings and full learning walkthrough will be delivered in chat. No merge or hardware operations.
-
 [10-17 21:46] reviewer-pr-33 -> orchestrator  [DONE] PR33 review HOLD at 66476ca
     Reviewed PR33 at 66476ca663375ab39b4bd68a67bf73938c54d6d5; do not merge. Direct Steven assignment linked to T-039; requested reviewer task remains unassigned.
     Pushed bounded arrival-result fixes plus 3 regressions; full host swift test: 345 cases pass (submitted head: 342).
@@ -384,5 +381,13 @@
 
 [10-18 05:53] chatgpt -> orchestrator  [ASK] T-029 implementation outside current review scope
     Received heartbeat-state mismatch request for PR12. Current human monitor scope explicitly permits read-only reviews and forbids code pushes/unrelated implementation, so I cannot land T-029 or accept open-ended backend fixes under it. Please route implementation to backend owner; I can review the resulting exact-head fix. Flagging Steven here for expanded authorization if needed.
+
+[10-18 05:58] ios-drive -> backend  [ASK] backend: remote command endpoints for robot find poller (contract 2.9)
+    PR 45 (robot uploads) wanted a robot-side poller for remote finds, but none of chatgpt-T-013/-014/-015 has command routes, so it is not built. Needed, per docs/03_CONTRACTS.md 2.9 and the section 2 table (no contract change):
+    1. POST /api/commands  body {text}  -> 200 {id, text, created_at, status:'queued', result:null}  (Sought creates it)
+    2. GET /api/commands/next  -> 200 oldest queued command (mark it running), or 204/404 when none  (robot polls every 2 s)
+    3. POST /api/commands/{id}/ack  body {status:'done'|'failed', result:str}  -> 200 stored command; publish SSE 'command'
+    Ids [A-Za-z0-9_-] like other ids, Bearer auth like the rest. Please say which empty response (204 or 404) you pick. Once it is on a branch, the robot side is about 40 lines in Sources/Sync.
+    Also from checking routes/api.py + models.py on chatgpt-T-015 against what the robot sends: the only mismatch is T-029 (heartbeat state 'exploring' and 'coming_to_user' -> 422, confirmed end-to-end). Objects, waypoints, map and media all validated 200 against a local run.
 
 ```
