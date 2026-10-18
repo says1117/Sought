@@ -15,6 +15,9 @@ final class PoseTracker: NSObject, ObservableObject, ARSessionDelegate {
     /// World y of the detected floor, nil until a horizontal plane of useful size is found.
     @Published private(set) var floorY: Double?
     @Published private(set) var publishedHz: Double = 0
+    /// True between `start` and `pause` (or a session failure). The app only re-runs ARKit when this is false,
+    /// because every run with a saved map restarts relocalization and invalidates the frame.
+    private(set) var isRunning = false
 
     let session = ARSession()
     private var limiter = RateLimiter(maxHz: PoseTracker.maxHz)
@@ -44,11 +47,18 @@ final class PoseTracker: NSObject, ObservableObject, ARSessionDelegate {
         floorY = nil
         let options: ARSession.RunOptions = resetTracking || initialWorldMap != nil
             ? [.resetTracking, .removeExistingAnchors] : []
+        // Forget the previous run's state BEFORE announcing the new one, so a leftover `.normal` is never read as
+        // "recognised" in the new run.
+        trackingReason = ""
+        tracking = .notAvailable
+        mapping = .notAvailable
+        pose = nil
         onSessionStart?(initialWorldMap != nil)
         session.run(config, options: options)
+        isRunning = true
     }
 
-    func pause() { session.pause() }
+    func pause() { session.pause(); isRunning = false }
 
     func currentWorldMap(_ completion: @escaping (ARWorldMap?) -> Void) {
         session.getCurrentWorldMap { map, _ in completion(map) }
@@ -66,8 +76,9 @@ final class PoseTracker: NSObject, ObservableObject, ARSessionDelegate {
         }
         lastStamp = t
 
-        tracking = Self.kind(frame.camera.trackingState)
+        // Reason first: subscribers combine (tracking, reason) and must see the new reason with the new tracking.
         trackingReason = Self.reason(frame.camera.trackingState)
+        tracking = Self.kind(frame.camera.trackingState)
         mapping = Self.kind(frame.worldMappingStatus)
         // Do not publish a pose the tracker itself says is unavailable.
         pose = tracking == .notAvailable ? nil : PoseMath.pose(from: frame.camera.transform)
@@ -82,7 +93,11 @@ final class PoseTracker: NSObject, ObservableObject, ARSessionDelegate {
 
     func sessionWasInterrupted(_ session: ARSession) { tracking = .notAvailable; pose = nil }
     func sessionInterruptionEnded(_ session: ARSession) { /* tracking state resumes via frames */ }
+    /// After an interruption, ask ARKit to relocalize into the same frame (it then reports `limited(.relocalizing)`)
+    /// instead of continuing in a frame that may have shifted.
+    func sessionShouldAttemptRelocalization(_ session: ARSession) -> Bool { true }
     func session(_ session: ARSession, didFailWithError error: Error) {
+        isRunning = false
         tracking = .notAvailable
         trackingReason = error.localizedDescription
         pose = nil

@@ -64,24 +64,26 @@ struct RecallApp: App {
                         .toolbar { ToolbarItem(placement: .topBarLeading) { Button("Done") { link.stop(); showDrive = false } } }
                 }
             }
-            .sheet(isPresented: $showTeach, onDismiss: { runtime.endManualControl("teach") }) { TeachContainer(link: link, tracker: pose) }
+            .sheet(isPresented: $showTeach, onDismiss: { runtime.endManualControl("teach") }) { TeachContainer(link: link, tracker: pose, runtime: runtime) }
             .sheet(isPresented: $showRobotTools, onDismiss: { runtime.stopEverything() }) {
                 NavigationStack { RobotToolsView(runtime: runtime) { showRobotTools = false } }
             }
             .sheet(isPresented: $showSelfTest, onDismiss: { runtime.endManualControl("selftest") }) { SelfTestContainer(link: link, tracker: pose) }
             .onAppear {
                 UIApplication.shared.isIdleTimerDisabled = true
-                startPoseSession()
+                startPoseSessionIfNeeded()
                 runtime.start()
             }
             .onChange(of: phase) { _, new in
                 if new == .active {
-                    startPoseSession()
+                    startPoseSessionIfNeeded()
                     runtime.start()
                 } else {
                     runtime.pause()          // brakes, cancels the coordinator task, stops the heartbeat
                     link.stop()
-                    pose.pause()
+                    // Only background stops ARKit. A brief .inactive (permission prompt, Control Center, a banner)
+                    // keeps the session, so relocalization is not restarted from zero each time.
+                    if new == .background { pose.pause() }
                     // The speech permission dialog can briefly make the scene inactive.
                     if new == .background || findBar.state != .starting {
                         findBar.stop(speakConfirmation: false)
@@ -91,7 +93,10 @@ struct RecallApp: App {
         }
     }
 
-    private func startPoseSession() {
+    /// Runs ARKit (relocalizing against the saved map) unless it is already running: every run with a map resets
+    /// tracking and the frame, so onAppear plus .active, or each return from .inactive, must not re-run it.
+    private func startPoseSessionIfNeeded() {
+        guard !pose.isRunning else { return }
         let mapAdapter = ARWorldMapAdapter(tracker: pose)
         pose.start(initialWorldMap: mapAdapter.initialWorldMap)
     }

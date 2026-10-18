@@ -52,7 +52,7 @@ struct GeminiPlanner: Planner {
     static let systemPrompt = """
     You control a small home rover. Pick the tool that matches the user's request. \
     You may only call the provided tools; you cannot set speeds, distances or safety. \
-    For go_to_waypoint use only a name from the known waypoints. If no tool fits, call say with a short reply.
+    For go_to_waypoint and come_to_waypoint use only a name from the known waypoints. If no tool fits, call say with a short reply.
     """
 
     func plan(_ utterance: String, context: PlannerContext) async throws -> [ToolCall] {

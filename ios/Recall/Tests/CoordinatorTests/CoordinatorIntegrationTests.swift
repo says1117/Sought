@@ -173,9 +173,21 @@ final class CoordinatorIntegrationTests: XCTestCase {
         XCTAssertEqual(rig.robot.movingCommands, 0, "no motion toward stored coordinates")
         XCTAssertEqual(rig.speaker.said.filter { $0 == CoordinatorConfig.notRecognisedSpoken }.count, 2, "\(rig.speaker.said)")
 
-        gate.update(tracking: .normal, mapping: .mapped)
+        gate.update(tracking: .limited, mapping: .limited, relocalizing: true); gate.update(tracking: .normal, mapping: .mapped)
         try await rig.coordinator.execute(.goToWaypoint(name: "kitchen"))
         XCTAssertGreaterThan(rig.robot.movingCommands, 0)
+    }
+
+    func testWaypointOlderThanTheMapIsRefusedEvenWhenRelocalized() async throws {
+        let gate = WorldFrameGate(now: { Date().addingTimeInterval(3600) })
+        let rig = try CoordIntegrationRig(encoders: CoordIntegrationRig.working(), frame: gate, trackMapId: "map-A")
+        // map-A was saved from a fresh scan after "kitchen" was marked under an older map.
+        gate.sessionStarted(loadedSavedMap: true, mapId: "map-A", waypointCutoff: Date().addingTimeInterval(1800))
+        gate.update(tracking: .limited, mapping: .limited, relocalizing: true); gate.update(tracking: .normal, mapping: .mapped)
+        XCTAssertTrue(gate.relocalized)
+        try await rig.coordinator.execute(.goToWaypoint(name: "kitchen"))
+        XCTAssertEqual(rig.robot.movingCommands, 0, "no motion toward a waypoint from another map's frame")
+        XCTAssertTrue(rig.speaker.said.contains(CoordinatorConfig.notRecognisedSpoken), "\(rig.speaker.said)")
     }
 
     func testWaypointMarkedThisSessionIsAllowedWithoutRelocalization() async throws {

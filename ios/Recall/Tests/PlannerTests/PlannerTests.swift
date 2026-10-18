@@ -35,6 +35,9 @@ final class KeywordPlannerTests: XCTestCase {
         let cases: [(String, ToolCall)] = [
             ("stop", .stop), ("Halt!", .stop), ("please stop now", .stop),
             ("come here", .comeToMe), ("come to me", .comeToMe),
+            ("come to me in the kitchen", .comeToWaypoint(name: "Kitchen")),
+            ("come to the kitchen", .comeToWaypoint(name: "Kitchen")),
+            ("can you come to me at the front door", .comeToWaypoint(name: "Front Door")),
             ("patrol", .startPatrol), ("Start patrol", .startPatrol),
             ("what changed?", .whatChanged(since: nil)),
             ("explore", .explore(maxMinutes: nil)), ("look around", .explore(maxMinutes: nil)),
@@ -74,6 +77,7 @@ final class ToolCallParsingTests: XCTestCase {
         XCTAssertEqual(try parse(fixture(fnCall("explore", #"{"max_minutes":10}"#))), [.explore(maxMinutes: 10)])
         XCTAssertEqual(try parse(fixture(fnCall("explore"))), [.explore(maxMinutes: nil)])
         XCTAssertEqual(try parse(fixture(fnCall("come_to_me"))), [.comeToMe])
+        XCTAssertEqual(try parse(fixture(fnCall("come_to_waypoint", #"{"name":"the kitchen"}"#))), [.comeToWaypoint(name: "Kitchen")])
         XCTAssertEqual(try parse(fixture(fnCall("say", #"{"text":"Hello"}"#))), [.say(text: "Hello")])
         // Parallel calls, order preserved; text part ignored.
         let multi = fixture(#"{"text":"ok"},"# + fnCall("stop") + "," + fnCall("say", #"{"text":"Stopped"}"#))
@@ -93,6 +97,7 @@ final class ToolCallParsingTests: XCTestCase {
                .badArguments(tool: "go_to_waypoint", reason: "name must be a string"))
         expect(fixture(fnCall("go_to_waypoint", #"{"name":"the moon"}"#)),
                .unresolvedTarget(tool: "go_to_waypoint", name: "the moon"))
+        expect(fixture(fnCall("come_to_waypoint", #"{"name":"attic"}"#)), .unresolvedTarget(tool: "come_to_waypoint", name: "attic"))
         expect(fixture(fnCall("explore", #"{"max_minutes":999}"#)), .badArguments(tool: "explore", reason: "max_minutes out of range"))
         expect(fixture(fnCall("explore", #"{"max_minutes":true}"#)), .badArguments(tool: "explore", reason: "max_minutes must be an integer"))
         expect(fixture(fnCall("explore", #"{"max_minutes":2.5}"#)), .badArguments(tool: "explore", reason: "max_minutes must be an integer"))
@@ -105,7 +110,7 @@ final class ToolCallParsingTests: XCTestCase {
     func testDeclarationsMatchEveryTool() throws {
         let names = GeminiPlanner.functionDeclarations().compactMap { $0["name"] as? String }
         XCTAssertEqual(names, ["find_object", "go_to_waypoint", "mark_waypoint", "check_route", "start_patrol",
-                               "what_changed", "stop", "say", "explore", "come_to_me"])
+                               "what_changed", "stop", "say", "explore", "come_to_me", "come_to_waypoint"])
         // Every declared tool parses with its minimal valid args.
         for n in names { XCTAssertEqual(PlannerTools.spec(named: n)?.name, n) }
     }

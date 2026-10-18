@@ -30,8 +30,12 @@ struct CoordinatorWaypoint: Equatable {
     /// True when recorded in the coordinate frame in use right now. Defaults to false: a stored waypoint is
     /// only driven to after relocalization against the saved map.
     var inCurrentFrame: Bool
-    init(name: String, x: Double, z: Double, yawDeg: Double = 0, inCurrentFrame: Bool = false) {
+    /// True when recorded before the active saved map existed (that map was saved from a fresh scan), so
+    /// relocalizing against it does not make this waypoint valid.
+    var predatesMap: Bool
+    init(name: String, x: Double, z: Double, yawDeg: Double = 0, inCurrentFrame: Bool = false, predatesMap: Bool = false) {
         self.name = name; self.x = x; self.z = z; self.yawDeg = yawDeg; self.inCurrentFrame = inCurrentFrame
+        self.predatesMap = predatesMap
     }
 }
 
@@ -111,6 +115,9 @@ struct CoordinatorDependencies {
     var lease = DriveLease()
     /// Gate for stored coordinates (see `WorldFrameGate`).
     var frame: CoordinatorFrameValidity = TrustedFrame()
+    /// Come to me v2: taught waypoints and routes, and the guarded go-to that drives each leg.
+    var taught: CoordinatorTaughtPlaces = NoTaughtPlaces()
+    var legs: CoordinatorLegDriving = UnwiredLegDriver()
 }
 
 /// T-039 SEAM: the app shell implements this to build the real adapters (ARKit pose, DriveLink, Memory,

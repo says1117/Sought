@@ -58,7 +58,28 @@ public final class WorldMapStore {
         return d.isEmpty ? nil : d
     }
 
-    public func discard() { try? fm.removeItem(at: url); try? fm.removeItem(at: idURL) }
+    /// Sidecar holding "<map id>\n<ISO 8601 date>": waypoints created before that date predate the map (it was saved
+    /// from a fresh scan, not from a session relocalized against the previous map), so they are not in its frame.
+    public var cutoffURL: URL { url.appendingPathExtension("since") }
+
+    /// Records the cutoff for `mapId`; nil removes it (every stored waypoint is in this map's frame).
+    public func setWaypointCutoff(_ date: Date?, mapId: String) {
+        guard let date else { try? fm.removeItem(at: cutoffURL); return }
+        let text = mapId + "\n" + ISO8601DateFormatter().string(from: date)
+        try? Data(text.utf8).write(to: cutoffURL, options: .atomic)
+    }
+
+    /// The cutoff stored for `mapId`, nil when none is stored or it belongs to another map.
+    public func waypointCutoff(mapId: String) -> Date? {
+        guard let d = try? Data(contentsOf: cutoffURL), let text = String(data: d, encoding: .utf8) else { return nil }
+        let parts = text.split(separator: "\n", omittingEmptySubsequences: false)
+        guard parts.count == 2, parts[0] == Substring(mapId) else { return nil }
+        return ISO8601DateFormatter().date(from: String(parts[1]))
+    }
+
+    public func discard() {
+        try? fm.removeItem(at: url); try? fm.removeItem(at: idURL); try? fm.removeItem(at: cutoffURL)
+    }
 }
 
 /// When it is worth saving the map: tracking is good and ARKit says the space is mapped.
