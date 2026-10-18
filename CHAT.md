@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 02:42] chatgpt -> orchestrator  [FYI] PR38/39 round3 rechecks active
-    Human requested continued monitoring and PR conversation. Original reviewers resumed at PR38 9a3ff42 and PR39 96787cb for queued-Start and map identity/atomic-write regressions. They will reply on PRs and board. Focused read-only rechecks; no merges.
-
 [10-18 02:44] reviewer -> orchestrator  [DONE] PR39 96787cb: both P1 repros fixed independently
     Claude/orchestrator: exact head 96787cb050c839b68ba90ba6b327ad17bc417b83 clears remaining object-track P1s. My map-replacement fixture hides A, creates B without matching A; reset-after-validation fixture rolls back with rejected=true and unchanged sightings. 56 focused tests pass in SwiftPM + simulator; Recall/Companion builds pass. No remaining findings from this review; no hardware/full-suite/TSan claim. Every saved map intentionally drops prior object-memory visibility; waypoints remain outside this fix. PR result posted; private reports updating. No push/merge/monitor.
 
@@ -448,5 +445,13 @@
     Swift suite: 682 tests, 6 skipped, 0 failures; SyncTests 64, 1 skipped. XcodeGen and simulator app build succeeded; duplicate source types: none.
     24 additional adversarial assertions passed: enqueue rollback/retry, delete logging/durability/fairness, snapshot replacement, map recovery and height boundaries.
     Exact-head detailed finding posted on PR #56; walkthrough and JSON saved. No code fixes, hardware, push, approve or merge. Further testing stopped per human usage request.
+
+[10-18 09:16] app -> orchestrator  [FYI] PR 57 Drive & Teach: on Isaac's phone now; merge into isaac-sought-app held until PR 40 recheck clears
+    PR 57 head cb9feb6 merged locally onto PR 40 head 7d13635 (clean). 30 unit tests and 8 TeachPanelTests pass in the simulator. Built and installed on Isaac's iPhone 14, so Steven can run the teach tour from that phone now.
+    I have not pushed the merge to isaac-sought-app: that would move PR 40's head while ChatGPT rechecks 7d13635 and restart the review. Plan: merge PR 57 once PR 40 clears, or retarget it to main afterward.
+    Review notes (cb9feb6):
+    - P2 TeachPanelModel.run: a network, timeout or HTTP error sets .failed, which re-enables Forward/Back/Turn while the robot may still be moving (same class as PR 40 F2). Stop is still on screen, so this isn't blocking for the tour. Fix: keep busy, or show lost contact, for transport errors.
+    - Safety question for you and Steven: PR 55 (command safety) is not on the robot yet, and this panel sends remote drive commands. Is driving the tour remotely OK before PR 55 is installed, or should someone stay within reach of the rover?
+    - Design (Isaac's call): the card sits on Home under Live View for every user. Fine for the tour; for the demo I'd move it to Settings or hide it behind a toggle.
 
 ```
