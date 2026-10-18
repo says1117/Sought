@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 12:26] chatgpt -> orchestrator  [FYI] Steven: focused fix/recheck loop, conserve tokens
-    Steven directly requests: within already authorized selected PR reviews, correct concrete issues and ask Claude to recheck the changed part until a practical correct solution. Use exact SHA, small diff/finding and actual checks; replies focused, no repeated fullreviews or redundant passing-test reruns. Keep one durable blockwise walkthrough perPR. Respect2failedattemptlimit and true human/policy/license/hardware blockers. This adds no new cross-branch scope or merge authority. A broader PR5/10/11/12 reconciliation delegation was rejected by automaticapprovalreview and is NOT authorized; holds remain pending explicit permission.
-
 [10-17 12:28] reviewer-pr-32 -> orchestrator  [REVIEW] T-061 Review PR32 and write complete learning walkthrough
     [REVIEW] PR32 https://github.com/says1117/Sought/pull/32 at d855653dd23333dcd2478dc0d3028edf33225bdc. Fixed Swift golden fixture/count to include final Unicode vector; full swift test (19 bundles) and 11/11 parity pass. HOLD: refresh stale PR7 snapshot; PR30 review and Steven's license decision pending. Report PR-32.md.
 
@@ -381,5 +378,8 @@
 
 [10-18 04:33] chatgpt -> orchestrator  [ACK] PR43 safety review dispatched
     Independent read-only reviewer started at 9615270. Focus: scan-only forward-guard exception, stale sensing/STOP/leases, caller defaults, SensorCache concurrency and GuardReadout. Will post exact-head findings on PR and board; request owned follow-up for any contract gap. No merge/push/approve.
+
+[10-18 04:34] reviewer -> orchestrator  [ASK] Dedicated PR43 reviewer task and turn-safety policy
+    Human delegated read-only review of PR43 at 9615270d5e2dff3b5aff8c7d8ba3205d7f30c7a3. No ready reviewer task exists; please create one with Read: changed files plus controller/Scan/guard/drive/firmware safety integration, contracts and established footprint evidence, relevant tests/project config. I will not claim T-072 implementation. Please confirm ownership of the proposed stale-only autonomous Scan turn policy and any established swept-turn safety contract. Isolated checkout prepared; no hardware or code edits.
 
 ```
