@@ -51,6 +51,10 @@ public final class RelocalizationMonitor {
     /// A limited state (any reason, or only `.relocalizing` when `needRelocalizingReason`) was seen since (re)arming.
     private var sawLimited = false
     private var needRelocalizingReason = false
+    /// Waiting after an in-run `.notAvailable` (rearmInRun): the next `.normal` re-recognises. ARKit sends many
+    /// `.notAvailable` frames in a row; the later ones (trackingDropped) must not cancel this, or a direct
+    /// notAvailable -> normal recovery never re-latches (seen on the phone after Scan here).
+    private var inRunRearm = false
 
     public init(clock: RelocClock = SystemRelocClock(), timeout: Double = RelocalizationMonitor.timeout) {
         self.clock = clock
@@ -64,6 +68,7 @@ public final class RelocalizationMonitor {
         state = .waiting(elapsed: 0)
         sawLimited = false
         needRelocalizingReason = false
+        inRunRearm = false
     }
 
     /// Feed each tracking update. `relocalizing` is true for `limited(.relocalizing)`. `mapping` is shown in the UI
@@ -73,7 +78,7 @@ public final class RelocalizationMonitor {
         guard startedAt != nil else { return state }
         if state == .relocalized { return state }
         if tracking == .limited && (relocalizing || !needRelocalizingReason) { sawLimited = true }
-        if tracking == .normal && sawLimited { state = .relocalized; return state }
+        if tracking == .normal && sawLimited { state = .relocalized; inRunRearm = false; return state }
         return tick()
     }
 
@@ -91,12 +96,13 @@ public final class RelocalizationMonitor {
         guard startedAt != nil, state != .relocalized else { return }
         needRelocalizingReason = true
         sawLimited = false
+        inRunRearm = false
     }
 
     /// Frames reported `.notAvailable` inside the same run (no interruption) while still waiting: a fresh limited ->
     /// normal is needed, but not specifically relocalizing (an earlier interruption's requirement is kept).
     public func trackingDropped() {
-        guard startedAt != nil, state != .relocalized else { return }
+        guard startedAt != nil, state != .relocalized, !inRunRearm else { return }
         sawLimited = false
     }
 
@@ -108,6 +114,7 @@ public final class RelocalizationMonitor {
         state = .waiting(elapsed: 0)
         sawLimited = true
         needRelocalizingReason = false
+        inRunRearm = true
     }
 
     /// The session was interrupted after the map had been recognised (or adopted): wait again, from now, for ARKit to
@@ -117,6 +124,7 @@ public final class RelocalizationMonitor {
         state = .waiting(elapsed: 0)
         sawLimited = false
         needRelocalizingReason = true
+        inRunRearm = false
     }
 
     /// Call periodically (about 1 Hz) so the timeout fires even when no tracking updates arrive.
@@ -130,5 +138,5 @@ public final class RelocalizationMonitor {
     }
 
     /// The user chose "fresh Teach": drop the wait and stop watching.
-    public func startFreshTeach() { startedAt = nil; state = .idle; sawLimited = false; needRelocalizingReason = false }
+    public func startFreshTeach() { startedAt = nil; state = .idle; sawLimited = false; needRelocalizingReason = false; inRunRearm = false }
 }

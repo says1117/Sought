@@ -131,6 +131,32 @@ final class FrameGateUnitTests: XCTestCase {
         XCTAssertEqual(g.activeMapId, "map-B")
     }
 
+    // Seen on the phone after Scan here: ARKit sends MANY .notAvailable frames in a row, then .normal directly.
+    func testRepeatedNotAvailableFramesThenNormalRecovers() {
+        let g = WorldFrameGate()
+        g.sessionStarted(loadedSavedMap: false)
+        _ = g.adoptSavedMap(mapId: "map-B", ifGeneration: nil)
+        for _ in 0..<30 { g.update(tracking: .notAvailable, mapping: .notAvailable) }
+        XCTAssertFalse(g.relocalized)
+        g.update(tracking: .normal, mapping: .limited)
+        XCTAssertTrue(g.relocalized, "repeated in-run drops must not cancel 'back on next normal'")
+        XCTAssertTrue(g.statusDetail?.hasPrefix("recognised at ") == true, g.statusDetail ?? "nil")
+    }
+
+    func testInterruptionDuringRepeatedDropsStillNeedsRelocalizing() {
+        let g = WorldFrameGate()
+        g.sessionStarted(loadedSavedMap: false)
+        _ = g.adoptSavedMap(mapId: "map-B", ifGeneration: nil)
+        for _ in 0..<5 { g.update(tracking: .notAvailable, mapping: .notAvailable) }
+        g.interrupted()
+        for _ in 0..<5 { g.update(tracking: .notAvailable, mapping: .notAvailable) }
+        g.update(tracking: .normal, mapping: .limited)
+        XCTAssertFalse(g.relocalized, "an interruption still demands relocalizing")
+        g.update(tracking: .limited, mapping: .limited, relocalizing: true)
+        g.update(tracking: .normal, mapping: .limited)
+        XCTAssertTrue(g.relocalized)
+    }
+
     func testInterruptionAfterAnInRunDropStillNeedsRelocalizing() {
         let g = WorldFrameGate()
         g.sessionStarted(loadedSavedMap: true, mapId: "map-A")
