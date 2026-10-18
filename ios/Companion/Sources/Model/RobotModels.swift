@@ -113,13 +113,6 @@ struct MapSnapshot: Equatable {
     }
 }
 
-struct ActivityItem: Identifiable, Equatable {
-    var id: String
-    var objectId: String
-    var text: String             // "Slippers moved to the front door"
-    var at: Date
-}
-
 // MARK: - Find
 
 enum FindPhase: Equatable {

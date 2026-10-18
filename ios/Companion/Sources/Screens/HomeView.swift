@@ -60,7 +60,10 @@ struct HomeView: View {
             }
             }
         }
-        .sheet(isPresented: $showActivity) { ActivitySheet().presentationDetents([.medium, .large]) }
+        .sheet(isPresented: $showActivity) { ActivitySheet().presentationDetents([.medium, .large]).presentationDragIndicator(.visible) }
+        .task {   // screenshot hook: -showActivity YES
+            if UserDefaults.standard.bool(forKey: "showActivity") { try? await Task.sleep(nanoseconds: 800_000_000); showActivity = true }
+        }
         .fullScreenCover(isPresented: $showLive) { LiveViewScreen() }
     }
 

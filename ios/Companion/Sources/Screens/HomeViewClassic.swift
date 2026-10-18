@@ -172,33 +172,6 @@ struct CallCard: View {
     }
 }
 
-struct ActivityCard: View {
-    var onOpen: () -> Void
-    @EnvironmentObject private var robot: RobotSource
-    @Environment(\.palette) private var p
-
-    var body: some View {
-        let latest = robot.activity.first
-        Button(action: onOpen) {
-            VStack(alignment: .leading, spacing: 9) {
-                Text("Activity log").font(SoughtFont.activityHeading)
-                Text(latest?.text ?? "No changes yet").font(SoughtFont.activityBody).fixedSize(horizontal: false, vertical: true)
-                if let latest { Text(StatusCopy.ago(latest.at, now: robot.now)).font(SoughtFont.activityMeta) }
-                Spacer(minLength: 0)
-            }
-            .foregroundStyle(p.activityText)
-            .padding(Space.l)
-            .frame(maxWidth: .infinity, minHeight: 147, alignment: .topLeading)
-            .soughtGlass(.activity, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Activity log. " + (latest.map { "\($0.text), \(StatusCopy.agoSpoken($0.at, now: robot.now))." } ?? "No changes yet."))
-        .accessibilityHint("Double tap to see all changes.")
-        .accessibilityIdentifier("activityCard")
-    }
-}
-
 struct LiveViewCard: View {
     var onOpen: () -> Void
     @EnvironmentObject private var robot: RobotSource
@@ -238,46 +211,6 @@ struct LiveViewCard: View {
 }
 
 // MARK: - Activity and live view screens
-
-struct ActivitySheet: View {
-    @EnvironmentObject private var robot: RobotSource
-    @EnvironmentObject private var router: Router
-    @Environment(\.palette) private var p
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    if robot.activity.isEmpty {
-                        Text("No changes yet. When an item is seen in a new spot, it shows up here.").font(SoughtFont.body)
-                    }
-                    ForEach(robot.activity) { a in
-                        let o = robot.objects.first { $0.id == a.objectId }
-                        Button { if let o { dismiss(); router.open(o) } } label: {
-                            HStack(spacing: Space.m) {
-                                if let o { ShadedPhoto(photo: o.photo, shadeTo: 0, radius: Radius.thumb).frame(width: 56, height: 56) }
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(a.text).font(SoughtFont.bodyMedium).foregroundStyle(p.text)
-                                    Text(StatusCopy.ago(a.at, now: robot.now)).font(SoughtFont.activityMeta).foregroundStyle(p.text)
-                                }
-                            }
-                        }
-                        .listRowBackground(p.surface)
-                    }
-                } footer: {
-                    Text("Based on where items were last seen. Soughtbot compares each item's latest spot with the one before.")
-                        .font(SoughtFont.cardMeta)
-                }
-            }
-            .scrollContentBackground(.hidden)
-            .background(p.background)
-            .navigationTitle("Activity log")
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
-            .safeAreaInset(edge: .top) { SampleBanner() }
-        }
-    }
-}
 
 struct LiveViewScreen: View {
     @EnvironmentObject private var robot: RobotSource

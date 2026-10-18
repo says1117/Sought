@@ -7,11 +7,19 @@ import SwiftUI
 
 @MainActor
 class RobotSource: ObservableObject {
-    @Published var status = RobotStatus(state: .idle, task: nil, battery: nil, pose: nil, lastHeartbeat: nil)
+    @Published var status = RobotStatus(state: .idle, task: nil, battery: nil, pose: nil, lastHeartbeat: nil) {
+        didSet { logStatusChange(from: oldValue, to: status) }
+    }
     @Published var objects: [TrackedObject] = []
     @Published var map: MapSnapshot?
     @Published var liveFrame: UIImage?          // nil when no live frames (fallback: latest thumbnail)
-    @Published var find: FindProgress?
+    @Published var find: FindProgress? {
+        didSet { logFindResult(from: oldValue, to: find) }
+    }
+    /// Finds started from this app and how they ended (Activity log).
+    @Published var findLog: [FindRecord] = []
+    /// Soughtbot's own notable state changes seen in its check-ins (Activity log).
+    @Published var robotLog: [RobotLogEntry] = []
     /// True until the first data arrives. Screens show shimmering placeholders, not an empty state.
     @Published var isLoading = false
     /// Ticks so "N min ago" and the offline check refresh without new data.
@@ -40,7 +48,35 @@ class RobotSource: ObservableObject {
 
     // MARK: Derived
 
-    var activity: [ActivityItem] { ActivityDeriver.items(objects: objects, map: map) }
+    var events: [ActivityEvent] {
+        ActivityDeriver.events(objects: objects, map: map, finds: findLog, robotLog: robotLog, now: now)
+    }
+
+    private func logFindResult(from old: FindProgress?, to new: FindProgress?) {
+        guard let new, old?.phase != new.phase else { return }
+        switch new.phase {
+        case .arrived: findLog.append(FindRecord(query: new.query, objectId: new.match?.id, found: true, at: Date()))
+        case .notFound, .failed: findLog.append(FindRecord(query: new.query, objectId: new.match?.id, found: false, at: Date()))
+        default: break
+        }
+    }
+
+    private func logStatusChange(from old: RobotStatus, to new: RobotStatus) {
+        if old.state != new.state {
+            let place = currentRoom.map { " in the \($0.lowercased())" } ?? ""
+            switch new.state {
+            case .blocked: robotLog.append(RobotLogEntry(text: "Soughtbot got stuck\(place)", at: Date()))
+            case .error: robotLog.append(RobotLogEntry(text: "Soughtbot needed help\(place)", at: Date()))
+            default: break
+            }
+            if old.state == .comingToUser && new.state == .idle {
+                robotLog.append(RobotLogEntry(text: "Soughtbot came to you", at: Date()))
+            }
+        }
+        if let a = old.battery, let b = new.battery, a >= 0.2, b < 0.2 {
+            robotLog.append(RobotLogEntry(text: "Soughtbot\u{2019}s battery is low (\(Int(b * 100))%)", at: Date()))
+        }
+    }
 
     var recentFinds: [TrackedObject] { objects.sorted { $0.lastSeen > $1.lastSeen } }
     var essentials: [TrackedObject] { objects.filter(\.isEssential).sorted { $0.lastSeen > $1.lastSeen } }

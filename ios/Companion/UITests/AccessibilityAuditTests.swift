@@ -23,6 +23,7 @@ final class AccessibilityAuditTests: XCTestCase {
         ("find not seen", ["-search", "car keys"]),
         ("item detail", ["-detail", "obj_sample0001"]),
         ("map pin card", ["-tab", "map", "-mapRoom", "Kitchen", "-mapPin", "obj_sample0008"]),
+        ("activity log", ["-tab", "home", "-showActivity", "YES", "-activityOpenFirst", "YES"]),
     ]
 
     private let gate: XCUIAccessibilityAuditType = [.hitRegion, .sufficientElementDescription, .trait]

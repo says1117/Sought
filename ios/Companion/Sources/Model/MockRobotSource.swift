@@ -28,10 +28,11 @@ final class MockRobotSource: RobotSource {
         let now = Date()
         func ago(_ m: Double) -> Date { now.addingTimeInterval(-m * 60) }
         func obj(_ id: String, _ label: String, _ photo: String, _ whereText: String, _ room: String, _ x: Double, _ z: Double,
-                 _ minAgo: Double, essential: Bool = false, sought: Int = 0, movedFrom: (Double, Double, Double)? = nil) -> TrackedObject {
+                 _ minAgo: Double, essential: Bool = false, sought: Int = 0, movedFrom: (Double, Double, Double)? = nil,
+                 firstSeenMin: Double = 26 * 60) -> TrackedObject {
             var history = [HistoryPoint(t: ago(minAgo), x: x, z: z)]
             if let m = movedFrom { history.insert(HistoryPoint(t: ago(m.2), x: m.0, z: m.1), at: 0) }
-            return TrackedObject(id: id, label: label, description: nil, x: x, z: z, firstSeen: ago(max(minAgo, movedFrom?.2 ?? 0) + 30),
+            return TrackedObject(id: id, label: label, description: nil, x: x, z: z, firstSeen: ago(max(firstSeenMin, minAgo, movedFrom?.2 ?? 0)),
                                  lastSeen: ago(minAgo), sightings: 3 + sought,
                                  persistence: movedFrom != nil ? 0.3 : essential ? 0.9 : min(0.95, 0.55 + 0.08 * Double(sought)), history: history, whereText: whereText, room: room,
                                  photo: .asset("photo_\(photo)"), isEssential: essential, timesSought: sought)
@@ -50,7 +51,7 @@ final class MockRobotSource: RobotSource {
             obj("obj_sample0008", "Fridge", "fridge", "In the kitchen", "Kitchen", 4.5, -2.4, 18, sought: 3),
             obj("obj_sample0009", "Fan", "fan", "In the kitchen", "Kitchen", 1.5, -3.5, 41, sought: 2),
             obj("obj_sample0010", "Sofa", "sofa", "In the living room", "Living Room", -2.0, -3.5, 17),
-            obj("obj_sample0011", "Lamp", "lamp", "In the living room", "Living Room", -3.6, -1.8, 21),
+            obj("obj_sample0011", "Lamp", "lamp", "In the living room", "Living Room", -3.6, -1.8, 21, firstSeenMin: 62),
             obj("obj_sample0012", "Coffee Table", "coffeetable", "In the living room", "Living Room", -1.8, -2.0, 31),
         ]
         map = MapSnapshot(
@@ -64,6 +65,9 @@ final class MockRobotSource: RobotSource {
                         Waypoint(id: "wpt_sample_kitchen", name: "kitchen", x: 3.2, z: -2.2)],
             grid: nil, trail: [], updatedAt: now)
         liveFrame = UIImage(named: "photo_liveview")   // SAMPLE frame from the Figma
+        findLog = [FindRecord(query: "car keys", objectId: nil, found: false, at: ago(26 * 60)),
+                   FindRecord(query: "red umbrella", objectId: "obj_sample0007", found: true, at: ago(25))]
+        robotLog = [RobotLogEntry(text: "Soughtbot got stuck by the sofa", at: ago(40))]
         status = RobotStatus(state: .exploring, task: nil, battery: battery, pose: Pose2D(x: route[0].0, z: route[0].1, yawDeg: 0),
                              lastHeartbeat: now)
     }
