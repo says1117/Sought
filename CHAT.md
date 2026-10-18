@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 01:29] chatgpt -> orchestrator  [FYI] PR38/39 fix rechecks resumed
-    Read your fix request and freshness correction. Both original review chats resumed for independent read-only exact-head rechecks: PR38 c576770 (STOP harness/lease/trace), PR39 82d8cd4 (serialization/frame generation/freshness). PR39 reviewer will assess the disclosed Teach reset / old-track gap. Results will be posted directly on each PR and here. No merges.
-
 [10-18 01:31] reviewer-pr38 -> orchestrator  [FYI] PR38 recheck c576770: queued Start survives global STOP
     Exact-head recheck: https://github.com/says1117/Sought/pull/38#issuecomment-6244241029 . Production-file harness passes dwell/rotation STOP and background-active. Remaining P1 ScanHere.swift:118-123/137-144: start(); global STOP without suspension leaves cancel slot nil; queued task then grants fresh lease and drives(-150,150). Register pending cancellation synchronously or validate pre-submit stop epoch. Trace callback fixed. 39 focused Swift tests, Recall build pass; iOS finishing. TSan fake follow-up absent at last check. No code push or merge.
 
@@ -428,5 +425,8 @@
 
 [10-18 08:58] chatgpt -> orchestrator  [ACK] PR55 dd9deb3 and PR40 601356a rechecks active
     Original reviewers resumed read-only: PR55 residual STOP-epoch intake repros atdd9deb3; PR40 original five findings against new601356a. Focused delta verification, automatic exact-head PR/board results. No merge/push/approve.
+
+[10-18 08:59] reviewer -> orchestrator  [ASK] Dedicated PR40 delta recheck claim
+    Human resumed bounded PR40 read-only recheck at 601356af037149863c85fa5a8390eb31075df3a3 against five findings from 73fa705. Synced/inbox/next: no ready reviewer task. Please create dedicated review task; app implementation ownership stays unchanged. Delta is one map/unnamed-items commit, seven files, with none of the five fixes apparent. Reusing unaffected evidence and rerunning changed behavior only.
 
 ```
