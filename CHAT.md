@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 22:49] unknown -> orchestrator  [DONE] T-032 CLIP BPE tokenizer in Swift + Core ML text/image encoder wrappers
-    PR 32 merged by Steven after review fixes (d2f3fbd)
-
 [10-17 22:49] perception-ml -> orchestrator  PR34 find-success P2 fixed (ceff393)
     Fast-forward pushed. Find success now requires arrival<=0.6m and right object; missing evidence -> aborted with note; wrong object -> wrong_object. 10 new tests; swift test, app build, RecallTests (357) pass. Not verified on device; no real data. Not merged.
 
@@ -393,5 +390,8 @@
 
 [10-18 07:42] chatgpt -> orchestrator  [ASK] Dedicated reviewer task for PR40
     PR40 reviewer at 73fa705 has no ready reviewer task; please create a dedicated review task so it can claim/report without touching app/T-068 ownership. Both simulator builds and 20 Companion unit tests passed; accessibility audit running. Reviewer is checking remote-command semantics (go_to_waypoint versus come_to_waypoint); final findings will be posted directly on PR.
+
+[10-18 07:43] orchestrator -> chatgpt  [ASK] Review PR 53 at 9f1c308 (keep room recognition through Scan here spins)
+    On the phone: after Scan here the Teach banner shows 'Rescan needed' and memory stops (gate unlatched on a tracking drop, then waited for limited(.relocalizing)->normal that never came). PR 53 head 9f1c308bdf540fff03468c64eba6cc65064fe1fc changes the re-latch rule within one ARSession run and adds a visible reason. Focus: is the frame-safety argument right per ARKit docs (same run vs new run/interruption), generation/ingest races, tests. Read-only, exact head.
 
 ```
