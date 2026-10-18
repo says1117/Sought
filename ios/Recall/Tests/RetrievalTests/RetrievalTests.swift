@@ -85,3 +85,44 @@ final class RetrievalTests: XCTestCase {
         XCTAssertFalse(r.log.usedUnconfirmed)
     }
 }
+
+final class RetrievalNegativesTests: XCTestCase {
+    // 3-d toy space: x = "bottle", y = "a person", z = "a wall".
+    private let enc = FakeTextEncoder(table: [
+        "bottle": [1, 0, 0], "a photo of bottle": [1, 0, 0],
+        "chair": [0.6, 0.8, 0], "a photo of chair": [0.6, 0.8, 0],
+        "a photo of a person": [0, 1, 0], "a photo of a wall": [0, 0, 1], "a photo of a chair": [0.6, 0.8, 0],
+    ])
+    private func track(_ id: String, _ e: [Float]) -> Track {
+        Track(id: id, position: SIMD3(0, 0, 0), embedding: e, sightings: 4, persistence: 1.0)
+    }
+
+    func testRegionsCloserToANegativeRankLastButAreKept() throws {
+        let person = track("person", [0.5, 0.86, 0])      // cos(bottle) 0.5 but closer to "a person"
+        let bottleish = track("bottle", [0.6, 0.1, 0.1])   // closer to bottle than to any negative
+        let weak = track("weak", [0.5, 0.3, 0.3])          // also a candidate, smaller margin
+        let r = try Retriever(encoder: enc, negatives: ["a person", "a wall"], arrivalNegatives: ["a person"])
+            .retrieve(phrase: "bottle", tracks: [person, weak, bottleish])
+        XCTAssertEqual(r.ranked.map(\.trackID), ["bottle", "weak", "person"], "person sinks but is not removed")
+        XCTAssertEqual(r.log.rejectedByNegatives, ["person"])
+        XCTAssertEqual(r.negatives.count, 1, "arrival negatives only")
+        XCTAssertGreaterThan(r.ranked[0].margin, r.ranked[1].margin)
+    }
+
+    func testNegativeSharingAWordWithTheQueryIsDropped() throws {
+        // "find the chair": the "a chair" negative must not reject chairs.
+        let chair = track("chair", [0.6, 0.8, 0])
+        let r = try Retriever(encoder: enc, negatives: ["a chair", "a wall"], arrivalNegatives: ["a chair", "a wall"])
+            .retrieve(phrase: "chair", tracks: [chair])
+        XCTAssertEqual(r.ranked.map(\.trackID), ["chair"])
+        XCTAssertTrue(r.log.rejectedByNegatives.isEmpty, "the chair negative was dropped for a chair query")
+        XCTAssertEqual(r.negatives.count, 1)
+    }
+
+    func testNoNegativesKeepsPlainRanking() throws {
+        let person = track("person", [0.5, 0.86, 0])
+        let r = try Retriever(encoder: enc).retrieve(phrase: "bottle", tracks: [person])
+        XCTAssertEqual(r.ranked.map(\.trackID), ["person"])
+        XCTAssertTrue(r.log.rejectedByNegatives.isEmpty)
+    }
+}

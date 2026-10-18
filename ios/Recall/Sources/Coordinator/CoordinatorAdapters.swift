@@ -165,7 +165,7 @@ final class FindRunnerAdapter: CoordinatorFinding {
         // Remembered positions come from storage, in the frame of an earlier session. Do not drive to them
         // until ARKit has recognised the saved map again.
         if !known.isEmpty && !frame.relocalized { return .refused(spoken: CoordinatorConfig.notRecognisedSpoken) }
-        let executor = FindExecutor(retriever: Retriever(encoder: set.text), driver: driver, images: set.images, config: config)
+        let executor = FindExecutor(retriever: Retriever(encoder: set.text, negatives: RetrievalConfig.negatives, arrivalNegatives: RetrievalConfig.arrivalNegatives), driver: driver, images: set.images, config: config)
         let result = await executor.find(phrase: description, tracks: known)
         onTrace?(result.trace)
         if Task.isCancelled || result.outcome == .aborted { return .cancelled }

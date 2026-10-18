@@ -93,6 +93,13 @@ public struct FindExecutor {
                           spoken: "I couldn't work out what to look for.")
         }
         if retrieval.log.usedUnconfirmed { notes.append("only unconfirmed tracks were available") }
+        if !retrieval.log.rejectedByNegatives.isEmpty {
+            notes.append("\(retrieval.log.rejectedByNegatives.count) of \(retrieval.log.scored.count) regions matched a person/wall/floor/furniture better (ranked last)")
+        }
+        if retrieval.ranked.contains(where: { $0.margin != 0 }) {
+            notes.append("margins: " + retrieval.ranked.prefix(config.maxCandidates)
+                .map { String(format: "%@ %.3f", String($0.trackID.suffix(4)), $0.margin) }.joined(separator: ", "))
+        }
         if !retrieval.log.skippedIncomparable.isEmpty {
             notes.append("skipped incomparable tracks: \(retrieval.log.skippedIncomparable.joined(separator: ","))")
         }
@@ -108,7 +115,7 @@ public struct FindExecutor {
             case .failed(let reason):
                 attempts.append(attempt(cand, .unreachable, nil, nil, "drive failed: \(reason)"))
             case .arrived:
-                let a = await check(cand, query: retrieval.query)
+                let a = await check(cand, query: retrieval.query, negatives: retrieval.negatives)
                 attempts.append(a)
                 if a.verdict == .accepted { found = cand.trackID; outcome = .success }
             }
@@ -120,7 +127,7 @@ public struct FindExecutor {
                       spoken: nil)
     }
 
-    private func check(_ cand: RankedTrack, query: [Float]) async -> CandidateAttempt {
+    private func check(_ cand: RankedTrack, query: [Float], negatives: [[Float]]) async -> CandidateAttempt {
         let embs: [[Float]]
         do {
             embs = try await images.captureEmbeddings(around: cand.position, count: config.cropsPerCandidate,
@@ -136,12 +143,26 @@ public struct FindExecutor {
             return attempt(cand, .notHere, nil, nil, "embedding dimension mismatch")
         }
         let needText = config.textFraction * cand.score
-        if si >= config.tauImg && st >= needText {
-            return attempt(cand, .accepted, si, st, "s_img >= tau_img and s_text >= \(config.textFraction) * score")
+        // Contrastive veto (arrival negatives, i.e. "a person"): at least one crop must look more like the query than
+        // like every arrival negative. s_img alone only says "same region as remembered"; it accepted a person as
+        // "bottle" on the rover. Background prompts are not used here (an object's crop contains floor around it).
+        var contrastOK = true
+        var bestMargin: Float?
+        if !negatives.isEmpty {
+            bestMargin = embs.compactMap { e -> Float? in
+                guard let t = cosine(e, query) else { return nil }
+                return t - (negatives.compactMap { cosine($0, e) }.max() ?? -1)
+            }.max()
+            contrastOK = (bestMargin ?? -1) > 0
+        }
+        let marginText = bestMargin.map { String(format: "; text margin %.3f", $0) } ?? ""
+        if si >= config.tauImg && st >= needText && contrastOK {
+            return attempt(cand, .accepted, si, st, "s_img >= tau_img and s_text >= \(config.textFraction) * score" + marginText)
         }
         var why: [String] = []
         if si < config.tauImg { why.append("s_img below tau_img") }
         if st < needText { why.append("s_text below \(config.textFraction) * score") }
+        if !contrastOK { why.append("looks more like a person than the query" + marginText) }
         return attempt(cand, .notHere, si, st, why.joined(separator: "; "))
     }
 
