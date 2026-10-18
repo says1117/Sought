@@ -308,10 +308,14 @@ async function homeV2(parent, x, y) {
 // ---------- 4. Screenshots of the other screens ----------
 
 const SHOTS = [
-  ['home_scrolled', 'Home v2, scrolled (search pinned)'], ['items', 'Item Log'], ['detail', 'Item detail'],
-  ['map', 'Map'], ['settings', 'Settings'], ['find_confirm', 'Find 1: confirm'], ['find_searching', 'Find 2: searching'],
-  ['find_guiding', 'Find 3: guiding'], ['find_found', 'Find 4: found'], ['find_notseen', 'Find: not seen yet'],
-  ['map_room', 'Map: room + pin card'], ['map_list', 'Map: item list'], ['home_stuck', 'Home: Soughtbot stuck (amber glow)'],
+  ['home_scrolled', 'Home, scrolled (search pinned)'], ['home_stuck', 'Home: Soughtbot stuck (amber glow)'], ['activity_log', 'Activity log, a move opened'],
+  ['items', 'Item Log'], ['detail', 'Item detail'],
+  ['map', 'Map with your pins'], ['map_room', 'Map: room + pin card'], ['map_list', 'Map: item list'],
+  ['pin_card', 'Pin: summary card'], ['pin_place', 'Pin: drag under the ring'], ['pin_name', 'Pin: name it'], ['pin_find', 'Pin: should be here'],
+  ['find_confirm', 'Find 1: confirm'], ['find_searching', 'Find 2: searching'], ['find_guiding', 'Find 3: guiding'], ['find_found', 'Find 4: found'],
+  ['find_notseen', 'Find: not seen yet (pin offer)'],
+  ['come_pick', 'Come to me: where are you?'], ['come_going', 'Come to me: on the way'],
+  ['settings', 'Settings'],
 ];
 
 async function screenshots(parent, x, y) {
