@@ -1,0 +1,296 @@
+import SwiftUI
+
+// Shared Sought components (plan section 6.4). Sizes and colors follow the Figma Home hi-fi and Item Log frames.
+
+// MARK: - Photos
+
+struct PhotoView: View {
+    let photo: PhotoRef
+    @Environment(\.palette) private var p
+
+    var body: some View {
+        switch photo {
+        case let .asset(name): Image(name).resizable().scaledToFill()
+        case let .jpeg(data):
+            if let ui = UIImage(data: data) { Image(uiImage: ui).resizable().scaledToFill() } else { placeholder }
+        case .none: placeholder
+        }
+    }
+
+    private var placeholder: some View {
+        ZStack { p.surface; Image(systemName: "photo").font(.title2).foregroundStyle(p.text.opacity(0.5)) }
+    }
+}
+
+/// Photo with the Figma bottom shade (night at the bottom fading out by about a third of the height).
+struct ShadedPhoto: View {
+    let photo: PhotoRef
+    var shadeTo: Double = 0.31
+    @Environment(\.palette) private var p
+
+    var body: some View {
+        Color.clear
+            .overlay(PhotoView(photo: photo))
+            .overlay(LinearGradient(stops: [.init(color: p.photoShade, location: 0.02),
+                                            .init(color: Color(hex: 0x39738A, alpha: 0.13), location: shadeTo),
+                                            .init(color: .clear, location: 1)],
+                                    startPoint: .bottom, endPoint: .top))
+            .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+            .accessibilityHidden(true)
+    }
+}
+
+// MARK: - Status line and header
+
+struct BatteryGlyph: View {
+    let level: Double?
+    @Environment(\.palette) private var p
+
+    var body: some View {
+        let l = max(0, min(1, level ?? 0))
+        ZStack(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 2).stroke(p.text, lineWidth: 1.2).frame(width: 14, height: 8)
+            RoundedRectangle(cornerRadius: 1).fill(l < 0.2 ? p.alert : p.found).frame(width: 12 * l, height: 6).padding(.leading, 1)
+            Rectangle().fill(p.text).frame(width: 1.5, height: 3).offset(x: 14.5)
+        }
+        .frame(width: 16, height: 16)
+        .accessibilityHidden(true)
+    }
+}
+
+struct StatusLine: View {
+    var singleLine = false
+    @EnvironmentObject private var robot: RobotSource
+    @Environment(\.palette) private var p
+
+    var body: some View {
+        let online = robot.status.isOnline(now: robot.now)
+        HStack(alignment: .center, spacing: 6) {
+            if robot.status.state != .idle && online {
+                Circle().fill(p.signal).frame(width: 6, height: 6).accessibilityHidden(true)
+            }
+            Text(StatusCopy.line(robot.status, now: robot.now))
+                .font(SoughtFont.status)
+                .foregroundStyle(p.text)
+                .lineLimit(singleLine ? 1 : 3)
+                .fixedSize(horizontal: singleLine, vertical: false)
+                .multilineTextAlignment(singleLine ? .trailing : .leading)
+            if online, robot.status.battery != nil { BatteryGlyph(level: robot.status.battery) }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(StatusCopy.spoken(robot.status, now: robot.now))
+        .accessibilityIdentifier("statusLine")
+    }
+}
+
+struct ScreenHeader: View {
+    let title: String
+    @Environment(\.palette) private var p
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline) {
+                titleText
+                Spacer(minLength: Space.s)
+                StatusLine(singleLine: true)
+            }
+            VStack(alignment: .leading, spacing: Space.xs) { titleText; StatusLine() }
+        }
+    }
+
+    private var titleText: some View {
+        Text(title).font(SoughtFont.screenTitle).foregroundStyle(p.title).accessibilityAddTraits(.isHeader)
+    }
+}
+
+// MARK: - Search and mic
+
+struct SearchBar: View {
+    @Binding var text: String
+    var placeholder: String
+    var onSubmit: (String) -> Void
+    @StateObject private var speech = SpeechInput()
+    @Environment(\.palette) private var p
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        HStack(spacing: Space.s) {
+            TextField("", text: $text, prompt: Text(placeholder).foregroundStyle(p.placeholder))
+                .font(SoughtFont.search)
+                .foregroundStyle(p.text)
+                .submitLabel(.search)
+                .focused($focused)
+                .onSubmit { submit() }
+                .padding(.horizontal, Space.l)
+                .frame(minHeight: 44)
+                .background(Capsule().fill(p.searchFill))
+                .overlay(Capsule().stroke(p.text.opacity(0.08), lineWidth: 1))
+                .softShadow()
+                .accessibilityLabel("Search for an item")
+                .accessibilityHint("Type what you are looking for, then search.")
+                .accessibilityIdentifier("searchField")
+            Button {
+                if speech.isListening { speech.stop() } else { speech.start() }
+            } label: {
+                Image("icon_mic").renderingMode(.template)
+                    .foregroundStyle(speech.isListening ? p.textOnDark : p.text)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(speech.isListening ? p.call : p.micFill))
+                    .overlay(Circle().stroke(p.signal, lineWidth: speech.isListening ? 2 : 0))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(speech.isListening ? "Stop listening" : "Speak to search")
+            .accessibilityIdentifier("micButton")
+        }
+        .onChange(of: speech.transcript) { _, t in if !t.isEmpty { text = t } }
+        .onChange(of: speech.isListening) { was, now in
+            if was && !now && !speech.transcript.isEmpty { submit() }
+        }
+        .overlay(alignment: .bottomLeading) {
+            if let e = speech.errorText {
+                Text(e).font(SoughtFont.cardMeta).foregroundStyle(p.alert).offset(y: 22)
+            }
+        }
+    }
+
+    private func submit() {
+        let q = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return }
+        focused = false
+        onSubmit(q)
+    }
+}
+
+// MARK: - Item card and row
+
+struct FindItButton: View {
+    let action: () -> Void
+    @Environment(\.palette) private var p
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: Space.s) {
+                Image("icon_search").renderingMode(.template).resizable().frame(width: 12, height: 12)
+                Text("Find it").font(SoughtFont.findIt)
+            }
+            .foregroundStyle(p.onPrimary)
+            .frame(maxWidth: .infinity, minHeight: 22)
+            .background(Capsule().fill(p.primary))
+            .padding(.vertical, 11)          // 44 pt tap target around the 22 pt pill
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.vertical, -11)
+    }
+}
+
+struct ItemCard: View {
+    let item: TrackedObject
+    var width: CGFloat = 169
+    var onFind: (TrackedObject) -> Void
+    var onOpen: (TrackedObject) -> Void
+    @EnvironmentObject private var robot: RobotSource
+    @Environment(\.palette) private var p
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.s) {
+            Button { onOpen(item) } label: {
+                ShadedPhoto(photo: item.photo).frame(width: width, height: width * 141 / 169).softShadow()
+            }
+            .buttonStyle(.plain)
+            VStack(alignment: .leading, spacing: Space.xs) {
+                Text(item.label).font(SoughtFont.cardTitle).foregroundStyle(p.text).lineLimit(2)
+                Text("\(item.whereText): \(StatusCopy.ago(item.lastSeen, now: robot.now))")
+                    .font(SoughtFont.cardMeta).foregroundStyle(p.text).lineLimit(2)
+                FindItButton { onFind(item) }.padding(.top, Space.xs)
+            }
+            .frame(width: width - 11, alignment: .leading)
+        }
+        .frame(width: width, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(item.label), \(item.whereText.lowercased()), seen \(StatusCopy.agoSpoken(item.lastSeen, now: robot.now)).")
+        .accessibilityHint("Double tap to find. Swipe up or down for more.")
+        .accessibilityAction { onFind(item) }
+        .accessibilityAction(named: "Find it") { onFind(item) }
+        .accessibilityAction(named: "Details") { onOpen(item) }
+        .accessibilityIdentifier("item-\(item.id)")
+    }
+}
+
+struct ItemRow: View {
+    let title: String
+    let items: [TrackedObject]
+    var banded = false
+    var emptyText = "Nothing here yet"
+    var onFind: (TrackedObject) -> Void
+    var onOpen: (TrackedObject) -> Void
+    @Environment(\.palette) private var p
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.s) {
+            Text(title).font(SoughtFont.sectionTitle).foregroundStyle(p.sectionTitle)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityLabel("\(title), \(items.count) \(items.count == 1 ? "item" : "items")")
+                .padding(.horizontal, Space.margin)
+            if items.isEmpty {
+                Text(emptyText).font(SoughtFont.body).foregroundStyle(p.text).padding(.horizontal, Space.margin)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(alignment: .top, spacing: Space.l) {
+                        ForEach(items) { ItemCard(item: $0, onFind: onFind, onOpen: onOpen) }
+                    }
+                    .padding(.horizontal, Space.margin)
+                    .padding(.vertical, Space.s)
+                }
+            }
+        }
+        .padding(.vertical, Space.l)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(banded ? p.band : .clear)
+    }
+}
+
+// MARK: - Sample banner
+
+struct SampleBanner: View {
+    @EnvironmentObject private var robot: RobotSource
+    @Environment(\.palette) private var p
+
+    var body: some View {
+        if robot.isSample {
+            HStack(spacing: 6) {
+                Image(systemName: "flask").imageScale(.small)
+                Text("SAMPLE DATA").font(SoughtFont.readout).tracking(1)
+            }
+            .foregroundStyle(p.onPrimary)
+            .padding(.horizontal, 10).padding(.vertical, 4)
+            .background(Capsule().fill(p.searching))
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Sample data. This is not from the robot.")
+            .accessibilityIdentifier("sampleBanner")
+        }
+    }
+}
+
+// MARK: - Glass
+
+struct Glass: ViewModifier {
+    var tint: Color
+    var shape: AnyShape
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.palette) private var p
+
+    func body(content: Content) -> some View {
+        if reduceTransparency {
+            content.background(shape.fill(p.card))
+        } else if #available(iOS 26.0, *) {
+            content.glassEffect(.regular.tint(tint), in: shape)
+        } else {
+            content.background(shape.fill(tint)).background(shape.fill(.ultraThinMaterial))
+        }
+    }
+}
+
+extension View {
+    func glass<S: Shape>(_ tint: Color, in shape: S) -> some View { modifier(Glass(tint: tint, shape: AnyShape(shape))) }
+}

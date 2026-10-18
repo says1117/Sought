@@ -101,6 +101,10 @@ targets:
     platform: iOS
     sources:
       - path: ../Companion/Sources
+        excludes: ["**/README.md"]
+      # Sought app resources: fonts (UIAppFonts), Figma icons and SAMPLE photos. Info.plist is set below, not copied.
+      - path: ../Companion/Resources
+        excludes: ["Info.plist", "Fonts/*.txt"]
       - path: Sources/ComeToMe/CompanionMessages.swift
       - path: Sources/ComeToMe/CompanionLink.swift
       - path: Sources/ComeToMe/NIRanging.swift
@@ -110,3 +114,4 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.recall.companion
         SWIFT_VERSION: "5.0"
         INFOPLIST_FILE: ../Companion/Resources/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: ""

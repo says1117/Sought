@@ -1,0 +1,138 @@
+import Foundation
+
+// App-side models. Field names follow docs/03_CONTRACTS.md section 2 (heartbeat 2.1, waypoint 2.2,
+// object track 2.4, map snapshot 2.7). Fields the app derives itself (room, whereText) are marked.
+
+enum RobotState: String, Codable, CaseIterable {
+    case idle, teaching, finding, exploring, blocked, error
+    case comingToUser = "coming_to_user"
+    case patrolling, checkingRoute = "checking_route"   // still in the contract, not produced (cut)
+}
+
+struct Pose2D: Codable, Equatable {
+    var x: Double
+    var z: Double
+    var yawDeg: Double
+
+    enum CodingKeys: String, CodingKey { case x, z, yawDeg = "yaw_deg" }
+}
+
+struct RobotStatus: Equatable {
+    var state: RobotState
+    var task: String?            // "find: blue backpack"
+    var battery: Double?         // 0...1, robot phone battery
+    var pose: Pose2D?
+    var lastHeartbeat: Date?     // nil means never heard from it
+
+    static let offlineAfter: TimeInterval = 10
+
+    func isOnline(now: Date = Date()) -> Bool {
+        guard let t = lastHeartbeat else { return false }
+        return now.timeIntervalSince(t) < Self.offlineAfter
+    }
+}
+
+struct HistoryPoint: Codable, Equatable {
+    var t: Date
+    var x: Double
+    var z: Double
+}
+
+struct TrackedObject: Identifiable, Equatable {
+    var id: String
+    var label: String
+    var description: String?
+    var x: Double
+    var z: Double
+    var firstSeen: Date
+    var lastSeen: Date
+    var sightings: Int
+    var history: [HistoryPoint]
+    // App side, derived or user set
+    var whereText: String        // "By the front door"; from the nearest waypoint when real
+    var room: String?
+    var photo: PhotoRef
+    var isEssential = false
+    var timesSought = 0
+}
+
+/// Where a picture comes from. Asset names are the bundled SAMPLE photos from the Figma.
+enum PhotoRef: Equatable {
+    case asset(String)
+    case jpeg(Data)
+    case none
+}
+
+struct Waypoint: Identifiable, Equatable {
+    var id: String
+    var name: String
+    var x: Double
+    var z: Double
+}
+
+/// A named room rectangle in world meters. Real maps only have waypoints, so rooms are SAMPLE only for now.
+struct Room: Identifiable, Equatable {
+    var id: String { name }
+    var name: String
+    var minX: Double, minZ: Double, maxX: Double, maxZ: Double
+
+    func contains(x: Double, z: Double) -> Bool { x >= minX && x <= maxX && z >= minZ && z <= maxZ }
+}
+
+struct OccupancyGrid: Equatable {
+    var resolution: Double
+    var originX: Double
+    var originZ: Double
+    var width: Int
+    var height: Int
+    var cells: [UInt8]   // 0 free, 1 unknown, 2 occupied low, 3 occupied high
+}
+
+struct MapSnapshot: Equatable {
+    var rooms: [Room]
+    var waypoints: [Waypoint]
+    var grid: OccupancyGrid?
+    var trail: [Pose2D]          // recent robot poses for the dotted path
+    var updatedAt: Date
+
+    /// World bounds that the map view fits to the screen.
+    var bounds: (minX: Double, minZ: Double, maxX: Double, maxZ: Double) {
+        if let g = grid {
+            return (g.originX, g.originZ, g.originX + Double(g.width) * g.resolution, g.originZ + Double(g.height) * g.resolution)
+        }
+        let xs = rooms.flatMap { [$0.minX, $0.maxX] } + waypoints.map(\.x)
+        let zs = rooms.flatMap { [$0.minZ, $0.maxZ] } + waypoints.map(\.z)
+        return (xs.min() ?? -1, zs.min() ?? -1, xs.max() ?? 1, zs.max() ?? 1)
+    }
+
+    func room(atX x: Double, z: Double) -> Room? { rooms.first { $0.contains(x: x, z: z) } }
+
+    func nearestWaypoint(x: Double, z: Double) -> Waypoint? {
+        waypoints.min { hypot($0.x - x, $0.z - z) < hypot($1.x - x, $1.z - z) }
+    }
+}
+
+struct ActivityItem: Identifiable, Equatable {
+    var id: String
+    var objectId: String
+    var text: String             // "Slippers moved to the front door"
+    var at: Date
+}
+
+// MARK: - Find
+
+enum FindPhase: Equatable {
+    case searching               // robot is checking memory / planning
+    case driving(distanceM: Double?)
+    case arrived
+    case notFound
+    case failed(reason: String)
+    case cancelled
+}
+
+struct FindProgress: Equatable {
+    var id: String
+    var query: String
+    var phase: FindPhase
+    var match: TrackedObject?
+}

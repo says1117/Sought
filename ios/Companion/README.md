@@ -1,48 +1,34 @@
-# Companion app (T-028)
+# Sought (user phone app)
 
-Second iPhone app for "come to me". Big **Come to me** button, connection status, distance readout, Cancel.
-Uses the same three shared files as the robot app: `ios/Recall/Sources/ComeToMe/CompanionMessages.swift`, `CompanionLink.swift`, `NIRanging.swift`.
-`NIRanging.swift` also needs `RangeSample.swift` (a tiny pure file).
+SwiftUI app the person carries to talk to Soughtbot. Grows the T-028 Companion target; code names stay `Companion` / `Recall`, the display name is **Sought**. Owner: role `app` (Isaac). Design source: Figma "Sought / SoughtBot" (Home hi-fi, Item Log).
 
-**Not compiled and not run.** There is no Xcode on the machine that wrote it and it needs two physical iPhones (U1/U2 chip). See `docs/come-to-me-test.md`.
+## Run
 
-## Add the target
-
-With XcodeGen (`ios/Recall/project.yml`, add under `targets:`; this PR does not edit that file):
-
-```yaml
-  Companion:
-    type: application
-    platform: iOS
-    sources:
-      - path: ../Companion/Sources
-      - path: ../Recall/Sources/ComeToMe/CompanionMessages.swift
-      - path: ../Recall/Sources/ComeToMe/CompanionLink.swift
-      - path: ../Recall/Sources/ComeToMe/NIRanging.swift
-      - path: ../Recall/Sources/ComeToMe/RangeSample.swift
-    info:
-      path: ../Companion/Resources/Info.plist
-    settings:
-      base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.recall.companion
-        SWIFT_VERSION: "5.0"
-        INFOPLIST_FILE: ../Companion/Resources/Info.plist
+```bash
+brew install xcodegen
+cd ios/Recall && xcodegen generate
+open Recall.xcodeproj   # scheme: Companion, any iOS 17+ simulator
 ```
-By hand in Xcode: File > New > Target > iOS App "Companion" (SwiftUI, bundle id `com.recall.companion`), delete the template files, drag in `ios/Companion/Sources/*` and the shared files above (tick the Companion target, keep "Reference files in place"), set the target's Info.plist file to `ios/Companion/Resources/Info.plist`, set your signing team. Needs a physical device: the simulator has no UWB.
 
-## Info.plist keys (already in `Resources/Info.plist`)
+Screenshot hooks (launch arguments): `-tab items|map|settings`, `-search "red umbrella"`, `-detail obj_sample0007`.
 
-| Key | Why |
+## Layout
+
+| Folder | What |
 |---|---|
-| `NSNearbyInteractionUsageDescription` | Nearby Interaction permission prompt |
-| `NSLocalNetworkUsageDescription` | MultipeerConnectivity uses the local network |
-| `NSBonjourServices` = `_recall-ni._tcp`, `_recall-ni._udp` | MultipeerConnectivity advertises/browses both for service type `recall-ni` |
+| `Sources/Design/Tokens.swift` | Colors (standard + high contrast), Geist / JetBrains Mono type, spacing |
+| `Sources/Model` | `RobotSource` (one class every screen reads), `MockRobotSource` (SAMPLE DATA), status copy, activity derivation |
+| `Sources/Components` | Status line, search + mic, item card and row, map canvas, tab bar, sample banner, glass |
+| `Sources/Screens` | Home, Item Log + detail, Find flow, Map, Settings |
+| `Sources/Services` | Speech input, spoken updates, haptics, settings |
+| `Resources` | Fonts (OFL, licenses alongside), Figma icons, SAMPLE photos |
 
-The **robot app** (`ios/Recall/Resources/Info.plist`, generated from `project.yml` `info.properties`) needs the same three keys. Add to `project.yml` under `Recall` > `info` > `properties`:
+## Data
 
-```yaml
-        NSNearbyInteractionUsageDescription: Measures the distance to your phone so the robot can come to you
-        NSLocalNetworkUsageDescription: Talks to the Recall companion app on your iPhone
-        NSBonjourServices: ["_recall-ni._tcp", "_recall-ni._udp"]
-```
-It already has `NSCameraUsageDescription`, which the Vision person-confirm phase also needs.
+Mock only for now, always labeled SAMPLE DATA. Real data comes through a Backend source once the robot uploads objects (board task T-071). Peer-link messages (`robot_status`, `objects_digest`, `find`) are a documented future option, not built, per the orchestrator.
+
+## Not done or not verified
+
+- Not run on a physical iPhone. Speech input and haptics are untested on device.
+- Come to me v2 (T-068) button is mocked; real wiring waits for the first real find.
+- `ComeToMeTestView` (Settings > For testing) is the original T-028 UWB screen, unchanged in behavior.
