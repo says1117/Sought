@@ -20,13 +20,13 @@ protocol EncoderProvider {
     func encoders() -> EncoderSet
 }
 
-enum EncoderError: Error, Equatable { case modelsMissing }
+enum ModelsMissingError: Error, Equatable { case modelsMissing }
 
 /// Used until the Core ML encoders ship (PR 32). Every use throws `modelsMissing`.
 struct ModelsMissingEncoder: TextEncoder, ImageEmbedder {
-    func encode(_ text: String) throws -> [Float] { throw EncoderError.modelsMissing }
+    func encode(_ text: String) throws -> [Float] { throw ModelsMissingError.modelsMissing }
     func captureEmbeddings(around position: SIMD3<Float>, count: Int, cropScale: Float) async throws -> [[Float]] {
-        throw EncoderError.modelsMissing
+        throw ModelsMissingError.modelsMissing
     }
 }
 
