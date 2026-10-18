@@ -20,6 +20,8 @@ struct CoordinatorStatus: Equatable {
 
 enum CoordinatorTaskKind: String, Equatable {
     case explore, find, goToWaypoint = "go_to_waypoint", comeToMe = "come_to_me"
+    /// Remote Teach move / turn / scan here.
+    case teach
 }
 
 /// One recorded decision. `t` is clock time at the decision.

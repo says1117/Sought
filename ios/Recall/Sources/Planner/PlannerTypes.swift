@@ -18,6 +18,14 @@ enum ToolCall: Equatable {
     case comeToMe
     /// Come to me v2: drive to the user at a taught place ("come to me in the kitchen").
     case comeToWaypoint(name: String)
+    /// Remote Teach: drive straight `meters` along the current heading (negative = back). Range-checked by the parsers.
+    case move(meters: Double)
+    /// Remote Teach: turn in place by `degrees` (positive = left / counter-clockwise, negative = right).
+    case turn(degrees: Double)
+    /// Remote Teach: the Scan here routine (4 x 90 degree turns with a dwell) as a coordinator task.
+    case scanHere
+    /// Remote Teach: save the ARWorldMap and adopt it, exactly like Teach's Save map.
+    case saveMap
 
     /// Wire name, identical to the Gemini function declaration name.
     var toolName: String {
@@ -33,6 +41,10 @@ enum ToolCall: Equatable {
         case .explore: return "explore"
         case .comeToMe: return "come_to_me"
         case .comeToWaypoint: return "come_to_waypoint"
+        case .move: return "move"
+        case .turn: return "turn"
+        case .scanHere: return "scan_here"
+        case .saveMap: return "save_map"
         }
     }
 }
@@ -99,7 +111,7 @@ enum PlannerText {
 // MARK: - Tool specs (single source for Gemini declarations and argument validation)
 
 struct ToolParam {
-    enum Kind: String { case string = "STRING", integer = "INTEGER" }
+    enum Kind: String { case string = "STRING", integer = "INTEGER", number = "NUMBER" }
     let name: String
     let kind: Kind
     let description: String
@@ -119,6 +131,21 @@ enum PlannerTools {
     static let maxDescriptionLength = 120
     static let maxSayLength = 300
     static let maxCallsPerPlan = 4
+    // Remote Teach ranges (command spec shared with Sought). Magnitudes outside are clamped; zero is refused.
+    static let moveRangeM: ClosedRange<Double> = 0.1...1.0
+    static let defaultMoveM = 0.5
+    static let turnRangeDeg: ClosedRange<Double> = 10...180
+    static let defaultTurnDeg = 90.0
+
+    /// Signed metres with the magnitude clamped into `moveRangeM`; nil for zero or not a number.
+    static func clampMove(_ m: Double) -> Double? { clampSigned(m, moveRangeM) }
+    /// Signed degrees with the magnitude clamped into `turnRangeDeg`; nil for zero or not a number.
+    static func clampTurn(_ d: Double) -> Double? { clampSigned(d, turnRangeDeg) }
+    private static func clampSigned(_ v: Double, _ r: ClosedRange<Double>) -> Double? {
+        guard v.isFinite, v != 0 else { return nil }
+        let mag = Swift.min(Swift.max(abs(v), r.lowerBound), r.upperBound)
+        return v < 0 ? -mag : mag
+    }
 
     static let specs: [ToolSpec] = [
         ToolSpec(name: "find_object",
@@ -154,6 +181,18 @@ enum PlannerTools {
         ToolSpec(name: "come_to_waypoint",
                  description: "Come to the user at a taught place they name, e.g. 'come to me in the kitchen' or 'come to the kitchen'. Follows taught routes and stops about 1 m short. The name must be one of the known waypoints.",
                  params: [ToolParam(name: "name", kind: .string, description: "Waypoint name from the known list.", required: true)]),
+        ToolSpec(name: "move",
+                 description: "Drive straight forward (positive) or back (negative) a short distance, e.g. 'forward 0.5 m' or 'back 0.3 m'.",
+                 params: [ToolParam(name: "meters", kind: .number, description: "Signed metres, 0.1 to 1.0 either way. Negative drives back.", required: true)]),
+        ToolSpec(name: "turn",
+                 description: "Turn in place, e.g. 'turn left 90' or 'turn right 45'.",
+                 params: [ToolParam(name: "degrees", kind: .number, description: "Signed degrees, 10 to 180 either way. Positive turns left, negative turns right.", required: true)]),
+        ToolSpec(name: "scan_here",
+                 description: "Look around from here: turn in place in four steps, pausing at each so objects are remembered.",
+                 params: []),
+        ToolSpec(name: "save_map",
+                 description: "Save the room map now, like Teach's Save map.",
+                 params: []),
     ]
 
     static func spec(named name: String) -> ToolSpec? { specs.first { $0.name == name } }
@@ -180,6 +219,11 @@ extension ToolCall {
             return t
         }
 
+        func number(_ key: String) throws -> Double {
+            guard let n = args[key] as? NSNumber, CFGetTypeID(n) != CFBooleanGetTypeID() else { throw bad("\(key) must be a number") }
+            return n.doubleValue
+        }
+
         switch name {
         case "find_object": return .findObject(description: try string("description", max: PlannerTools.maxDescriptionLength))
         case "go_to_waypoint": return .goToWaypoint(name: try string("name", max: PlannerTools.maxNameLength))
@@ -200,6 +244,14 @@ extension ToolCall {
             return .explore(maxMinutes: v)
         case "come_to_me": return .comeToMe
         case "come_to_waypoint": return .comeToWaypoint(name: try string("name", max: PlannerTools.maxNameLength))
+        case "move":
+            guard let m = PlannerTools.clampMove(try number("meters")) else { throw bad("meters must not be zero") }
+            return .move(meters: m)
+        case "turn":
+            guard let d = PlannerTools.clampTurn(try number("degrees")) else { throw bad("degrees must not be zero") }
+            return .turn(degrees: d)
+        case "scan_here": return .scanHere
+        case "save_map": return .saveMap
         default: throw PlannerError.unknownTool(name)
         }
     }
@@ -225,4 +277,18 @@ extension ToolCall {
             return self
         }
     }
+}
+
+// MARK: - Remote Teach text
+
+/// Short numbers for Remote Teach acks and labels: "0.5", "1", "0.25"; degrees as whole numbers.
+enum RemoteTeachText {
+    static func meters(_ m: Double) -> String {
+        let r = (m * 100).rounded() / 100
+        if r == r.rounded() { return String(Int(r)) }
+        var s = String(format: "%.2f", r)
+        while s.hasSuffix("0") { s.removeLast() }
+        return s
+    }
+    static func degrees(_ d: Double) -> String { String(Int(d.rounded())) }
 }

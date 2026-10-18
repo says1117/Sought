@@ -32,6 +32,8 @@ final class RobotCoordinator {
         var worker: Task<Void, Error>?
         var cancelled = false
         var started = false
+        /// Remote Teach: `done` carries the runner's summary alone ("moved 0.5 m"), not "done: label: summary".
+        var plainDone = false
         var token: UInt64?
         /// Lease epoch right after this request was cancelled; the drain timer may brake only if it is unchanged.
         var cancelEpoch: UInt64?
@@ -57,6 +59,7 @@ final class RobotCoordinator {
     private var _status = CoordinatorStatus.idle
     private var _trace: [CoordinatorTraceEntry] = []
     private var _stopGeneration: UInt64 = 0
+    private var savingMap = false
 
     /// Synchronous, serialized status notification; may re-enter (e.g. STOP). Keep it brief;
     /// dispatch UI updates asynchronously and never synchronously wait on another thread.
@@ -137,6 +140,16 @@ final class RobotCoordinator {
             }
             return try await submit(makeRequest(.goToWaypoint, "go to: \(wp.name)", { [deps] in try await deps.navigator.goTo(wp) },
                                                 { [deps] in deps.navigator.cancel() }), remote: remote)
+        case .move(let m):
+            let label = m < 0 ? "move back \(RemoteTeachText.meters(-m)) m" : "move \(RemoteTeachText.meters(m)) m"
+            return try await submitTeach(label, remote: remote) { [deps] in try await deps.teach.move(meters: m) }
+        case .turn(let d):
+            let label = d < 0 ? "turn right \(RemoteTeachText.degrees(-d))°" : "turn left \(RemoteTeachText.degrees(d))°"
+            return try await submitTeach(label, remote: remote) { [deps] in try await deps.teach.turn(degrees: d) }
+        case .scanHere:
+            return try await submitTeach("scan here", remote: remote) { [deps] in try await deps.teach.scanHere() }
+        case .saveMap:
+            return await saveMap(remote: remote)
         case .checkRoute, .startPatrol, .whatChanged:
             return refuse("unsupported", call.toolName, "I can't do that yet.")
         }
@@ -191,6 +204,51 @@ final class RobotCoordinator {
         return try await submit(makeRequest(.comeToMe, "come to: \(goal.label)", { [deps] in
             try await ComeToPlaceRunner.run(targetId: targetPlace.id, goal: goal, deps: deps, settings: settings)
         }, { [deps] in deps.legs.cancel() }), remote: remote)
+    }
+
+    // MARK: - Remote Teach
+
+    /// Move / turn / scan here: admitted atomically or refused, never queued (for local callers too), refused without
+    /// normal tracking, and `done` carries the runner's short summary. Runs under the drive lease; STOP and pause cancel it.
+    private func submitTeach(_ label: String, remote: UInt64?,
+                             _ run: @escaping () async throws -> CoordinatorTaskResult) async throws -> CoordinatorCallOutcome {
+        let spoken: String? = remote == nil ? "I can't do that until I know where I am. I need a rescan." : nil
+        guard deps.pose.tracking() == .normal else { return refuse("refused", "\(label): tracking not normal", spoken) }
+        let req = makeRequest(.teach, label, run, { [deps] in deps.teach.cancel() })
+        req.plainDone = true
+        return try await submit(req, remote: remote ?? stopGeneration)
+    }
+
+    /// Save map: refused while a task runs or is waiting, a manual tool is open (Teach has its own Save map), or a save
+    /// is already in progress. Not motion, so it holds no lease. "map saved" or "map not saved: <why>".
+    private func saveMap(remote: UInt64?) async -> CoordinatorCallOutcome {
+        let refused: CoordinatorCallOutcome? = synchronized {
+            if let stale = staleRemoteLocked(remote, "save map") { return stale }
+            let why: String?
+            if deps.lease.manualHeld { why = "manual control is open" }
+            else if let busy = active { why = busy.cancelled ? "previous task still stopping" : "busy with \(busy.label)" }
+            else if let waiting = pending { why = "busy, \(waiting.label) is waiting" }
+            else if savingMap { why = "already saving the map" }
+            else { why = nil }
+            if let why {
+                record("refused", "save map: \(why)")
+                return .busy("save map: \(why)")
+            }
+            savingMap = true
+            record("start", "save map")
+            return nil
+        }
+        if let refused { return refused }
+        let failure = await deps.teach.saveMap()
+        return synchronized {
+            savingMap = false
+            if let failure {
+                record("error", "save map: \(failure)")
+                return .failed("map not saved: \(failure)")
+            }
+            record("done", "save map")
+            return .done("map saved")
+        }
     }
 
     private func refuseComeToMe(_ why: String, _ spoken: String) -> CoordinatorCallOutcome {
@@ -327,6 +385,8 @@ final class RobotCoordinator {
         case .explore: return .exploring
         case .find, .goToWaypoint: return .finding
         case .comeToMe: return .comingToUser
+        // The heartbeat contract has no teach state; the task string ("move 0.5 m", "scan here") says what it is.
+        case .teach: return .exploring
         }
     }
 
@@ -401,7 +461,16 @@ final class RobotCoordinator {
     }
 
     private func markWaypoint(_ name: String, remote: UInt64?) -> CoordinatorCallOutcome {
-        synchronized { staleRemoteLocked(remote, "mark \(name)") ?? markWaypointLocked(name) }
+        synchronized {
+            if let stale = staleRemoteLocked(remote, "mark \(name)") { return stale }
+            // Remote Teach: a remote mark is refused like remote motion while a manual tool is open or a task is waiting.
+            if remote != nil, active == nil, deps.lease.manualHeld || pending != nil {
+                let why = deps.lease.manualHeld ? "manual control is open" : "busy, a task is waiting"
+                record("refused", "remote mark \(name): \(why)")
+                return .busy("mark \(name): \(why)")
+            }
+            return markWaypointLocked(name)
+        }
     }
 
     private func markWaypointLocked(_ name: String) -> CoordinatorCallOutcome {
@@ -417,11 +486,11 @@ final class RobotCoordinator {
             if deps.waypoints.isPersistent {
                 record("marked", wp.name)
                 deps.speaker.say("Saved this spot as \(wp.name).")
-                return .done("marked: \(wp.name)")
+                return .done("marked \(wp.name)")
             } else {
                 record("marked-temporary", wp.name)
                 deps.speaker.say("Saved this spot as \(wp.name), but only until the app closes. Storage is not working, so it will not be remembered.")
-                return .done("marked-temporary: \(wp.name)")
+                return .done("marked \(wp.name) (temporary: storage is not working)")
             }
         } catch {
             return refuse("error", "mark \(name): \(error)", "I couldn't save that spot.")
@@ -481,7 +550,7 @@ final class RobotCoordinator {
             switch outcome {
             case .success(.completed(let summary)):
                 record("done", "\(req.label)\(summary.map { ": \($0)" } ?? "")")
-                end(req, .done("done: \(req.label)\(summary.map { ": \($0)" } ?? "")"))
+                end(req, .done(req.plainDone ? (summary ?? req.label) : "done: \(req.label)\(summary.map { ": \($0)" } ?? "")"))
                 publish(.idle)
             case .success(.refused(let spoken)):
                 record("refused", "\(req.label): \(spoken)")

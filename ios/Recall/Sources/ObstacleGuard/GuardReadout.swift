@@ -28,6 +28,17 @@ public enum TurnGuard {
     }
 }
 
+/// Guard for Remote Teach's straight reverse ("back 0.5 m"). LiDAR only sees ahead, so this is sonar only: it holds
+/// on the ESP32 rear flag, on rear sonar closer than the stop distance, on missing sonar telemetry and on stale readings.
+public enum RearGuard {
+    /// True = do not reverse now.
+    public static func hold(sonar: SonarSample?, stale: Bool) -> Bool {
+        if stale { return true }
+        guard let s = sonar else { return true }
+        return ObstacleLogic.evaluate(corridor: nil, sonar: s, direction: .reverse).level == .stop
+    }
+}
+
 public enum GuardReadout {
     /// - ageS: seconds since the sensor cache was last written; older than `staleAfterS` means the readings are stale.
     public static func text(corridor: CorridorResult?, sonar: SonarSample?, ageS: Double, staleAfterS: Double) -> String {

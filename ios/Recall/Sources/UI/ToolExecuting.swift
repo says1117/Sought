@@ -47,6 +47,10 @@ enum ToolCallDescription {
         case .explore(let m): return m.map { "Exploring for up to \($0) minutes" } ?? "Exploring"
         case .comeToMe: return "Coming to you"
         case .comeToWaypoint(let n): return "Coming to you in the \(n)"
+        case .move(let m): return m < 0 ? "Moving back \(RemoteTeachText.meters(-m)) m" : "Moving forward \(RemoteTeachText.meters(m)) m"
+        case .turn(let d): return d < 0 ? "Turning right \(RemoteTeachText.degrees(-d))°" : "Turning left \(RemoteTeachText.degrees(d))°"
+        case .scanHere: return "Scanning here"
+        case .saveMap: return "Saving the map"
         }
     }
 

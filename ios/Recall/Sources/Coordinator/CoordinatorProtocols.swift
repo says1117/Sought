@@ -68,6 +68,29 @@ protocol CoordinatorNavigating: AnyObject {
     func cancel()
 }
 
+/// Remote Teach (move / turn / scan here / save map from Sought). Motion follows the runner lifetime contract above:
+/// it runs as a coordinator task under the drive lease and `cancel()` (STOP, pause, a manual tool) ends it.
+protocol CoordinatorRemoteTeaching: AnyObject {
+    /// Straight drive along the current heading; negative backs up (rear sonar guard). Summary is the short ack.
+    func move(meters: Double) async throws -> CoordinatorTaskResult
+    /// Turn in place with the turn guard; positive is left.
+    func turn(degrees: Double) async throws -> CoordinatorTaskResult
+    /// The Scan here routine. Summary is "scan done n/n".
+    func scanHere() async throws -> CoordinatorTaskResult
+    func cancel()
+    /// Save the ARWorldMap and adopt it as Teach's Save map does. nil when saved, else why not.
+    func saveMap() async -> String?
+}
+
+/// Keeps `CoordinatorDependencies` total for callers that do not wire Remote Teach.
+final class UnwiredRemoteTeach: CoordinatorRemoteTeaching {
+    func move(meters: Double) async throws -> CoordinatorTaskResult { .refused(spoken: "Remote teach is not wired up in this build.") }
+    func turn(degrees: Double) async throws -> CoordinatorTaskResult { .refused(spoken: "Remote teach is not wired up in this build.") }
+    func scanHere() async throws -> CoordinatorTaskResult { .refused(spoken: "Remote teach is not wired up in this build.") }
+    func cancel() {}
+    func saveMap() async -> String? { "not wired up in this build" }
+}
+
 /// Waypoint names to poses, and saving the current pose as a new waypoint.
 protocol CoordinatorWaypoints: AnyObject {
     func lookup(_ name: String) -> CoordinatorWaypoint?
@@ -118,6 +141,8 @@ struct CoordinatorDependencies {
     /// Come to me v2: taught waypoints and routes, and the guarded go-to that drives each leg.
     var taught: CoordinatorTaughtPlaces = NoTaughtPlaces()
     var legs: CoordinatorLegDriving = UnwiredLegDriver()
+    /// Remote Teach: move / turn / scan here / save map.
+    var teach: CoordinatorRemoteTeaching = UnwiredRemoteTeach()
 }
 
 /// T-039 SEAM: the app shell implements this to build the real adapters (ARKit pose, DriveLink, Memory,

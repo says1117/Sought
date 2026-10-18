@@ -120,6 +120,18 @@ final class AppRuntime: ObservableObject {
         self.explore = explore
         wiring.makeExplorer = explore.makeExplorer
         // EXPLORE END
+        // REMOTE TEACH BEGIN: move / turn / scan here / save map from remote commands, on the coordinator's Controller and
+        // lease. Save map uses Teach's ARWorldMapAdapter and adopts the map through mapSaved (onSaved is set at the end of init).
+        let teachMapSaver = ARWorldMapAdapter(tracker: pose)
+        teachMapSaver.currentGeneration = { [frameGate] in frameGate.generation }
+        let teachPoses = poseBox
+        let scanConfig = ScanHereModel.defaultConfig
+        wiring.makeRemoteTeach = { controller in
+            RemoteTeachAdapter(controller: controller, poses: teachPoses, reverseSink: LeasedDriveSink(base: sink, lease: lease),
+                               rearHold: { cache.rearHold() }, scanConfig: scanConfig,
+                               saveMap: { await Self.saveWorldMap(teachMapSaver) })
+        }
+        // REMOTE TEACH END
         let coordinator = wiring.makeCoordinator()
         self.coordinator = coordinator
         self.storageWarning = warning
@@ -187,6 +199,24 @@ final class AppRuntime: ObservableObject {
                 PlannerContext(waypointNames: ((try? waypoints.waypoints()) ?? []).map(\.name))
             }))
         // END REMOTE COMMANDS
+        // REMOTE TEACH: a remote save map is adopted exactly like Teach's (main queue, see ARWorldMapAdapter.onSaved).
+        teachMapSaver.onSaved = { [weak self] id, generation in
+            MainActor.assumeIsolated { self?.mapSaved(mapId: id, generation: generation) }
+        }
+    }
+
+    /// REMOTE TEACH: Teach's Save map, awaited. nil when saved, else the reason Teach would show.
+    private nonisolated static func saveWorldMap(_ saver: ARWorldMapAdapter) async -> String? {
+        await withCheckedContinuation { (c: CheckedContinuation<String?, Never>) in
+            DispatchQueue.main.async {
+                saver.saveCurrentMap { result in
+                    switch result {
+                    case .success: c.resume(returning: nil)
+                    case .failure(let e): c.resume(returning: e.localizedDescription)
+                    }
+                }
+            }
+        }
     }
 
     /// Perception crops are CIImages; the Core ML image model takes preprocessed RGBA, so convert and embed one by one.
@@ -327,6 +357,12 @@ final class SensorCache {
         lock.lock(); let s = sonar, t = stamp; lock.unlock()
         let stale = ProcessInfo.processInfo.systemUptime - t > Self.maxAgeS
         return TurnGuard.hold(sonar: s, stale: stale) == nil ? .clear : .stop
+    }
+
+    /// REMOTE TEACH: true = do not reverse now (rear flag, rear sonar too close, no sonar, stale; see RearGuard).
+    func rearHold() -> Bool {
+        lock.lock(); let s = sonar, t = stamp; lock.unlock()
+        return RearGuard.hold(sonar: s, stale: ProcessInfo.processInfo.systemUptime - t > Self.maxAgeS)
     }
 
     /// What the forward guard sees now, as text for the Scan here debug line.
