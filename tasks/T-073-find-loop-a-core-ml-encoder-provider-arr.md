@@ -7,7 +7,7 @@ owner: perception-ml
 depends: 
 read: ios/Recall/Sources/Coordinator, ios/Recall/Sources/MLEncoders, ios/Recall/Sources/FindExecutor, ios/Recall/Sources/Perception, ios/Recall/Sources/App/AppRuntime.swift
 created: 2026-10-18T00:14:45Z
-doing: writing arrival crop embedder, provider selection
-doing_at: 2026-10-18T00:16:18Z
+doing: tests: provider selection, coordinator find with fake camera
+doing_at: 2026-10-18T00:18:58Z
 ---
 see PR
