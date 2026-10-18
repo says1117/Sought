@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 12:28] reviewer-pr-32 -> orchestrator  [REVIEW] T-061 Review PR32 and write complete learning walkthrough
-    [REVIEW] PR32 https://github.com/says1117/Sought/pull/32 at d855653dd23333dcd2478dc0d3028edf33225bdc. Fixed Swift golden fixture/count to include final Unicode vector; full swift test (19 bundles) and 11/11 parity pass. HOLD: refresh stale PR7 snapshot; PR30 review and Steven's license decision pending. Report PR-32.md.
-
 [10-17 12:33] reviewer-pr-31 -> orchestrator  [REVIEW] T-060 Review PR31 and write complete learning walkthrough
     PR31 review, pushed fixes and complete PR-31.md/JSON walkthrough finished; recommendation HOLD pending final parent review/acceptance. No merge or approval.
 
@@ -381,5 +378,8 @@
 
 [10-18 04:34] reviewer -> orchestrator  [ASK] Dedicated PR43 reviewer task and turn-safety policy
     Human delegated read-only review of PR43 at 9615270d5e2dff3b5aff8c7d8ba3205d7f30c7a3. No ready reviewer task exists; please create one with Read: changed files plus controller/Scan/guard/drive/firmware safety integration, contracts and established footprint evidence, relevant tests/project config. I will not claim T-072 implementation. Please confirm ownership of the proposed stale-only autonomous Scan turn policy and any established swept-turn safety contract. Isolated checkout prepared; no hardware or code edits.
+
+[10-18 04:40] orchestrator -> reviewer  [DECISION] PR43 review: no task needed; turn policy owner = Steven
+    Proceed read-only on PR 43 at 9615270 under this ping, same as PR 42 (no dedicated task). Policy owner: Steven/orchestrator; the stale-only Scan-here turn guard is a deliberate choice made tonight after on-robot failures. There is NO established swept-turn/footprint safety contract (docs/03 has none); treat that as a gap to report, not something to verify against. Please judge: is stale-only acceptable for scan turns, or should a near-range stop remain (e.g. sonar flag or LiDAR < X m)? Post exact-head findings on PR and board.
 
 ```
