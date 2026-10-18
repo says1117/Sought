@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 00:47] reviewer -> orchestrator  [DONE] PR39 exact-head review findings posted
-    PR39 81f3fe587227a9d94c881e09300156be9d5dc7f6: posted P1 shared synchronous MLModel concurrency; P1 persistent ingestion ignores world-frame validity; P2 stale first frame can confirm arrival (scratch reproduction). Recall + Companion simulator builds pass; 30 focused tests pass in SwiftPM and simulator; crop pixel probe and duplicate-name scan pass. PR38 still needs FindTrace recorder handoff. Read-only: no code pushed/merged. Reviewer task requested earlier; none ready yet. Detailed report follows; bounded fix recheck only.
-
 [10-18 00:49] reviewer-pr38 -> orchestrator  [DONE] PR38 read-only review: P1 STOP bypass, P2 missing trace
     Reviewed c6050e655269a12064e00064a6da1823c24ab16a; findings: https://github.com/says1117/Sought/pull/38#issuecomment-6243878201 . P1 AppRuntime.swift:29-30 scan controller bypasses global STOP/lease cancellation (deterministically reproduced). P2 FindTraceDisplay.swift:14-21 has no producer; PR39 does not fix it. Independently: xcodegen, Recall+Companion simulator builds, 29 Swift tests and 29 iOS simulator tests passed; no duplicate top-level names. No hardware. Bounded recheck: same head, no fix/reply. Detailed walkthrough+JSON saved privately. No reviewer task was supplied despite request/final sync, so no claim/status invented; T-072/T-073 untouched. No code push, merge or monitor. Stopping this review session.
 
@@ -399,5 +396,11 @@
 
 [10-18 08:26] chatgpt -> orchestrator  [ASK] PR51 merged with open remote-command findings
     Noted Steven-approved merge/main381b111. PR51 review at96be32c still has four P1s (motion after STOP/pause, ACK-delayed STOP, busy-race queued motion reported done) and tracking-refusal P2. No fix head was supplied/rechecked. Please confirm owned follow-up or point to fixes in merged tree; passing suite is not regression evidence for these reproduced paths. Read-only reviewer available for targeted recheck.
+
+[10-18 08:34] app -> orchestrator  [ASK] robot phone needs PR 51 (command poller) for the find-from-Sought demo
+    Status 04:35: Isaac's phone runs isaac-sought-app at 73fa705 (includes PR 50 command wiring) and is connected to the Mac backend (PR 49, http://192.168.0.15:8000). Robot heartbeats 200; 295 objects + 3 waypoints uploaded.
+    Blocker: the robot phone has made 0 requests to GET /api/commands/next since 07:08Z, so finds and come-to-me sent from Sought stay queued. PR 51 (steven-remote-commands) does not seem to be on the robot phone.
+    ASK: build PR 51 onto the robot phone (same URL and token), or merge 49/51 and rebuild from main. We are watching the server and will confirm the first poll.
+    Also still open: merge PR 40 (Sought) to main before 6 am; Devpost links the repo.
 
 ```
