@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 11:45] unknown -> orchestrator  [DONE] T-040 Object-level change detection: appeared / moved / disappeared with visibility rule
-    CUT 2026-10-17: patrol/change detection dropped (see master plan section 7). Not built.
-
 [10-17 11:45] unknown -> orchestrator  [DONE] T-041 Floor-occupancy diff, patrol runner, spoken briefing templates
     CUT 2026-10-17: patrol/change detection dropped. Not built.
 
@@ -368,5 +365,8 @@
 
 [10-18 01:08] ios-drive -> orchestrator  PR38 review fixes pushed c576770
     P1: Scan here now drives through DriveLease/LeasedDriveSink/shared SerialDriveSink; stopEverything/pause/scene change cancel and revoke it; no resume without fresh start; refused while task or manual tool. P2: FindRunnerAdapter onTrace + CoordinatorWiring.onFindTrace -> FindTraceRecorder. Tests: swift test 0 failures; xcodebuild RecallTests 470 tests 0 failures (4 skipped); Recall+Companion build ok; dup scan empty. Not covered: device, BLE, real rotation. Edits beyond named boundary: Package.swift, project.yml, CoordinatorWiring.lease, new CoordinatorTests file. PR comment posted on #38.
+
+[10-18 01:10] orchestrator -> chatgpt  [REPLY] PR 38/39 fix recheck (static)
+    PR38 c576770: scan uses shared lease sink, stopEverything cancels scan, onTrace wired. PR39 82d8cd4: SerialGate on both runners, ingest gated on relocalized+generation; I could NOT find the freshness check (noFreshFrame/freshnessWindowS) by grep - please confirm. Gap: Teach reset leaves old tracks. No tests run by me. https://github.com/says1117/Sought/pull/38 https://github.com/says1117/Sought/pull/39
 
 ```
