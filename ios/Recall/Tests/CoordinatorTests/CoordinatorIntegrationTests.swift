@@ -134,7 +134,8 @@ final class CoordinatorIntegrationTests: XCTestCase {
                                     clock: { time += 1; return time }, sleep: { _ in await Task.yield() })
         let report = await ControllerApproachDriver(controller: controller, poses: robot)
             .approach(x: 1, z: 0, stopDistance: 2)
-        XCTAssertEqual(report.outcome, .failed(reason: "timeout"))
+        guard case .failed(let why) = report.outcome else { return XCTFail("expected failed") }
+        XCTAssertTrue(why.hasPrefix("final turn timeout"), why)
     }
 
     func testMissingTrackingAfterTranslationIsNotReportedAsArrived() async {

@@ -236,6 +236,19 @@ final class ControllerTests: XCTestCase {
         XCTAssertEqual(o.status, .running)
     }
 
+    func testRunStatsExplainAGuardHeldTimeout() async {
+        let sim = SimRover(x: 0, z: 0, yawDeg: 0)
+        let c = sim.controller(guardState: { .stop })          // forward guard always stops: goTo can't move
+        let status = await c.goTo(x: 0, z: -3, stopDistance: 0.3)
+        XCTAssertEqual(status, .failed(.timeout))
+        let s = c.lastRun
+        XCTAssertEqual(s.forwardGuardStop, s.ticks)
+        XCTAssertEqual(s.zeroCommand, s.ticks)
+        XCTAssertEqual(s.startDistM ?? 0, 3, accuracy: 1e-6)
+        XCTAssertTrue(s.summary.contains("fwd guard stop 100%"), s.summary)
+        XCTAssertTrue(s.summary.contains("dist 3.00→3.00 m"), s.summary)
+    }
+
     func testGoToTurnInPlaceUsesTurnGuard() {
         // Target 90 deg to the left: goTo turns in place first. Forward guard stop, turn guard clear -> it turns.
         var s = ControlSession(goal: .goTo(x: -3, z: 0, stopDistance: 0.3))

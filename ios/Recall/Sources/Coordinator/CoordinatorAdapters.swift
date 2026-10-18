@@ -107,10 +107,12 @@ final class ControllerApproachDriver: ApproachDriver {
 
     func approach(x: Double, z: Double, stopDistance: Double) async -> ApproachReport {
         let status = await controller.goTo(x: x, z: z, stopDistance: stopDistance)
+        // Why a drive failed, for the Last find trace (guard holds vs turning vs driving, distance progress).
+        let why = " (" + controller.lastRun.summary + ")"
         switch status {
         case .failed(.cancelled): return ApproachReport(outcome: .cancelled)
-        case .failed(.timeout): return ApproachReport(outcome: .failed(reason: "timeout"))
-        case .failed(.trackingLost): return ApproachReport(outcome: .failed(reason: "tracking lost"))
+        case .failed(.timeout): return ApproachReport(outcome: .failed(reason: "timeout" + why))
+        case .failed(.trackingLost): return ApproachReport(outcome: .failed(reason: "tracking lost" + why))
         case .running: return ApproachReport(outcome: .failed(reason: "controller did not finish"))
         case .done:
             guard !Task.isCancelled else { return ApproachReport(outcome: .cancelled) }
@@ -126,8 +128,8 @@ final class ControllerApproachDriver: ApproachDriver {
                 case .done: break
                 case .running: return ApproachReport(outcome: .failed(reason: "controller did not finish"))
                 case .failed(.cancelled): return ApproachReport(outcome: .cancelled)
-                case .failed(.timeout): return ApproachReport(outcome: .failed(reason: "timeout"))
-                case .failed(.trackingLost): return ApproachReport(outcome: .failed(reason: "tracking lost"))
+                case .failed(.timeout): return ApproachReport(outcome: .failed(reason: "final turn timeout (" + controller.lastRun.summary + ")"))
+                case .failed(.trackingLost): return ApproachReport(outcome: .failed(reason: "final turn tracking lost"))
                 }
             }
             return ApproachReport(outcome: .arrived)
