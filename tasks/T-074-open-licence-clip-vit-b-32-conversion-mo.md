@@ -7,8 +7,8 @@ owner: perception-ml
 depends: 
 read: ml/conversion/README.md, ios/Recall/Sources/MLEncoders
 created: 2026-10-18T02:38:38Z
-doing: converted + parity done; now Swift ModelConfig
-doing_at: 2026-10-18T02:43:59Z
+doing: Swift config done; running swift test and 224 PIL check
+doing_at: 2026-10-18T02:46:32Z
 ---
 see PR
 
