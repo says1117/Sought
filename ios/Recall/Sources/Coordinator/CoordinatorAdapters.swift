@@ -245,7 +245,9 @@ struct CoordinatorWiring {
                 navigator: ControllerNavigator(controller: controller),
                 waypoints: StoreWaypointsAdapter(store: waypointStore, poses: poses, isPersistent: waypointsPersistent, frame: frame),
                 drive: DriveStopAdapter(sink: drive), speaker: speaker, clock: clock,
-                pose: ControllerPoseAdapter(source: poses), lease: lease, frame: frame),
+                pose: ControllerPoseAdapter(source: poses), lease: lease, frame: frame,
+                taught: StoreTaughtPlacesAdapter(store: waypointStore, frame: frame),
+                legs: ControllerLegDriver(controller: controller, poses: poses)),
             config: cfg)
     }
 

@@ -36,6 +36,8 @@ struct CoordinatorConfig {
     /// A cancelled runner that has not returned after this long is force-released (the STOP was already sent).
     var drainTimeoutS: TimeInterval = 3.0
     var features = RecallFeatureFlags()
+    /// Come to me v2 stop distances (placeholders until measured on the floor).
+    var comeToMe = ComeToMeSettings()
     static let rescanReason = "need a rescan"
     static let notRecognisedSpoken = "I have not recognised this room yet, please rescan."
 }

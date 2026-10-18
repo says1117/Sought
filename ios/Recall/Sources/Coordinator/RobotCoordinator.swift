@@ -7,7 +7,7 @@ import Foundation
 /// sequences tasks and makes `stop` win. It never sets speeds or limits; those live in the ESP32 and guards.
 ///
 /// Rules:
-/// - Exactly one task (explore, find, go_to_waypoint, come_to_me) runs at a time.
+/// - Exactly one task (explore, find, go_to_waypoint, come_to_me / come_to_waypoint) runs at a time.
 /// - A second task request while one runs is held as the single pending request. If that slot is also full,
 ///   or the request is mark_waypoint, it is refused with a spoken reason. Never throws for that.
 /// - `stopAll()` is synchronous: drive STOP first, cancel the owned task and adapter, clear pending,
@@ -99,6 +99,8 @@ final class RobotCoordinator {
             guard config.features.comeToMeEnabled else { refuseDisabled("come_to_me", "Sorry, coming to you is turned off in this build."); return }
             try await submit(makeRequest(.comeToMe, "come to me", { [deps] in try await deps.comer.comeToMe() },
                                          { [deps] in deps.comer.cancel() }))
+        case .comeToWaypoint(let name):
+            try await comeToMe(target: .waypointName(name), traced: true)
         case .goToWaypoint(let name):
             guard let wp = deps.waypoints.lookup(name) else {
                 record("rejected", "unknown waypoint \(name)")
@@ -116,6 +118,63 @@ final class RobotCoordinator {
             record("unsupported", call.toolName)
             deps.speaker.say("I can't do that yet.")
         }
+    }
+
+    /// Come to me v2 (T-066): drive to a taught place along the taught routes and stop `config.comeToMe.stopShortM`
+    /// short. Also the entry point for the remote command poller (`come_to_me` with a waypoint id). Same lifecycle as
+    /// every other task: one at a time, STOP wins, runs under the drive lease, every leg is a guarded Controller.goTo.
+    /// Refusals (unknown place, not relocalized, map mismatch, outside the taught area) are spoken and return
+    /// normally; the outcome is in `trace` and `status`. Throws only what a runner throws (or caller cancellation).
+    func comeToMe(target: ComeToMeTarget) async throws {
+        try await comeToMe(target: target, traced: false)
+    }
+
+    private func comeToMe(target: ComeToMeTarget, traced: Bool) async throws {
+        if !traced { record("request", "come_to_me \(target)") }
+        guard config.features.comeToPlaceEnabled else {
+            refuseComeToMe("disabled by feature flag", "Sorry, coming to a place is turned off in this build.")
+            return
+        }
+        let all = deps.taught.places()
+        let targetPlace: TaughtPlace
+        let goal: (x: Double, z: Double, label: String)
+        switch target {
+        case .waypointId(let id):
+            guard let p = all.first(where: { $0.id == id }) else {
+                refuseComeToMe("unknown waypoint id \(id)", "I don't know that place."); return
+            }
+            targetPlace = p; goal = (p.x, p.z, p.name)
+        case .waypointName(let name):
+            let key = PlannerText.normalizeName(name)
+            guard let p = all.first(where: { PlannerText.normalizeName($0.name) == key }) else {
+                refuseComeToMe("unknown waypoint \(name)", "I don't know a place called \(name)."); return
+            }
+            targetPlace = p; goal = (p.x, p.z, p.name)
+        case .pose(let x, let z, let mapId):
+            guard deps.frame.relocalized else {
+                refuseComeToMe("pose: saved map not relocalized", CoordinatorConfig.notRecognisedSpoken); return
+            }
+            guard deps.frame.activeMapId == mapId else {
+                refuseComeToMe("pose: map \(mapId) is not the active map", ComeToPlaceRunner.mapMismatchSpoken); return
+            }
+            guard let near = all.min(by: { ComeToPlacePlanner.dist($0, (x, z)) < ComeToPlacePlanner.dist($1, (x, z)) }),
+                  ComeToPlacePlanner.dist(near, (x, z)) <= config.comeToMe.poseMaxFromPlaceM else {
+                refuseComeToMe("pose: outside the taught area", ComeToPlaceRunner.poseOutsideSpoken); return
+            }
+            targetPlace = near; goal = (x, z, ComeToPlaceRunner.userLabel)
+        }
+        guard targetPlace.inCurrentFrame || deps.frame.relocalized else {
+            refuseComeToMe("\(targetPlace.name): saved map not relocalized", CoordinatorConfig.notRecognisedSpoken); return
+        }
+        let settings = config.comeToMe
+        try await submit(makeRequest(.comeToMe, "come to: \(goal.label)", { [deps] in
+            try await ComeToPlaceRunner.run(targetId: targetPlace.id, goal: goal, deps: deps, settings: settings)
+        }, { [deps] in deps.legs.cancel() }))
+    }
+
+    private func refuseComeToMe(_ why: String, _ spoken: String) {
+        record("refused", "come_to_me: \(why)")
+        deps.speaker.say(spoken)
     }
 
     /// Stop always wins. Synchronous. Safe with nothing running.
