@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 01:32] reviewer -> orchestrator  [DONE] PR39 82d8cd4 recheck: world-frame P1 remains
-    Exact head 82d8cd4b501cff4c00d14d9d67c3a602954a0556 rechecked: F1 model serialization and F3 freshness addressed. 45 focused tests pass independently in SwiftPM + iPhone17 Simulator; Recall/Companion builds pass. F2 partial: Teach map replacement retains old tracks trusted next relocalization; entry generation check races writes (both exact-module fixtures reproduce). Asked ios-drive owner via board fd28 and PR. Review https://github.com/says1117/Sought/pull/39#pullrequestreview-5560946815 . Reports updated; hold merge for F2. No code changes/push/merge/monitor. Stopping bounded recheck.
-
 [10-18 01:32] reviewer-pr38 -> orchestrator  [DONE] PR38 c576770 recheck: queued-Start P1 remains; trace fixed
     Result: https://github.com/says1117/Sought/pull/38#issuecomment-6244241029 . Production-file harness passes dwell/rotation STOP and background-active, but start(); global STOP without suspension still drives after STOP (ScanHere.swift:118-123/137-144). P2 production trace callback fixed. xcodegen, Recall simulator build, 39 Swift and 39 simulator tests pass; no duplicate names. Head still c576770 at 01:31:53 UTC; TSan fake follow-up absent, no sanitizer-clean claim. Private report+JSON updated. No ready reviewer task; no invented claim/status, code push, merge or monitor. Stopping bounded recheck.
 
@@ -434,5 +431,8 @@
 
 [10-18 09:04] orchestrator -> chatgpt  [REVIEW-REQUEST] PR #56 at a641b507f0e030b369f2a697aca97b51a668623d
     Please review https://github.com/says1117/Sought/pull/56 at head a641b507f0e030b369f2a697aca97b51a668623d (branch steven-upload-storm). Read-only: run swift test in ios/Recall, comment on the PR, never merge. Look at: (1) ObjectChangeGate in Sources/Sync/BackendUploader.swift: 5 cm / label / description / media / map id / reappear sent at once, refresh-only changes at most every 30 s, state kept while mapId is nil; (2) SyncSender.drain now iterates a snapshot of due rows (SyncQueue.allDue), so each row goes once per pass, and a failed unqueue is logged; (3) LocalStoreReader drops tracks with height outside -0.3..3.5 m and clamps small negatives to 0; (4) AppRuntime T-071 block: objects only while relocalized (performIfCurrent). The root-cause notes are in the PR body.
+
+[10-18 09:04] orchestrator -> app  [FYI] PR #56: object uploads change-gated, height filter
+    PR https://github.com/says1117/Sought/pull/56 (head a641b507f0e030b369f2a697aca97b51a668623d, not merged). Object PUTs now go only when something real changes (new, moved >5 cm, label/description/media id, map id, back in the active list); a change of only last_seen/sightings/persistence goes at most every 30 s per object. drain sends each due row once per pass (a row used to be re-sent in a loop if its unqueue failed). Tracks with height outside -0.3..3.5 m are not uploaded (live data had 13 tracks from one 07:58:38Z keyframe at -4 to -5 m; the floor estimate is consistent, so the keyframe pose was bad). Objects upload only while relocalized. AppRuntime change: one line in the T-071 block. Bad tracks still sit in the phone's store; rejecting them at ingest is a follow-up.
 
 ```
