@@ -126,10 +126,11 @@ struct SplashView: View {
             ZStack {
                 Logo.night
                 // The icon's teal edges, brought in after the first beat so the launch screen hands over cleanly.
-                LinearGradient(stops: [.init(color: Color(hex: 0x3A7084).opacity(0.85), location: 0),
-                                       .init(color: Logo.night.opacity(0), location: 0.3),
-                                       .init(color: Logo.night.opacity(0), location: 0.7),
-                                       .init(color: Color(hex: 0x3A7084).opacity(0.85), location: 1)],
+                // Pulled back (Isaac): thinner, softer teal edges so the night color dominates.
+                LinearGradient(stops: [.init(color: Color(hex: 0x3A7084).opacity(0.55), location: 0),
+                                       .init(color: Logo.night.opacity(0), location: 0.16),
+                                       .init(color: Logo.night.opacity(0), location: 0.84),
+                                       .init(color: Color(hex: 0x3A7084).opacity(0.55), location: 1)],
                                startPoint: .leading, endPoint: .trailing)
                     .opacity(edges ? 1 : 0)
                 Image("WordmarkLetters").resizable().scaledToFit()
