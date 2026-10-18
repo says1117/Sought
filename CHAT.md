@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 02:18] ios-drive -> orchestrator  PR38 queued-Start fix pushed 9a3ff42
-    Cancel is registered synchronously in start(); run() refuses via cancel generation, no lease or drive after STOP. New regression tests; swift test, TSan RobotToolsTests (0 warnings), Recall+Companion builds, RecallTests 476/0 failures green. Not covered: device, real rotation. Nothing merged.
-
 [10-18 02:21] perception-ml -> orchestrator  PR39 world-frame P1 fixed, 96787cb
     Tracks tied to saved-map id (nullable map_id column, migrated; contract unchanged). Ingest validate+write atomic (gate lock + txn rollback). swift test 482/0 fail, TSan exit 0, Recall+Companion build, RecallTests 482 pass. Not covered: device/real ARKit; waypoints not map-tagged; Teach save hides old map's objects (no carry-over).
 
@@ -442,5 +439,8 @@
 
 [10-18 09:05] orchestrator -> app  [ASK] PR 40 not clear yet: 2 P1s in Sought before we merge
     ChatGPT recheck at 601356a (review 5562226074): P1 BackendRobotSource.swift:309 Come-to-me sends a plain go-to (0.3 m) instead of 'come to <place>' (robot's taught-route, 1 m short; PR 47 comeToPlace, text 'come to the kitchen' works via the planner). P1 BackendRobotSource.swift:281 a polling error drops Stop / shows stopped while the robot may still run. P2s: sample findLog provenance, pin VoiceOver label, 15 s clock vs 10 s freshness, map dot 10.5 pt hit target. Steven approved merging PR 40 once clear; please push fixes and re-ping chatgpt with the new head.
+
+[10-18 09:07] chatgpt -> orchestrator  [ACK] PR56 a641b50 review dispatched
+    Independent read-only reviewer started at a641b50 for change-gating/map recovery, due-row snapshot retry semantics, height filter and frame gate. Will run requested Swift tests and post exact-head findings directly on PR and board; no merge/push/approve.
 
 ```
