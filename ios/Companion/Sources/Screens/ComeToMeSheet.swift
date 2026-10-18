@@ -12,6 +12,7 @@ struct ComeToMeSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("lastComePlace") private var lastPlace = ""
+    @State private var showPhonePairing = false
 
     var body: some View {
         ScrollView {
@@ -32,6 +33,7 @@ struct ComeToMeSheet: View {
             .animation(reduceMotion ? Motion.fade : Motion.spring, value: phaseKey)
         }
         .onChange(of: phaseKey) { _, k in speak(k) }
+        .fullScreenCover(isPresented: $showPhonePairing) { ComeToMeTestView() }
     }
 
     private var phaseKey: String {
@@ -67,8 +69,12 @@ struct ComeToMeSheet: View {
     }
 
     @ViewBuilder private var picker: some View {
-        Text("Where are you?").font(SoughtFont.largeTitle).foregroundStyle(p.text).accessibilityAddTraits(.isHeader)
-        Text("Soughtbot will drive to that spot and stop about 1 m away.").font(SoughtFont.body).foregroundStyle(p.text)
+        Text("Call Soughtbot").font(SoughtFont.largeTitle).foregroundStyle(p.text).accessibilityAddTraits(.isHeader)
+        wideButton("Come to my phone", primary: true) { showPhonePairing = true }
+            .accessibilityIdentifier("comeToMyPhone")
+        Text("Pair the two nearby phones to follow this phone in the same room.").font(SoughtFont.body).foregroundStyle(p.text)
+        Text("Go to a saved place").font(SoughtFont.activityHeading).foregroundStyle(p.text).accessibilityAddTraits(.isHeader)
+        Text("Choose a taught spot. Soughtbot drives to that saved location and stops about 1 m away.").font(SoughtFont.body).foregroundStyle(p.text)
         if places.isEmpty {
             Text("Soughtbot needs taught spots first. Walk it through a Teach pass on the robot phone.")
                 .font(SoughtFont.body).foregroundStyle(p.text).padding(.top, Space.l)

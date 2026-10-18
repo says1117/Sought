@@ -235,6 +235,8 @@ struct CoordinatorWiring {
     /// Builds the explore task on the coordinator's Controller (ExploreRuntime.makeExplorer). nil = UnwiredExplorer.
     /// The coordinator still refuses explore unless `features.exploreEnabled`.
     var makeExplorer: ((Controller) -> CoordinatorExploring)? = nil
+    /// Paired phone approach, constructed on the same leased/serialized drive path by AppRuntime.
+    var makeComer: (() -> CoordinatorComingToUser)? = nil
     /// Builds Remote Teach (move / turn / scan here / save map) on the coordinator's Controller. nil = UnwiredRemoteTeach.
     var makeRemoteTeach: ((Controller) -> CoordinatorRemoteTeaching)? = nil
 
@@ -250,7 +252,7 @@ struct CoordinatorWiring {
         cfg.features = features
         return RobotCoordinator(
             dependencies: CoordinatorDependencies(
-                explorer: makeExplorer?(controller) ?? UnwiredExplorer(), finder: finder, comer: UnwiredComeToMe(),
+                explorer: makeExplorer?(controller) ?? UnwiredExplorer(), finder: finder, comer: makeComer?() ?? UnwiredComeToMe(),
                 navigator: ControllerNavigator(controller: controller),
                 waypoints: StoreWaypointsAdapter(store: waypointStore, poses: poses, isPersistent: waypointsPersistent, frame: frame),
                 drive: DriveStopAdapter(sink: drive), speaker: speaker, clock: clock,

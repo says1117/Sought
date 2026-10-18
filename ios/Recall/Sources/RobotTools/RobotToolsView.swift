@@ -27,6 +27,7 @@ struct RobotToolsView: View {
                 Text("Scan here").tag(0)
                 Text("Last find").tag(1)
                 Text("Memory").tag(2)
+                Text("Pair phone").tag(4)
                 if runtime.features.exploreEnabled { Text("Explore").tag(3) }
             }
             .pickerStyle(.segmented)
@@ -36,6 +37,7 @@ struct RobotToolsView: View {
                 case 0: scanSection
                 case 1: findSection
                 case 3: ExplorePreviewSection(runtime: runtime)
+                case 4: PairedPhoneSection(link: runtime.pairedPhone)
                 default: memorySection
                 }
             }
@@ -164,5 +166,34 @@ struct RobotToolsView: View {
         .buttonStyle(.borderedProminent).tint(.red)
         .padding()
         .accessibilityLabel("Stop the robot")
+    }
+}
+
+private struct PairedPhoneSection: View {
+    @ObservedObject var link: PairedPhoneLink
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Come to the paired phone").font(.title2.bold())
+            Text("Keep both apps open in the same room. Enter the same six-digit code on both phones.")
+            SecureField("Six-digit pairing code", text: $link.code)
+                .keyboardType(.numberPad).textContentType(.oneTimeCode).textFieldStyle(.roundedBorder)
+                .disabled(link.pairing)
+            Button("Pair phone", action: link.beginPairing).buttonStyle(.borderedProminent)
+                .disabled(!link.supported || link.pairing)
+            Button("Disconnect", action: link.stopPairing).buttonStyle(.bordered)
+                .disabled(!link.pairing)
+            Text(link.message)
+            if !link.supported { Text("Distance and direction ranging are unavailable on this phone.").foregroundStyle(.secondary) }
+            Text(link.distance.map { String(format: "Distance %.2f m", $0) } ?? "Distance unavailable")
+            Text(link.bearing.map { String(format: "Bearing %.0f° (positive is left)", $0) } ?? "Direction unavailable")
+            Text("With the wheels raised and the robot stationary, check that the bearing reads ahead, left and right correctly as you move the handheld phone. Then enable approach for this pairing session.")
+                .font(.footnote)
+            Toggle("Enable approach after checking bearing", isOn: $link.approachEnabled)
+                .disabled(!link.connected || link.distance == nil || link.bearing == nil)
+            Text("The robot approaches in short guarded segments and stops about one metre away. An obstacle can stop it; this mode does not find routes around walls.")
+                .font(.footnote).foregroundStyle(.secondary)
+        }
+        .padding()
     }
 }
