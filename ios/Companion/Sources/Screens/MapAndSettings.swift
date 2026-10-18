@@ -52,9 +52,9 @@ struct MapScreen: View {
         }
         .padding(.horizontal, Space.margin)
         .padding(.top, Space.l)
-        .padding(.bottom, 110)
+        .padding(.bottom, Space.l)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(p.background.ignoresSafeArea())
+        .background(Color.clear)
     }
 
     private func legend<V: View>(_ mark: V, _ text: String) -> some View {
@@ -112,7 +112,7 @@ struct SettingsScreen: View {
             .foregroundStyle(p.text)
             .environment(\.defaultMinListRowHeight, 48)
             .scrollContentBackground(.hidden)
-            .background(p.background.ignoresSafeArea())
+            .background(Color.clear)
             .safeAreaInset(edge: .top) {
                 VStack(alignment: .leading, spacing: Space.s) {
                     SampleBanner()
@@ -120,7 +120,7 @@ struct SettingsScreen: View {
                 }
                 .padding(.horizontal, Space.margin).padding(.top, Space.l)
             }
-            .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 90) }
+            
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showComeToMeTest) { ComeToMeTestView() }
         }

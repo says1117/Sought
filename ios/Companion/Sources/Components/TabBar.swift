@@ -1,6 +1,6 @@
 import SwiftUI
 
-// Floating glass tab bar from the Figma: 354 wide pill over a teal fade, four icons split by thin white rules.
+// Glass tab bar from the Figma: a pill on an opaque teal band, four icons split by thin white rules.
 
 enum AppTab: String, CaseIterable, Identifiable {
     case home, map, items, settings
@@ -39,17 +39,17 @@ struct SoughtTabBar: View {
         }
         .padding(.horizontal, Space.l)
         .padding(.vertical, 9)
-        .glass(p.tabGlass, in: Capsule())
-        .overlay(Capsule().stroke(Color(red: 157 / 255, green: 189 / 255, blue: 198 / 255, opacity: 0.09), lineWidth: 1))
-        .softShadow()
+        .soughtGlass(.tabBar, in: Capsule())
         .padding(.horizontal, Space.margin)
         .padding(.top, Space.m)
-        .background(alignment: .bottom) {
-            LinearGradient(stops: [.init(color: p.tabGradientTop, location: 0), .init(color: p.tabGradientBottom, location: 0.58)],
+        .padding(.bottom, Space.xs)
+        // Opaque band: content never shows through behind the bar (contrast). Starts at the background's bottom
+        // color so the seam is invisible, then deepens to the Figma teal.
+        .background {
+            LinearGradient(stops: [.init(color: p.isHighContrast ? p.background : Color(hex: 0xCDE1E7), location: 0),
+                                   .init(color: p.tabGradientBottom, location: 0.58)],
                            startPoint: .top, endPoint: .bottom)
-                .frame(height: 120)
                 .ignoresSafeArea(edges: .bottom)
-                .allowsHitTesting(false)
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Tab bar")

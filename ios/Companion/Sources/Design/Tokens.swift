@@ -97,6 +97,7 @@ enum SoughtFont {
     static let bodyMedium = Font.custom("Geist-Medium", size: 17, relativeTo: .body)
     static let status = Font.custom("Geist-Regular", size: 12, relativeTo: .caption)
     static let search = Font.custom("Geist-Light", size: 15, relativeTo: .subheadline)
+    static let searchHero = Font.custom("Geist-Regular", size: 17, relativeTo: .body)
     static let cardTitle = Font.custom("Geist-SemiBold", size: 12, relativeTo: .footnote)
     static let cardMeta = Font.custom("Geist-Light", size: 12, relativeTo: .footnote)
     static let activityHeading = Font.custom("Geist-SemiBold", size: 14, relativeTo: .subheadline)
@@ -121,6 +122,13 @@ enum Space {
 enum Radius {
     static let card: CGFloat = 8       // Figma uses 8 on cards and photos
     static let button: CGFloat = 12
+}
+
+/// One motion language for the whole app. Reduce Motion swaps these for plain fades at the call site.
+enum Motion {
+    static let spring = Animation.spring(duration: 0.38, bounce: 0.18)
+    static let quick = Animation.easeOut(duration: 0.2)
+    static let fade = Animation.easeInOut(duration: 0.25)
 }
 
 extension View {

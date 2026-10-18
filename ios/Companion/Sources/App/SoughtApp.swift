@@ -20,6 +20,36 @@ struct SoughtApp: App {
     }
 }
 
+/// Keeps every tab alive (scroll position survives) and crossfades between them.
+struct TabContainer: View {
+    let selection: AppTab
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage("homeV1") private var homeV1 = false
+
+    var body: some View {
+        ZStack {
+            ForEach(AppTab.allCases) { tab in
+                let on = tab == selection
+                page(tab)
+                    .opacity(on ? 1 : 0)
+                    .offset(y: on || reduceMotion ? 0 : 8)
+                    .allowsHitTesting(on)
+                    .accessibilityHidden(!on)
+            }
+        }
+        .animation(reduceMotion ? Motion.fade : Motion.spring, value: selection)
+    }
+
+    @ViewBuilder private func page(_ t: AppTab) -> some View {
+        switch t {
+        case .home: if homeV1 { HomeViewClassic() } else { HomeView() }
+        case .map: MapScreen()
+        case .items: ItemLogView()
+        case .settings: SettingsScreen()
+        }
+    }
+}
+
 struct RootView: View {
     @EnvironmentObject private var robot: RobotSource
     @EnvironmentObject private var router: Router
@@ -29,26 +59,18 @@ struct RootView: View {
     private var palette: Palette { settings.highContrast ? .highContrast : .standard }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            Group {
-                switch router.tab {
-                case .home: HomeView()
-                case .map: MapScreen()
-                case .items: ItemLogView()
-                case .settings: SettingsScreen()
-                }
-            }
+        TabContainer(selection: router.tab)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            SoughtTabBar(selection: $router.tab)
-        }
+            .background(SoughtBackground())
+            .safeAreaInset(edge: .bottom, spacing: 0) { SoughtTabBar(selection: $router.tab) }
         .environment(\.palette, palette)
         .preferredColorScheme(settings.highContrast ? .dark : .light)
         .tint(palette.text)
         .sheet(item: $router.detail) { o in
-            ItemDetailView(itemId: o.id).environment(\.palette, palette).presentationDragIndicator(.visible)
+            ItemDetailView(itemId: o.id).background(SoughtBackground()).environment(\.palette, palette).presentationDragIndicator(.visible)
         }
         .fullScreenCover(item: $router.findRequest) { r in
-            FindFlowView(request: r).environment(\.palette, palette)
+            FindFlowView(request: r).background(SoughtBackground()).environment(\.palette, palette)
         }
         .onChange(of: robot.status.state) { _, s in announce(s) }
         .onChange(of: settings.haptics) { _, v in Haptics.shared.enabled = v }

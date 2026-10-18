@@ -38,10 +38,10 @@ struct ItemLogView: View {
                     }
                 }
             }
-            .padding(.bottom, 120)
+            .padding(.bottom, Space.xl)
         }
         .scrollDismissesKeyboard(.interactively)
-        .background(p.backgroundAlt.ignoresSafeArea())
+        .background(Color.clear)
     }
 
     private var filtered: [TrackedObject] {
@@ -125,7 +125,7 @@ struct ItemDetailView: View {
             }
             .padding(Space.margin)
         }
-        .background(p.background.ignoresSafeArea())
+        .background(Color.clear)
     }
 
     private func fact(_ k: String, _ v: String) -> some View {

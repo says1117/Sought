@@ -38,7 +38,7 @@ struct FindFlowView: View {
                 .frame(maxWidth: .infinity)
             }
         }
-        .background(p.background.ignoresSafeArea())
+        .background(Color.clear)
         .onAppear { if request.confirmed { start() } }
         .onChange(of: robot.find?.phase) { _, phase in react(to: phase) }
         .onDisappear { pulseTask?.cancel() }

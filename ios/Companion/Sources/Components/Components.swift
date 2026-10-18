@@ -108,40 +108,50 @@ struct ScreenHeader: View {
 struct SearchBar: View {
     @Binding var text: String
     var placeholder: String
+    var hero = false
     var onSubmit: (String) -> Void
     @StateObject private var speech = SpeechInput()
     @Environment(\.palette) private var p
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var focused: Bool
 
+    /// One glass capsule: magnifier, field, and the mic attached at the trailing end.
     var body: some View {
+        let height: CGFloat = hero ? 56 : 48
         HStack(spacing: Space.s) {
+            Image("icon_search").renderingMode(.template).resizable().frame(width: 16, height: 16)
+                .foregroundStyle(p.text).accessibilityHidden(true)
             TextField("", text: $text, prompt: Text(placeholder).foregroundStyle(p.placeholder))
-                .font(SoughtFont.search)
+                .font(hero ? SoughtFont.searchHero : SoughtFont.search)
                 .foregroundStyle(p.text)
                 .submitLabel(.search)
                 .focused($focused)
                 .onSubmit { submit() }
-                .padding(.horizontal, Space.l)
                 .frame(minHeight: 44)
-                .background(Capsule().fill(p.searchFill))
-                .overlay(Capsule().stroke(p.text.opacity(0.08), lineWidth: 1))
-                .softShadow()
                 .accessibilityLabel("Search for an item")
                 .accessibilityHint("Type what you are looking for, then search.")
                 .accessibilityIdentifier("searchField")
             Button {
+                Haptics.shared.tap()
                 if speech.isListening { speech.stop() } else { speech.start() }
             } label: {
                 Image("icon_mic").renderingMode(.template)
-                    .foregroundStyle(speech.isListening ? p.textOnDark : p.text)
-                    .frame(width: 44, height: 44)
+                    .foregroundStyle(speech.isListening ? p.onPrimary : p.text)
+                    .frame(width: height - 12, height: height - 12)
                     .background(Circle().fill(speech.isListening ? p.call : p.micFill))
                     .overlay(Circle().stroke(p.signal, lineWidth: speech.isListening ? 2 : 0))
+                    .scaleEffect(speech.isListening && !reduceMotion ? 1.06 : 1)
+                    .animation(Motion.spring, value: speech.isListening)
+                    .frame(minWidth: 44, minHeight: 44)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(speech.isListening ? "Stop listening" : "Speak to search")
             .accessibilityIdentifier("micButton")
         }
+        .padding(.leading, Space.l)
+        .padding(.trailing, 6)
+        .frame(height: height)
+        .soughtGlass(.search, in: Capsule())
         .onChange(of: speech.transcript) { _, t in if !t.isEmpty { text = t } }
         .onChange(of: speech.isListening) { was, now in
             if was && !now && !speech.transcript.isEmpty { submit() }
@@ -270,27 +280,4 @@ struct SampleBanner: View {
             .accessibilityIdentifier("sampleBanner")
         }
     }
-}
-
-// MARK: - Glass
-
-struct Glass: ViewModifier {
-    var tint: Color
-    var shape: AnyShape
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @Environment(\.palette) private var p
-
-    func body(content: Content) -> some View {
-        if reduceTransparency {
-            content.background(shape.fill(p.card))
-        } else if #available(iOS 26.0, *) {
-            content.glassEffect(.regular.tint(tint), in: shape)
-        } else {
-            content.background(shape.fill(tint)).background(shape.fill(.ultraThinMaterial))
-        }
-    }
-}
-
-extension View {
-    func glass<S: Shape>(_ tint: Color, in shape: S) -> some View { modifier(Glass(tint: tint, shape: AnyShape(shape))) }
 }
