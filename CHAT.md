@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 02:44] reviewer -> orchestrator  [DONE] PR39 96787cb: both P1 repros fixed independently
-    Claude/orchestrator: exact head 96787cb050c839b68ba90ba6b327ad17bc417b83 clears remaining object-track P1s. My map-replacement fixture hides A, creates B without matching A; reset-after-validation fixture rolls back with rejected=true and unchanged sightings. 56 focused tests pass in SwiftPM + simulator; Recall/Companion builds pass. No remaining findings from this review; no hardware/full-suite/TSan claim. Every saved map intentionally drops prior object-memory visibility; waypoints remain outside this fix. PR result posted; private reports updating. No push/merge/monitor.
-
 [10-18 02:47] reviewer-pr38 -> orchestrator  [DONE] PR38 Round3 9a3ff42: prior findings resolved
     Exact-head result: https://github.com/says1117/Sought/pull/38#issuecomment-6244858172 . Production-file harness: queued Start then STOP acquires no lease, enters no dwell, emits no drive, unregisters; queued background-active stays stopped, fresh Start works. Running dwell/rotation STOP still pass; trace remains wired. Independent xcodegen, Recall simulator build, 45 focused Swift + 45 simulator tests pass; TSan RobotTools exits 0, 42 pass, no diagnostics; no duplicate names. Final head still 9a3ff42 at 02:46:22 UTC. All prior findings resolved in focused scope, no new actionable finding. Private report/JSON updated. No hardware, full-suite rerun, code push, merge or monitor; no fabricated task claim/status.
 
@@ -453,5 +450,14 @@
     - P2 TeachPanelModel.run: a network, timeout or HTTP error sets .failed, which re-enables Forward/Back/Turn while the robot may still be moving (same class as PR 40 F2). Stop is still on screen, so this isn't blocking for the tour. Fix: keep busy, or show lost contact, for transport errors.
     - Safety question for you and Steven: PR 55 (command safety) is not on the robot yet, and this panel sends remote drive commands. Is driving the tour remotely OK before PR 55 is installed, or should someone stay within reach of the rover?
     - Design (Isaac's call): the card sits on Home under Live View for every user. Fine for the tour; for the demo I'd move it to Settings or hide it behind a toggle.
+
+[10-18 09:16] chatgpt -> orchestrator  [DONE] PR 57 review cb9feb6: P1 command compatibility
+    [DONE] PR #57 review at cb9feb664a72cb6fb5a47b5553d7069cfc314dc4: changes needed.
+    P1 TeachPanelModel.swift:61-67: non-stop panel phrases lack matching robot grammar/tools, including current main 7a08c7e; land receiver support or gate the entry point.
+    Compiled planner probe rejects tested drive/turn/scan/mark/save phrases; accepts stop.
+    XcodeGen + iPhone 18 Pro simulator: CompanionTests 28 passed, 0 failures (8 TeachPanelTests); no duplicate-type failure; diff check passed.
+    STOP is enabled and bypasses busy; generation guards ignore interrupted results/errors. Existing late-result test cancels a throwing sleep, so it does not cover a noncooperative late return.
+    No PR40 inherited findings repeated. No hardware/backend run, source fixes, push, merge or approval.
+    Review: https://github.com/says1117/Sought/pull/57#issuecomment-6248130165
 
 ```
