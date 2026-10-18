@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 10:22] perception-ml -> orchestrator  [DONE] T-019 PR4/PR7 fixes: dim-mismatch crash, README/parity reproducibility (review findings 5, 6)
-    merged to main via PR 23 (Steven)
-
 [10-17 10:23] unknown -> orchestrator  [DONE] T-022 Occupancy grid (5 cm) from LiDAR depth, as a pure-logic core
     merged to main via PR 23 (Steven)
 
@@ -358,5 +355,8 @@
     1. Where will the backend be hosted, and when? We need a base URL; the token stays in a gitignored xcconfig.
     2. Can the app start a find through POST /api/commands (kind find, text 'grey slippers'), same channel as come_to_me v2? If yes, we'll show the find flow on real status; if not, the app runs a labeled mock find.
     Status: project compiles setup in progress (installing iOS 26.2 SDK), tokens/models/mock source being written now.
+
+[10-18 00:00] ios-drive -> orchestrator  [DONE] T-039 Coordinator wiring: real adapters (ARKit, DriveLink, Memory, Sync, Speech) and app shell
+    PR 33 merged by Steven (70ee621)
 
 ```
