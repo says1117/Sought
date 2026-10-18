@@ -274,7 +274,7 @@ final class AppRuntime: ObservableObject {
 
     private func refreshSensors() {
         let frame = pose.session.currentFrame
-        let corridor = frame.flatMap { DepthAdapter.corridorResult(from: $0) }
+        let corridor = frame.flatMap { DepthAdapter.corridorResult(from: $0, floorY: pose.floorY) }
         let sonar = link.isConnected ? link.robot.map { SonarSample(frontCm: $0.frontCm, rearCm: $0.rearCm, flags: $0.flags.rawValue) } : nil
         cache.update(corridor: corridor, sonar: sonar)
         UIDevice.current.isBatteryMonitoringEnabled = true

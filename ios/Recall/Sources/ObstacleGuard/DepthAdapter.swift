@@ -10,7 +10,11 @@ import RecallShared
 
 public enum DepthAdapter {
     /// Returns nil when the frame has no scene depth (no LiDAR, or semantics not enabled).
+    /// Uses the camera's ARKit pose (world-frame sampling), so the phone's real tilt/rotation is accounted for.
+    /// `floorY`: detected floor height (PoseTracker.floorY); nil falls back to camera y minus `mount.heightM`.
+    /// `mount` is only used for that fallback height.
     public static func corridorResult(from frame: ARFrame,
+                                      floorY: Double? = nil,
                                       mount: CameraMount = CameraMount(),
                                       corridor: Corridor = Corridor(),
                                       stride: Int = 2) -> CorridorResult? {
@@ -51,8 +55,10 @@ public enum DepthAdapter {
         let sx = Float(w) / iw, sy = Float(h) / ih
         let intr = DepthIntrinsics(fx: k[0][0] * sx, fy: k[1][1] * sy, cx: k[2][0] * sx, cy: k[2][1] * sy)
 
-        return CorridorSampler.sample(depth: buf, width: w, height: h, intrinsics: intr,
-                                      mount: mount, corridor: corridor, stride: stride)
+        let m = frame.camera.transform
+        let floor = floorY.map(Float.init) ?? (m.columns.3.y - mount.heightM)
+        return CorridorSampler.sampleWorld(depth: buf, width: w, height: h, intrinsics: intr,
+                                           cameraToWorld: m, floorY: floor, corridor: corridor, stride: stride)
     }
 }
 #endif
