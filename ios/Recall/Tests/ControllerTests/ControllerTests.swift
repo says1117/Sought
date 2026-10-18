@@ -236,6 +236,36 @@ final class ControllerTests: XCTestCase {
         XCTAssertEqual(o.status, .running)
     }
 
+    func testGoToTurnInPlaceUsesTurnGuard() {
+        // Target 90 deg to the left: goTo turns in place first. Forward guard stop, turn guard clear -> it turns.
+        var s = ControlSession(goal: .goTo(x: -3, z: 0, stopDistance: 0.3))
+        let o = s.tick(TickInput(pose: Pose2D(x: 0, z: 0, yawDeg: 0), tracking: .normal, guardState: .stop, now: 0,
+                                 turnGuardState: .clear))
+        XCTAssertLessThan(o.command.left, 0)
+        XCTAssertGreaterThan(o.command.right, 0)
+    }
+
+    func testGoToTurnInPlaceHeldByTurnGuard() {
+        var s = ControlSession(goal: .goTo(x: -3, z: 0, stopDistance: 0.3))
+        let o = s.tick(TickInput(pose: Pose2D(x: 0, z: 0, yawDeg: 0), tracking: .normal, guardState: .clear, now: 0,
+                                 turnGuardState: .stop))
+        XCTAssertEqual(o.command, .zero)
+    }
+
+    func testGoToForwardStillObeysForwardGuard() {
+        // Target straight ahead (err 0): driving forward ignores a clear turn guard and stops on the forward guard.
+        var s = ControlSession(goal: .goTo(x: 0, z: -3, stopDistance: 0.3))
+        let o = s.tick(TickInput(pose: Pose2D(x: 0, z: 0, yawDeg: 0), tracking: .normal, guardState: .stop, now: 0,
+                                 turnGuardState: .clear))
+        XCTAssertEqual(o.command, .zero)
+    }
+
+    func testGoToTurnWithoutTurnGuardObeysForwardGuard() {
+        var s = ControlSession(goal: .goTo(x: -3, z: 0, stopDistance: 0.3))
+        let o = s.tick(TickInput(pose: Pose2D(x: 0, z: 0, yawDeg: 0), tracking: .normal, guardState: .stop, now: 0))
+        XCTAssertEqual(o.command, .zero)
+    }
+
     func testRotateObeysGuardStopWithoutTurnGuard() {
         var s = ControlSession(goal: .rotateBy(deg: 90))
         let o = s.tick(TickInput(pose: Pose2D(x: 0, z: 0, yawDeg: 0), tracking: .normal, guardState: .stop, now: 0))
