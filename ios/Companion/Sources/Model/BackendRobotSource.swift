@@ -304,7 +304,9 @@ final class BackendRobotSource: RobotSource {
         if let m = match, !m.needsName, !m.isPin { return "find \(m.label.lowercased())" }
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let lower = q.lowercased()
-        return ["find ", "where is ", "where are ", "where\u{2019}s ", "where's "].contains { lower.hasPrefix($0) } ? q : "find \(q)"
+        // Phrases the planner already understands go through as typed: "go to the kitchen" is a place, not an object.
+        let asIs = ["find ", "where is ", "where are ", "where\u{2019}s ", "where's ", "go to ", "come to "]
+        return asIs.contains { lower.hasPrefix($0) } ? q : "find \(q)"
     }
 
     override func cancelFind() {

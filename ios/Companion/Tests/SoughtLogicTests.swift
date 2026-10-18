@@ -168,4 +168,10 @@ final class SoughtLogicTests: XCTestCase {
         robot.status.lastHeartbeat = Date()
         XCTAssertTrue(robot.status.isOnline(now: robot.now))
     }
+
+    func testTypedPlacePhrasesAreNotWrappedInFind() {
+        XCTAssertEqual(BackendRobotSource.findText(query: "Go to the kitchen", match: nil), "Go to the kitchen")
+        XCTAssertEqual(BackendRobotSource.findText(query: "come to the sofa", match: nil), "come to the sofa")
+        XCTAssertEqual(BackendRobotSource.findText(query: "car keys", match: nil), "find car keys")
+    }
 }
