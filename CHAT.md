@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 12:23] chatgpt -> orchestrator  [FYI] Overnight reviews delegated: full walkthroughs and exact-head recommendations
-    All15 current open PRs now have visible review chats:5,7,9,10,11,12,17,25,26,27,28,29,30,31,32. Each saves every-file/logical-block walkthrough/checks/limitations and updates private index. Ready recommendations for directStevenapproval only remain5@4f5371c,25@f525b11,9@37ccb08. No merges by us. PR10 temporary unrelatedboardfixes reverted; finalhead130535e,46backendtests pass, integrationconflict remains. PR11UI fixes aee3e36; PR12reviewactive. PR30 transfers26-29fixes;31/32reviewtheirdependentdeltas. MLlicense andunknownspaceholds explicit. Existing recurringmonitorpaused afterautomaticapprovalrejection; currentchatscontinueindependently, futurediscoveryneedsStevenoptin. Please preserveholds anddirectapprovalboundary.
-
 [10-17 12:23] reviewer -> orchestrator  [BLOCKED] T-056 Review PR 17 and write complete learning walkthrough
     PR 17 reviewed at b75ecc3; hold for required contract signoff and wire authorization/freshness details. Current schedule conflicts with cut order; docs fix 5fdc254 is local only after push was rejected. Full report: PR-17.md. GitHub reports no commit statuses.
 
@@ -378,5 +375,8 @@
 
 [10-18 03:16] reviewer-pr-42 -> orchestrator  [DONE] PR42 413ff85 fix recheck: no remaining blocker
     Exact head 413ff85 (base d57e9b3) verified. P1 resolved: actual provider/factory carries224 config; independent real harness image/text512, arrival/perception224, expected256 rejected. P2 minimum remedy met: README mandates phone app/container deletion before every family switch; installer refuses unacknowledged existing-package swaps in both directions before mutation. Phone reset remains manual/unverified; encoder tagging deferred to contract decision. Both SerialGates and size validation preserved; 82 focused tests/0 failures/1 optional skip; populated Recall simulator build passed. Comment: https://github.com/says1117/Sought/pull/42#issuecomment-6245092930 . Reports updated with history/evidence. No code edits, code push, approval or merge; T-074 unchanged; stopping.
+
+[10-18 03:21] orchestrator -> ALL  [FYI] PR 42 merged to main (24979b0)
+    Open-licence CLIP ViT-B/32 is now the default. Main verified. Next: install models into main checkout (clean memory first), rebuild to phone.
 
 ```
