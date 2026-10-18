@@ -24,7 +24,25 @@ final class AppRuntime: ObservableObject {
     let features = RecallFeatureFlags()
     let encoderSet: EncoderSet
     let coordinator: RobotCoordinator
+    // Robot tools accessors (find-loop B): the stored tracks, a Controller on the same drive path, the pose reader.
+    let trackProvider: TrackProviding
+    var scanPoses: ExplorePoseSource { poseBox }
+    /// Scan here drives only through the coordinator's drive lease and its serialized sink, so global STOP,
+    /// pause and backgrounding revoke it exactly like a coordinator task.
+    func makeScanController() -> Controller {
+        Controller(poses: poseBox, sink: LeasedDriveSink(base: driveSink, lease: driveLease), guardState: { [cache] in cache.guardState() })
+    }
+    /// Start preconditions for a scan, and the lease it drives under. Registers the scan for runtime cancellation.
+    func makeScanGate() -> ScanHereGate {
+        LeaseScanGate(lease: driveLease, coordinatorBusy: { [coordinator] in coordinator.isBusy || coordinator.hasPending },
+                      register: { [weak self] cancel in self?.scanCancel = cancel },
+                      unregister: { [weak self] in self?.scanCancel = nil })
+    }
 
+    private let driveLease: DriveLease
+    private let driveSink: SerialDriveSink
+    /// Cancels the running scan (revokes its lease). Set while a scan runs; called by stop, pause, backgrounding.
+    private var scanCancel: (() -> Void)?
     private let waypointStore: WaypointStore
     private let cache = SensorCache()
     private let frameGate = WorldFrameGate()
@@ -73,12 +91,19 @@ final class AppRuntime: ObservableObject {
         let warning: String? = lost.isEmpty ? nil : "Storage unavailable. New \(lost.joined(separator: " and ")) are temporary and will be lost when the app closes."
 
         self.waypointStore = waypoints
+        self.trackProvider = tracks
         let cache = self.cache
-        let wiring = CoordinatorWiring(
-            poses: poseBox, drive: SerialDriveSink(target: link, queue: .main, isOnQueue: { Thread.isMainThread }),
+        let sink = SerialDriveSink(target: link, queue: .main, isOnQueue: { Thread.isMainThread })
+        let lease = DriveLease()
+        self.driveSink = sink
+        self.driveLease = lease
+        var wiring = CoordinatorWiring(
+            poses: poseBox, drive: sink,
             guardState: { cache.guardState() }, waypointStore: waypoints, trackStore: tracks,
             encoders: encoders, speaker: SpeakerAdapter(speaker: speaker), features: features,
             waypointsPersistent: waypointsPersistent, frame: frameGate)
+        wiring.lease = lease
+        wiring.onFindTrace = { FindTraceRecorder.shared.record($0) }   // Robot tools 'Last find'
         let coordinator = wiring.makeCoordinator()
         self.coordinator = coordinator
         self.storageWarning = warning
@@ -157,6 +182,10 @@ final class AppRuntime: ObservableObject {
 
     /// Stop button, backgrounding: brake and cancel the task. Safe to call any time.
     func stopEverything() {
+        // The scan first: revoke its lease and brake, then the coordinator (which revokes the lease for good).
+        let cancelScan = scanCancel
+        scanCancel = nil
+        cancelScan?()
         coordinator.stopAll()
         link.stop()
     }

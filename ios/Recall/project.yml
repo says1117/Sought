@@ -89,6 +89,10 @@ targets:
       - path: Sources/ComeToMe/ComeToMeRunner.swift
       - path: Sources/ComeToMe/RangeSample.swift
       - path: Sources/Coordinator
+      - path: Sources/RobotTools/ScanHere.swift
+      - path: Sources/RobotTools/FindTraceDisplay.swift
+      - path: Sources/RobotTools/MemoryInspector.swift
+      - path: Sources/RobotTools/ScanLease.swift
       - path: Sources/Teach/WaypointStore.swift
       - path: Sources/Teach/WorldMapStore.swift
       - path: Sources/Teach/RelocalizationMonitor.swift

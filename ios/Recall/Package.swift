@@ -69,6 +69,11 @@ let package = Package(
         .target(name: "EvalCore", dependencies: ["Memory", "Retrieval", "FindExecutor"], path: "Sources/EvalMode",
                 sources: ["EvalGroundTruth.swift", "EvalQueries.swift", "EvalRawRun.swift", "EvalScoring.swift",
                           "EvalRetrievalRunner.swift", "EvalFindTrialLogger.swift", "EvalViewModel.swift"]),
+        .target(name: "RobotToolsCore", dependencies: ["ExploreCore", "PoseCore", "Memory", "FindExecutor"], path: "Sources/RobotTools",
+                sources: ["ScanHere.swift", "FindTraceDisplay.swift", "MemoryInspector.swift"]),
+        .target(name: "RobotToolsLease", dependencies: ["RobotToolsCore", "CoordinatorCore", "ControllerCore", "ExploreCore", "PoseCore"],
+                path: "Sources/RobotTools", sources: ["ScanLease.swift"]),
+        .testTarget(name: "RobotToolsTests", dependencies: ["RobotToolsCore", "RobotToolsLease", "CoordinatorCore", "ControllerCore", "ExploreCore", "PoseCore", "Memory", "FindExecutor"], path: "Tests/RobotToolsTests"),
         .testTarget(name: "EvalModeTests", dependencies: ["EvalCore", "Memory", "Retrieval", "FindExecutor"], path: "Tests/EvalModeTests"),
     ]
 )
