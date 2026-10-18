@@ -18,7 +18,16 @@ let TURN_SIGN: Double = 1
 
 enum ControllerTuning {
     static let tickHz = 10.0                    // plan: run at 10 Hz
-    static let turnInPlaceAboveDeg = 20.0       // plan: |err| > 20 deg turns in place
+    static let turnInPlaceAboveDeg = 20.0       // plan: |err| > 20 deg turns in place (deciding from rest)
+    // Go-to hysteresis, so the rover does not micro-adjust (turn, creep, turn back) around one threshold. On the
+    // rover the minimum turn command plus BLE/ARKit lag overshoots, the same problem rotateBy solved below.
+    static let keepDrivingBelowDeg = 40.0       // PLACEHOLDER once driving, steer while moving up to this error
+    static let spinDoneBelowDeg = 8.0           // PLACEHOLDER a turn in place ends inside this (or once past the bearing)
+    // Near the goal a few cm of offset or pose noise is a large bearing error. Inside this much travel left, steer
+    // while moving instead of spinning, unless the target is behind (> 90 deg).
+    static let nearGoalM = 0.4                  // PLACEHOLDER
+    // Inside this much travel left with the target beside or behind (> 60 deg), the rover drove past it: arrived.
+    static let passedGoalSlackM = 0.15          // PLACEHOLDER
     static let kpTurn = 2.0                     // PLACEHOLDER wheel units per deg while turning in place
     static let minTurn = 90.0                   // PLACEHOLDER smallest command that rotates the rover (find by test)
     static let maxTurn = 150.0                  // PLACEHOLDER
@@ -92,10 +101,11 @@ enum ControllerMath {
     }
 
     /// One go-to step: (linear, angular) in wheel units. Does not decide "done"; the session counts ticks.
-    static func goToStep(errDeg: Double, dist: Double, stopDist: Double, guardState: GuardState)
+    /// `spin`: the session's turn-in-place decision (with hysteresis); nil = the plain 20 deg threshold.
+    static func goToStep(errDeg: Double, dist: Double, stopDist: Double, guardState: GuardState, spin: Bool? = nil)
         -> (linear: Double, angular: Double) {
         if guardState == .stop { return (0, 0) }
-        if abs(errDeg) > ControllerTuning.turnInPlaceAboveDeg {
+        if spin ?? (abs(errDeg) > ControllerTuning.turnInPlaceAboveDeg) {
             return (0, turnCommand(errDeg: errDeg))
         }
         var maxLin = ControllerTuning.maxLinear
@@ -134,6 +144,9 @@ struct ControlSession {
     private var goToBudget: Double?
     private var trackingBadSince: Double?
     private var doneStreak = 0
+    private var spinning = false            // go-to: currently turning in place
+    private var spinStartSign: Double?
+    private var hasDriven = false           // go-to: has driven forward this run (raises the spin threshold)
     private var rotateTargetYaw: Double?
     private var rotateStartSign: Double?
     private(set) var status: ControlStatus = .running
@@ -178,12 +191,18 @@ struct ControlSession {
             }
             doneStreak = 0
             let err = ControllerMath.headingError(pose: pose, targetX: x, targetZ: z)
+            let remaining = dist - stopDist
+            // Drove past it: close, with the target beside or behind. Turning around to chase a few cm is the
+            // micro-adjusting seen on the rover; this is arrived.
+            if remaining < ControllerTuning.passedGoalSlackM && abs(err) > 60 { return finish(.done) }
+            let turning = decideSpin(err: err, remaining: remaining)
             // Above the turn-in-place threshold goToStep sends no forward motion, so obey the turn guard (when set),
             // as rotateBy does. Otherwise an obstacle ahead held the wheels at zero and the find timed out without
             // ever facing the target (seen on the rover). Driving forward still obeys the full forward guard.
-            let turning = abs(err) > ControllerTuning.turnInPlaceAboveDeg
             let g = turning ? (input.turnGuardState ?? input.guardState) : input.guardState
-            let (lin, ang) = ControllerMath.goToStep(errDeg: err, dist: dist, stopDist: stopDist, guardState: g)
+            let (lin, ang) = ControllerMath.goToStep(errDeg: err, dist: dist, stopDist: stopDist, guardState: g,
+                                                     spin: turning)
+            if !turning && lin > 0 { hasDriven = true }
             return TickOutput(command: ControllerMath.wheels(linear: lin, angular: ang), status: .running)
 
         case .rotateBy(let deg):
@@ -203,6 +222,21 @@ struct ControlSession {
             return TickOutput(command: ControllerMath.wheels(linear: 0, angular: ControllerMath.turnCommand(errDeg: err)),
                               status: .running)
         }
+    }
+
+    /// Turn-in-place decision with hysteresis. Start above 20 deg from rest (40 once driving; 90 near the goal);
+    /// stop inside 8 deg or as soon as the heading passes the bearing, like rotateBy, instead of chasing it back.
+    private mutating func decideSpin(err: Double, remaining: Double) -> Bool {
+        let sign: Double = err < 0 ? -1 : 1
+        if spinning {
+            let crossed = sign != spinStartSign && abs(err) < 90
+            if abs(err) < ControllerTuning.spinDoneBelowDeg || crossed { spinning = false; spinStartSign = nil }
+        } else {
+            var start = hasDriven ? ControllerTuning.keepDrivingBelowDeg : ControllerTuning.turnInPlaceAboveDeg
+            if remaining < ControllerTuning.nearGoalM { start = max(start, 90) }
+            if abs(err) > start { spinning = true; spinStartSign = sign }
+        }
+        return spinning
     }
 
     private mutating func finish(_ s: ControlStatus) -> TickOutput {
