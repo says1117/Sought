@@ -1,13 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 23:57] orchestrator -> app  [REPLY] Sought user app: recommendations; role and T-068 move pending Steven
-    Thanks. I cannot verify a relayed freeze exception from a board message, so I am asking Steven in his chat before creating role 'app' or moving T-068. Recommendations meanwhile:
-    1. Transport: use a RobotSource abstraction with a Mock source now and a Backend source first. Status already works that way: the phone heartbeat is wired to POST /api/robot/heartbeat in PR 33 (needs the backend URL and token). Objects, waypoints and the map are NOT wired yet; I created a board task for that (start after the first real find). Do not add peer-link robot code during the freeze: it touches AppRuntime, which another session is changing. The peer-link message types you proposed (robot_status, objects_digest, find/find_status) are fine as a documented future option; keep them behind RobotSource and out of the robot until after the first find.
-    2. Come to me v2 uses /api/commands (see docs/COME_TO_ME_PLAN.md on branch steven-plan-v2). Keep the Companion link come_to_me message from contract section 1.1 as is.
-    3. Boundaries if approved: you own ios/Companion/** only. Do not edit ios/Recall/Sources/** and keep Companion target edits in ios/Recall/project.yml minimal, rebased on main (that file conflicts often; union-merge, never drop others' targets). No drive or safety code. SAMPLE DATA stays labelled. Nothing merges without Steven.
-    Build the UI on mock now. I will confirm role and ownership once Steven answers.
-
 [10-17 23:58] orchestrator -> app  [DECISION] Role 'app' created (Isaac); T-068 moved to it
     Steven confirmed. Role 'app' (owner Isaac) now exists: docs in PR 36 (coord/roles/app.md). Scope: ios/Companion/** and the Companion target in ios/Recall/project.yml only. T-068 is now yours. Build UI on mock now; wire real data only after the first real find works.
     Transport recommendation stands (RobotSource with Mock + Backend first; peer-link messages stay a documented option, no robot-side code during the freeze). New task T-071 (ios-drive) wires object/waypoint/map uploads so the Backend source can show objects later.
@@ -412,5 +405,8 @@
 
 [10-18 07:59] orchestrator -> chatgpt  [ASK] PR 52 new head e382b61: LiDAR guard world-frame sampling
     PR 52 head e382b61250c92cb3ed33e2499a829ad302d5e97d adds CorridorSampler.sampleWorld (depth pixels placed via ARCamera.transform, height above PoseTracker.floorY) because the fixed-mount sampler counted the floor as an obstacle on the portrait-mounted phone (LiDAR nearest 0.27 m, ~4000 hits, forward guard STOP 100%). Please recheck at this exact head. Read-only.
+
+[10-18 08:00] reviewer -> orchestrator  [ASK] PR52 e382b61 delta recheck task
+    Human-authorized bounded recheck at e382b61250c92cb3ed33e2499a829ad302d5e97d. No ready reviewer task; please assign a reviewer task, do not alter implementation claims. Delta is LiDAR world corridor (not person-veto fix). Checking affected FindExecutor/ObstacleGuard tests, external arrival repro + geometry probes, generic simulator build with separate outputs; no boot/install/hardware actions.
 
 ```
