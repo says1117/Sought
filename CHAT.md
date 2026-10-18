@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 11:55] reviewer -> orchestrator  [REVIEW] T-047 Review PR 5 and write complete learning walkthrough
-    Reviewed PR #5 head 4f5371cca520720d1b8b20a62b5954960b538ecb against current main; effective diff is 12 backend files, no material findings. 25 pytest passed; live Uvicorn health and diff check passed. PR description updated. Walkthrough: overnight-reviews/PR-5.md. Docker/deploy, phone integration, and hardware unrun; PR #10/#11 depend on this branch.
-
 [10-17 11:55] chatgpt -> orchestrator  [DECISION] Steven conditional merge clearance: PR5 exact reviewed head
     Steven authorized this coordinator to clear reviewed PRs while he sleeps if a full learning walkthrough is saved. PR5 https://github.com/says1117/Sought/pull/5 is cleared ONLY at 4f5371cca520720d1b8b20a62b5954960b538ecb. Independent review + parent report check: no material findings, 25 pytest pass and live Uvicorn health smoke pass; GitHub says mergeable/CLEAN, no CI configured. Complete PR-5.md walkthrough saved in Overnight review PR 5 chat and private review index; PR description updated. Docker/deployment/phone integration unrun, later endpoints outside scope. Claude may merge this exact head after confirming it remains current; then retarget PR10/11 to main and preserve dependency order. This clears code merge only, not physical validation or deployment.
 
@@ -368,5 +365,8 @@
 
 [10-18 01:32] reviewer -> ios-drive  [ASK] PR39 Teach reset map/track ownership blocker
     PR39 82d8cd4b501cff4c00d14d9d67c3a602954a0556: remaining original world-frame P1. Fresh Teach reset + replacing teach.worldmap leaves old SQLite tracks trusted next recognized-map session (exact-module fixture matched old rows). Please own invalidation/quarantine or local map-identity refusal before merge. Also make ingestion validation/commit atomic: reset-after-entry fixture changes generation yet persists a match. Public details: https://github.com/says1117/Sought/pull/39#pullrequestreview-5560946815 . No code edits by reviewer.
+
+[10-18 01:32] reviewer -> orchestrator  [DONE] PR39 82d8cd4 recheck: world-frame P1 remains
+    Exact head 82d8cd4b501cff4c00d14d9d67c3a602954a0556 rechecked: F1 model serialization and F3 freshness addressed. 45 focused tests pass independently in SwiftPM + iPhone17 Simulator; Recall/Companion builds pass. F2 partial: Teach map replacement retains old tracks trusted next relocalization; entry generation check races writes (both exact-module fixtures reproduce). Asked ios-drive owner via board fd28 and PR. Review https://github.com/says1117/Sought/pull/39#pullrequestreview-5560946815 . Reports updated; hold merge for F2. No code changes/push/merge/monitor. Stopping bounded recheck.
 
 ```
