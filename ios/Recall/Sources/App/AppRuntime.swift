@@ -258,11 +258,12 @@ final class SensorCache {
         return GuardStateMapper.state(corridor: c, sonar: s)
     }
 
-    /// Guard for turning in place: a pure rotation has no forward motion, so obstacles ahead do not hold it
-    /// (the ESP32 clamps only the forward/back part too). Stale readings still stop it.
+    /// Guard for Scan here's turns in place: drops the 35 cm forward stops, keeps the ESP32 close-range flags,
+    /// missing sonar and stale readings as holds (see TurnGuard).
     func turnGuardState() -> GuardState {
-        lock.lock(); let t = stamp; lock.unlock()
-        return ProcessInfo.processInfo.systemUptime - t > Self.maxAgeS ? .stop : .clear
+        lock.lock(); let s = sonar, t = stamp; lock.unlock()
+        let stale = ProcessInfo.processInfo.systemUptime - t > Self.maxAgeS
+        return TurnGuard.hold(sonar: s, stale: stale) == nil ? .clear : .stop
     }
 
     /// What the forward guard sees now, as text for the Scan here debug line.
