@@ -107,10 +107,12 @@ final class ControllerApproachDriver: ApproachDriver {
 
     func approach(x: Double, z: Double, stopDistance: Double) async -> ApproachReport {
         let status = await controller.goTo(x: x, z: z, stopDistance: stopDistance)
+        // Why a drive failed, for the Last find trace (guard holds vs turning vs driving, distance progress).
+        let why = " (" + controller.lastRun.summary + ")"
         switch status {
         case .failed(.cancelled): return ApproachReport(outcome: .cancelled)
-        case .failed(.timeout): return ApproachReport(outcome: .failed(reason: "timeout"))
-        case .failed(.trackingLost): return ApproachReport(outcome: .failed(reason: "tracking lost"))
+        case .failed(.timeout): return ApproachReport(outcome: .failed(reason: "timeout" + why))
+        case .failed(.trackingLost): return ApproachReport(outcome: .failed(reason: "tracking lost" + why))
         case .running: return ApproachReport(outcome: .failed(reason: "controller did not finish"))
         case .done:
             guard !Task.isCancelled else { return ApproachReport(outcome: .cancelled) }
@@ -126,8 +128,8 @@ final class ControllerApproachDriver: ApproachDriver {
                 case .done: break
                 case .running: return ApproachReport(outcome: .failed(reason: "controller did not finish"))
                 case .failed(.cancelled): return ApproachReport(outcome: .cancelled)
-                case .failed(.timeout): return ApproachReport(outcome: .failed(reason: "timeout"))
-                case .failed(.trackingLost): return ApproachReport(outcome: .failed(reason: "tracking lost"))
+                case .failed(.timeout): return ApproachReport(outcome: .failed(reason: "final turn timeout (" + controller.lastRun.summary + ")"))
+                case .failed(.trackingLost): return ApproachReport(outcome: .failed(reason: "final turn tracking lost"))
                 }
             }
             return ApproachReport(outcome: .arrived)
@@ -165,7 +167,7 @@ final class FindRunnerAdapter: CoordinatorFinding {
         // Remembered positions come from storage, in the frame of an earlier session. Do not drive to them
         // until ARKit has recognised the saved map again.
         if !known.isEmpty && !frame.relocalized { return .refused(spoken: CoordinatorConfig.notRecognisedSpoken) }
-        let executor = FindExecutor(retriever: Retriever(encoder: set.text), driver: driver, images: set.images, config: config)
+        let executor = FindExecutor(retriever: Retriever(encoder: set.text, negatives: RetrievalConfig.negatives, arrivalNegatives: RetrievalConfig.arrivalNegatives), driver: driver, images: set.images, config: config)
         let result = await executor.find(phrase: description, tracks: known)
         onTrace?(result.trace)
         if Task.isCancelled || result.outcome == .aborted { return .cancelled }
@@ -209,7 +211,8 @@ struct CoordinatorWiring {
     var drive: DriveSink
     var guardState: () -> GuardState
     /// Guard for the coordinator's turns in place (find's final facing turn). nil = turns obey `guardState`.
-    /// The app passes Scan here's turn guard (SensorCache.turnGuardState); goTo always obeys `guardState`.
+    /// The app passes Scan here's turn guard (SensorCache.turnGuardState). goTo also uses it while turning in place
+    /// toward its target (|heading error| > 20 deg, no forward motion); driving forward always obeys `guardState`.
     var turnGuard: (() -> GuardState)? = nil
     var waypointStore: WaypointStore
     var trackStore: TrackProviding
@@ -254,7 +257,8 @@ struct CoordinatorWiring {
             config: cfg)
     }
 
-    /// The coordinator's Controller: drives under the shared lease; goTo obeys `guardState`, rotateBy `turnGuard`.
+    /// The coordinator's Controller: drives under the shared lease; forward motion obeys `guardState`, turns in place
+    /// (rotateBy and goTo's turn-toward phase) obey `turnGuard`.
     func makeController() -> Controller {
         Controller(poses: poses, sink: LeasedDriveSink(base: drive, lease: lease), guardState: guardState,
                    turnGuard: turnGuard, clock: controllerClock, sleep: controllerSleep)

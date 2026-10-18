@@ -160,7 +160,12 @@ struct ControlSession {
             }
             doneStreak = 0
             let err = ControllerMath.headingError(pose: pose, targetX: x, targetZ: z)
-            let (lin, ang) = ControllerMath.goToStep(errDeg: err, dist: dist, stopDist: stopDist, guardState: input.guardState)
+            // Above the turn-in-place threshold goToStep sends no forward motion, so obey the turn guard (when set),
+            // as rotateBy does. Otherwise an obstacle ahead held the wheels at zero and the find timed out without
+            // ever facing the target (seen on the rover). Driving forward still obeys the full forward guard.
+            let turning = abs(err) > ControllerTuning.turnInPlaceAboveDeg
+            let g = turning ? (input.turnGuardState ?? input.guardState) : input.guardState
+            let (lin, ang) = ControllerMath.goToStep(errDeg: err, dist: dist, stopDist: stopDist, guardState: g)
             return TickOutput(command: ControllerMath.wheels(linear: lin, angular: ang), status: .running)
 
         case .rotateBy(let deg):

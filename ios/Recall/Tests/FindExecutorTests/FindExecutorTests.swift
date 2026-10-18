@@ -157,3 +157,34 @@ final class FindExecutorTests: XCTestCase {
         XCTAssertEqual(obj["time_s"] as? Double, 1.0)         
     }
 }
+
+private struct NegEncoder: TextEncoder {
+    func encode(_ text: String) throws -> [Float] { text.hasSuffix("a person") ? [0, 1, 0] : [1, 0, 0] }
+}
+
+final class FindExecutorContrastTests: XCTestCase {
+    private func make(_ d: FakeDriver, _ im: FakeImages) -> FindExecutor {
+        var t = 0.0
+        return FindExecutor(retriever: Retriever(encoder: NegEncoder(), negatives: ["a person"], arrivalNegatives: ["a person"]), driver: d, images: im,
+                            clock: { t += 1; return t })
+    }
+
+    func testArrivalRejectsCropThatLooksMoreLikeANegative() async {
+        // Track passes retrieval (closer to "bottle"), but every arrival crop looks more like a person.
+        let tr = Track(id: "a", position: SIMD3(1, 0, 1), embedding: [0.9, 0.4, 0], sightings: 4, persistence: 1.0)
+        let d = FakeDriver(), im = FakeImages()
+        im.byX[1] = [[0.5, 0.86, 0]]                      // s_text 0.5, person 0.86 -> contrast fails
+        let r = await make(d, im).find(phrase: "bottle", tracks: [tr])
+        XCTAssertEqual(r.outcome, .notFound)
+        XCTAssertTrue(r.attempts[0].reason.contains("looks more like"), r.attempts[0].reason)
+    }
+
+    func testArrivalAcceptsWhenQueryBeatsNegatives() async {
+        let tr = Track(id: "a", position: SIMD3(1, 0, 1), embedding: [0.9, 0.4, 0], sightings: 4, persistence: 1.0)
+        let d = FakeDriver(), im = FakeImages()
+        im.byX[1] = [[0.9, 0.4, 0]]                       // identical to the track; bottle 0.91 > person 0.41
+        let r = await make(d, im).find(phrase: "bottle", tracks: [tr])
+        XCTAssertEqual(r.outcome, .success)
+        XCTAssertTrue(r.attempts[0].reason.contains("text margin"), r.attempts[0].reason)
+    }
+}

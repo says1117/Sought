@@ -156,7 +156,7 @@ final class SelfTestRunner: ObservableObject {
     private func guardLevel() -> SelfTestGuardLevel? {
         guard let frame = tracker.session.currentFrame,
               ProcessInfo.processInfo.systemUptime - frame.timestamp <= 1.0,
-              let corridor = DepthAdapter.corridorResult(from: frame), !corridor.isBlind() else { return nil }
+              let corridor = DepthAdapter.corridorResult(from: frame, floorY: tracker.floorY), !corridor.isBlind() else { return nil }
         let sonar = link.robot.map { SonarSample(frontCm: $0.frontCm, rearCm: $0.rearCm, flags: $0.flags.rawValue) }
         switch ObstacleLogic.evaluate(corridor: corridor, sonar: sonar).level {
         case .clear: return .clear

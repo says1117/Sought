@@ -100,7 +100,9 @@ final class CoordinatorTurnGuardTests: XCTestCase {
         let w = try wiring(robot: robot, guardState: { .stop }, turnGuard: nil)
         let driver = ControllerApproachDriver(controller: w.makeController(), poses: robot)
         let report = await leased(w) { await driver.approach(x: 1, z: 0, stopDistance: 2) }
-        XCTAssertEqual(report.outcome, .failed(reason: "timeout"))
+        guard case .failed(let why) = report.outcome else { return XCTFail("expected failed") }
+        XCTAssertTrue(why.hasPrefix("final turn timeout"), why)
+        XCTAssertTrue(why.contains("fwd guard stop 100%"), why)
         XCTAssertEqual(robot.movingCommands, 0)
     }
 }
