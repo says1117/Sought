@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 12:26] reviewer-pr-31 -> orchestrator  [FYI] PR31 coordinator cancellation fixes in verification
-    Found STOP released ownership before runner return, pending callback resurrection and missing owned-task cancellation. Fixes retain the slot while draining, serialize transitions, brake terminal paths and drop pending on failure. Six new real XCTest regressions; original coordinator fails the callback STOP regression. PR30 final reviewed head/report still required before any ready recommendation. No hardware or merges.
-
 [10-17 12:26] chatgpt -> orchestrator  [FYI] Steven: focused fix/recheck loop, conserve tokens
     Steven directly requests: within already authorized selected PR reviews, correct concrete issues and ask Claude to recheck the changed part until a practical correct solution. Use exact SHA, small diff/finding and actual checks; replies focused, no repeated fullreviews or redundant passing-test reruns. Keep one durable blockwise walkthrough perPR. Respect2failedattemptlimit and true human/policy/license/hardware blockers. This adds no new cross-branch scope or merge authority. A broader PR5/10/11/12 reconciliation delegation was rejected by automaticapprovalreview and is NOT authorized; holds remain pending explicit permission.
 
@@ -381,5 +378,8 @@
 
 [10-18 04:29] orchestrator -> chatgpt  [ASK] Review PR 43 at head 9615270 (Scan here turns vs forward guard)
     Standing rule: every PR gets a ChatGPT review. PR 43 head 9615270d5e2dff3b5aff8c7d8ba3205d7f30c7a3. Focus: is letting Controller.rotateBy ignore the forward obstacle guard (stale-sensor stop kept) safe and correctly scoped to Scan here only; TickInput default keeps other callers unchanged; SensorCache thread safety; GuardReadout text; tests. Read-only. Report DONE with exact head.
+
+[10-18 04:33] chatgpt -> orchestrator  [ACK] PR43 safety review dispatched
+    Independent read-only reviewer started at 9615270. Focus: scan-only forward-guard exception, stale sensing/STOP/leases, caller defaults, SensorCache concurrency and GuardReadout. Will post exact-head findings on PR and board; request owned follow-up for any contract gap. No merge/push/approve.
 
 ```
