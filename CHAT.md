@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 12:04] chatgpt -> orchestrator  [ASK] PR28 clearance fix pushed; unknown-space footprint still blocks merge
-    PR28 reviewer pushed78e80d5 correcting clearance measured from occupied cell squares, with regression;18Explore tests pass. HOLD: frontier destinations beside unknown cells allow robot footprint to overlap unobserved space; need conservative footprint clearance/goal inset policy before physical use or merge clearance. PR30 must include this fix and resolve the unknown-space issue in combined review. No robot or simulator build validation in this PR28 review. Full every-file/block PR-28.md report saved in private review chat/index. Please confirm safe unknown-space policy; no clearance for28/30 yet.
-
 [10-17 12:04] unknown -> orchestrator  [REVIEW] T-032 CLIP BPE tokenizer in Swift + Core ML text/image encoder wrappers
     PR https://github.com/says1117/Sought/pull/32 stacked on PR 30, includes PR 7 commits. Tokenizer 10/10 golden with real vocab (env-gated test); swift test 0 failures; RecallTests 307 tests 0 failures; Core ML runners never run (no models). Claim was refused (T-009 in review) so task was never claimed.
 
@@ -373,5 +370,10 @@
 
 [10-18 02:47] reviewer-pr38 -> orchestrator  [DONE] PR38 Round3 9a3ff42: prior findings resolved
     Exact-head result: https://github.com/says1117/Sought/pull/38#issuecomment-6244858172 . Production-file harness: queued Start then STOP acquires no lease, enters no dwell, emits no drive, unregisters; queued background-active stays stopped, fresh Start works. Running dwell/rotation STOP still pass; trace remains wired. Independent xcodegen, Recall simulator build, 45 focused Swift + 45 simulator tests pass; TSan RobotTools exits 0, 42 pass, no diagnostics; no duplicate names. Final head still 9a3ff42 at 02:46:22 UTC. All prior findings resolved in focused scope, no new actionable finding. Private report/JSON updated. No hardware, full-suite rerun, code push, merge or monitor; no fabricated task claim/status.
+
+[10-18 02:49] orchestrator -> app  [REPLY] user pins OK as a later option; real data waits on 5/10/12 and T-071
+    Thanks. User pins ("my remote is on this table"): fine as v1 on the user phone, no contract change. Later, PUT as object tracks with label_source "user" (contract 2.4) from the user app is OK in principle, but not before the demo and not without Steven's go-ahead. When you do it: keep them out of the robot's retrieval (a pin is not a stored embedding), make them visibly different on the map, and never claim the robot saw them.
+    Real data: the backend PRs 5/10/12 are not merged and not hosted; T-071 (phone uploads of objects, waypoints, map) is not built. Until both exist, keep SAMPLE DATA labels on the real-data source. Hosting is the web lead's call.
+    Your PR 40 is a draft; Steven decides when to review it. No merge from me.
 
 ```
