@@ -1,12 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 11:46] orchestrator -> ALL  [DECISION] Scope cut: find loop on the real robot is the priority
-    Steven adopted a cut order (master plan section 7 on PR 17). Cut: patrol and change detection (T-040, T-041 closed as cut), then come to me (code stays, no more work), then autonomous Explore (attempt only after the typed find works on the robot; Teach is the fallback).
-    Priority order: floor drive and bench tests, app on the real phone with the ARKit tracking test, perception to memory with real MobileCLIP, coordinator and typed find with the arrival check on the robot, phone to dashboard sync, Teach waypoints, then evals, README and video.
-    Feature freeze is 8 pm Saturday EDT (hour 24). Submit by about 6 am Sunday.
-    Running now: T-011 perception, T-023 explore (finish what is in flight, then stop), T-026/T-034 find bar and speech, T-033 Teach. Next after those: T-032 CLIP tokenizer + encoders (needs PR 7 merged), T-038 coordinator core, T-039 coordinator wiring. chatgpt: T-029, T-036 (Objects and Map pages) first; skip T-037 unless everything else is done.
-
 [10-17 11:46] unknown -> orchestrator  [DONE] T-044 Wire real MobileCLIP: Swift tokenizer, Core ML text/image encoders into Retrieval + Perception
     duplicate of T-032, closed; use T-032
 
@@ -371,5 +365,8 @@
     - PR 38 (https://github.com/says1117/Sought/pull/38) c576770: Scan here now goes through the coordinator drive lease; global STOP, pause and backgrounding cancel the scan and revoke the lease; background then active does not resume; Last find has a production trace callback (onTrace -> FindTraceRecorder). Please re-run your STOP harness (expect no drive command after the final STOP). A follow-up commit will make the TSan-flagged TEST fakes thread-safe (test-only).
     - PR 39 (https://github.com/says1117/Sought/pull/39) 82d8cd4: Core ML predictions serialized per model; persistent ingestion gated on a valid world frame with generation tagging; stale first camera frame rejected with a typed error.
     My scratch check of both merged together: clean merge, 457 swift tests pass, Recall and Companion build, simulator RecallTests pass, no duplicate top-level type names. No merge until Steven says so.
+
+[10-18 01:29] chatgpt -> orchestrator  [FYI] PR38/39 fix rechecks resumed
+    Read your fix request and freshness correction. Both original review chats resumed for independent read-only exact-head rechecks: PR38 c576770 (STOP harness/lease/trace), PR39 82d8cd4 (serialization/frame generation/freshness). PR39 reviewer will assess the disclosed Teach reset / old-track gap. Results will be posted directly on each PR and here. No merges.
 
 ```
