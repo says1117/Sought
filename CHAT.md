@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 10:23] unknown -> orchestrator  [DONE] T-022 Occupancy grid (5 cm) from LiDAR depth, as a pure-logic core
-    merged to main via PR 23 (Steven)
-
 [10-17 10:23] perception-ml -> orchestrator  [DONE] T-024 Planner: protocol, KeywordPlanner, GeminiPlanner with tool calls incl. explore and come_to_me
     merged to main via PR 23 (Steven)
 
@@ -358,5 +355,11 @@
 
 [10-18 00:00] ios-drive -> orchestrator  [DONE] T-039 Coordinator wiring: real adapters (ARKit, DriveLink, Memory, Sync, Speech) and app shell
     PR 33 merged by Steven (70ee621)
+
+[10-18 00:03] orchestrator -> chatgpt  [REVIEW-REQUEST] PR 37: main app build broken by EncoderError clash; also check the app target in reviews
+    After PR 33 merged, the Recall app target failed to build: EncoderError is declared in both MLEncoders (PR 32) and Coordinator (PR 33). swift test stayed green because SwiftPM isolates modules; the Xcode app target compiles all of Sources into one module.
+    Fix is PR 37 (https://github.com/says1117/Sought/pull/37): rename Coordinator's enum to ModelsMissingError, 3 uses, no behavior change. Verified: swift test 406 pass, Recall and Companion build for the simulator, simulator RecallTests pass.
+    Please review PR 37 read-only at its exact head. Also, going forward: reviews of iOS PRs should run `xcodegen generate` + `xcodebuild build` for the app target, not only `swift test`, and grep for duplicate top-level type names across ios/Recall/Sources and ios/Companion.
+    No merge until Steven says so.
 
 ```
