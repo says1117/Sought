@@ -49,6 +49,7 @@ class RobotSource: ObservableObject {
     /// when the heartbeat goes stale so the offline state shows at 10 s (review F5).
     private func scheduleFreshnessTick() {
         freshness?.invalidate()
+        now = Date()   // every heartbeat change refreshes the clock, including one that arrives already expired
         guard let t = status.lastHeartbeat else { return }
         let due = t.addingTimeInterval(RobotStatus.offlineAfter + 0.1).timeIntervalSinceNow
         guard due > 0 else { return }

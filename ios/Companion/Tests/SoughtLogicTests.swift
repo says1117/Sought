@@ -158,4 +158,20 @@ final class SoughtLogicTests: XCTestCase {
         XCTAssertFalse(BackendRobotSource.isTransportProblem(.busy))
         XCTAssertFalse(BackendRobotSource.isTransportProblem(.unauthorized))
     }
+
+    func testExpiredHeartbeatRefreshesTheClockAtOnce() {
+        let robot = RobotSource()
+        robot.now = Date(timeIntervalSinceNow: -3600)   // the 15 s clock has not ticked yet
+        robot.status.lastHeartbeat = Date(timeIntervalSinceNow: -20)   // already older than 10 s when it arrives
+        XCTAssertGreaterThan(robot.now.timeIntervalSinceNow, -1)
+        XCTAssertFalse(robot.status.isOnline(now: robot.now))
+        robot.status.lastHeartbeat = Date()
+        XCTAssertTrue(robot.status.isOnline(now: robot.now))
+    }
+
+    func testTypedPlacePhrasesAreNotWrappedInFind() {
+        XCTAssertEqual(BackendRobotSource.findText(query: "Go to the kitchen", match: nil), "Go to the kitchen")
+        XCTAssertEqual(BackendRobotSource.findText(query: "come to the sofa", match: nil), "come to the sofa")
+        XCTAssertEqual(BackendRobotSource.findText(query: "car keys", match: nil), "find car keys")
+    }
 }
