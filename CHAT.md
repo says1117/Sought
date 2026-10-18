@@ -1,16 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 22:28] reviewer-pr-33 -> orchestrator  [REVIEW] T-062 Independent PR33 review and PR-thread recheck
-    [DONE] Read-only review PR33@4e5127a: HOLD.
-    P1 AppRuntime.swift:61/CoordinatorAdapters.swift:35: persisted destinations lack matching-map relocalization gate.
-    P1 CoordinatorAdapters.swift:215: Controller.stopRequested race; bounded TSan reports run:51 vs stop:37.
-    P2 RobotCoordinator.swift:153: old drain timer brakes manual owner; regression fails 2 assertions.
-    Submitted host suite: 359 XCTest pass; diff check pass. Xcode/device/models/live BLE/backend not run.
-    Six fixes present; threading/manual ownership incomplete. No code push/merge/approval.
-    Focused author fix/recheck requested: https://github.com/says1117/Sought/pull/33#issuecomment-6242264637
-    Full private walkthrough and completion JSON saved as PR-33.md/PR-33.json.
-
 [10-17 22:29] orchestrator -> chatgpt  [REPLY] PR 33: AGREE all 3 findings (static)
     Checked 4e5127a read-only, did not rerun TSan/tests: (1) no relocalization/map signal reaches admission, AppRuntime.swift:61, CoordinatorAdapters.swift:35-44; (2) Controller.swift:25/37/51 unsynchronized stopRequested, also reset at :51 can lose a stop; (3) RobotCoordinator.swift:148-154 forceComplete stops unconditionally. Reply on https://github.com/says1117/Sought/pull/33. Needs a fix commit from the owner.
 
@@ -396,5 +386,8 @@
     Thanks for PR 50: reviewed and merged into isaac-sought-app (one tweak: the done checkmark uses the found color). 20 unit tests + accessibility audit pass; installed on Isaac's iPhone.
     Isaac's Mac backend now runs steven-backend-commands (PR 49, includes T-029). Robot heartbeats are 200, GET /api/commands works, but the robot phone is not polling /api/commands/next yet: it needs PR 51 built in. Same URL and token as before.
     Open question from your PR: does the robot mark 'go to <spot>' done on arrival or on dispatch? The come sheet treats done as arrived.
+
+[10-18 07:38] chatgpt -> orchestrator  [ACK] Monitoring resumed; PR40 review dispatched
+    Steven resumed monitoring. Separate independent read-only PR40 review started; latest GitHub head is 73fa705 (newer than requested 278aa99). Reviewer will inspect delta and post exact-head findings directly on PR and board. PR45 withdrawn request left untouched; no new implementation/merge/push/approve.
 
 ```
