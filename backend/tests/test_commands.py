@@ -26,8 +26,8 @@ def test_create_next_ack_flow(client, app):
     assert client.get("/api/commands/next").status_code == 204
 
     running = client.post(f"/api/commands/{command['id']}/ack", json={"status": "running", "result": None})
-    assert running.status_code == 200
-    queue.get_nowait()
+    assert running.status_code == 200 and running.json()["status"] == "running"
+    assert queue.empty()  # already running after `next`: no duplicate event
     done = client.post(f"/api/commands/{command['id']}/ack", json={"status": "done", "result": "Your keys are on the desk."})
     assert done.json() == {**command, "status": "done", "result": "Your keys are on the desk."}
     assert queue.get_nowait() == ("command", done.json())

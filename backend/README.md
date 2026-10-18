@@ -79,7 +79,7 @@ Shape is docs/03_CONTRACTS.md section 2.9:
   and returns it. **204 No Content when nothing is queued.**
 - `POST /api/commands/{id}/ack` body `{"status": "running|done|failed", "result": "..."|null}`
   (result up to 500 characters). 404 for an unknown id; 409 to change a done/failed command
-  (an identical repeat returns 200).
+  (an ack that changes nothing returns 200 and emits no event).
 - `GET /api/commands/{id}` returns one command (404 if unknown).
 - `GET /api/commands?limit=20` returns the newest commands first (limit 1..200).
 

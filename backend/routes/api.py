@@ -228,10 +228,10 @@ def ack_command(id: str, payload: CommandAck, request: Request):
             raise HTTPException(404, "Unknown command")
         current = record[0]
         updated = {**current, "status": payload.status, "result": payload.result}
+        if updated == current:
+            # Retried acks (and the robot's running ack after `next` claimed it) change nothing and emit nothing.
+            return current
         if current["status"] in ("done", "failed"):
-            # Retried final acks are idempotent; a finished command never changes.
-            if updated == current:
-                return current
             raise HTTPException(409, "Command already finished")
         body = commands.put("commands", id, updated, time.time())
     return publish_command(request, body)
