@@ -12,6 +12,7 @@ struct HomeView: View {
     @State private var query = ""
     @State private var showActivity = false
     @State private var showLive = false
+    @State private var showTeach = false
     @State private var pinned = false
     @Environment(\.dynamicTypeSize) private var dts
 
@@ -44,6 +45,7 @@ struct HomeView: View {
                                 LiveViewCard { showLive = true }.frame(width: col, height: 87 + Space.l + 147)
                             }
                         }
+                        TeachCard { showTeach = true }
                         recentFinds(col: col).id("recent")
                     } header: {
                         searchHeader
@@ -66,6 +68,10 @@ struct HomeView: View {
             if UserDefaults.standard.bool(forKey: "showActivity") { try? await Task.sleep(nanoseconds: 800_000_000); showActivity = true }
         }
         .fullScreenCover(isPresented: $showLive) { LiveViewScreen() }
+        .sheet(isPresented: $showTeach) { TeachPanelView(robot: robot).presentationDetents([.large]).presentationDragIndicator(.visible) }
+        .task {   // screenshot hook: -showTeach YES
+            if UserDefaults.standard.bool(forKey: "showTeach") { try? await Task.sleep(nanoseconds: 800_000_000); showTeach = true }
+        }
     }
 
     // MARK: Pieces
