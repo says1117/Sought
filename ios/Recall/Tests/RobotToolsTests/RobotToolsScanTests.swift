@@ -25,6 +25,7 @@ final class RTFakeScanRig: ExploreDrive, ExploreClock, ExplorePoseSource, ScanHe
     private var _driveAvailable = true, _grantCurrent = true
     private var _registeredCancel: (() -> Void)?
     private var _scanEndedCount = 0
+    private var _acquireCount = 0
 
     private func locked<T>(_ body: () -> T) -> T { lock.lock(); defer { lock.unlock() }; return body() }
 
@@ -44,8 +45,9 @@ final class RTFakeScanRig: ExploreDrive, ExploreClock, ExplorePoseSource, ScanHe
     var grantCurrent: Bool { get { locked { _grantCurrent } } set { locked { _grantCurrent = newValue } } }
     var registeredCancel: (() -> Void)? { get { locked { _registeredCancel } } set { locked { _registeredCancel = newValue } } }
     var scanEndedCount: Int { locked { _scanEndedCount } }
+    var acquireCount: Int { locked { _acquireCount } }
 
-    func acquireDrive() -> ScanDriveGrant? { guard driveAvailable else { return nil }; grantCurrent = true; return RTFakeGrant(rig: self) }
+    func acquireDrive() -> ScanDriveGrant? { locked { _acquireCount += 1 }; guard driveAvailable else { return nil }; grantCurrent = true; return RTFakeGrant(rig: self) }
     func scanStarted(cancel: @escaping () -> Void) { registeredCancel = cancel }
     func scanEnded() { locked { _scanEndedCount += 1; _registeredCancel = nil } }
 
@@ -247,5 +249,84 @@ final class RobotToolsScanTests: XCTestCase {
     func testProgressText() {
         XCTAssertEqual(ScanHereState.dwelling(step: 2, total: 4).progressText, "Looking: stop 2 of 4")
         XCTAssertNil(ScanHereState.finished.stepLabel)
+    }
+
+    /// The runtime's global STOP: take the registered cancel out of its slot and call it, exactly as stopEverything does.
+    private func globalStop(_ rig: RTFakeScanRig) {
+        let cancel = rig.registeredCancel
+        rig.registeredCancel = nil
+        cancel?()
+    }
+
+    func testStopBetweenStartAndQueuedTaskNeverDrives() async {
+        let rig = RTFakeScanRig()
+        let m = model(rig)
+        m.start()
+        XCTAssertNotNil(rig.registeredCancel, "start() must register cancellation before the task runs")
+        globalStop(rig)                                     // no suspension between start() and STOP
+        for _ in 0..<50 { await Task.yield() }              // let the queued task run
+        XCTAssertEqual(rig.acquireCount, 0, "no lease after STOP")
+        XCTAssertTrue(rig.rotations.isEmpty, "no drive command after STOP")
+        XCTAssertFalse(m.state.isRunning)
+        XCTAssertEqual(m.state, .idle)
+        XCTAssertNil(rig.registeredCancel)
+    }
+
+    func testBackgroundThenActiveBeforeQueuedTaskDoesNotStart() async {
+        let rig = RTFakeScanRig()
+        let m = model(rig)
+        m.start()
+        globalStop(rig)                                     // background
+        // returning to active starts nothing by itself
+        for _ in 0..<50 { await Task.yield() }
+        XCTAssertEqual(rig.acquireCount, 0)
+        XCTAssertTrue(rig.rotations.isEmpty)
+        XCTAssertEqual(m.state, .idle)
+        // a fresh explicit Start works
+        m.start()
+        while m.state != .finished { await Task.yield() }
+        XCTAssertEqual(rig.rotations, [90, 90, 90, 90])
+    }
+
+    func testNormalStartStillRunsAndUnregisters() async {
+        let rig = RTFakeScanRig()
+        let m = model(rig)
+        m.start()
+        XCTAssertNotNil(rig.registeredCancel)
+        while m.state != .finished { await Task.yield() }
+        XCTAssertEqual(rig.rotations, [90, 90, 90, 90])
+        XCTAssertEqual(rig.acquireCount, 1)
+        while rig.registeredCancel != nil { await Task.yield() }
+    }
+
+    func testRefusedStartUnregisters() async {
+        let rig = RTFakeScanRig()
+        rig.tracking = .limited
+        let m = model(rig)
+        m.start()
+        while rig.registeredCancel != nil { await Task.yield() }
+        guard case .refused = m.state else { return XCTFail("\(m.state)") }
+    }
+
+    func testGlobalStopDuringDwellViaRegisteredCancel() async {
+        let rig = RTFakeScanRig()
+        let m = model(rig)
+        rig.onSleep = { [unowned self] n in if n == 2 { self.globalStop(rig) } }
+        m.start()
+        while m.state.isRunning || m.state == .idle { await Task.yield() }
+        XCTAssertEqual(m.state, .cancelled)
+        XCTAssertEqual(rig.rotations.count, 1)
+    }
+
+    func testGlobalStopDuringRotationViaRegisteredCancel() async {
+        let rig = RTFakeScanRig()
+        rig.blockRotate = true
+        let m = model(rig)
+        m.start()
+        while rig.rotations.isEmpty { await Task.yield() }
+        globalStop(rig)
+        while m.state.isRunning { await Task.yield() }
+        XCTAssertEqual(m.state, .cancelled)
+        XCTAssertEqual(rig.rotations.count, 1)
     }
 }

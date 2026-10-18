@@ -104,6 +104,9 @@ final class ScanHereModel: ObservableObject {
     private var task: Task<Void, Never>?
     private var flags = ScanFlags()
     private var grant: ScanDriveGrant?
+    /// Bumped by every cancel. A queued Start remembers the value it was queued under and refuses to begin if it changed.
+    private var cancelGeneration = 0
+    private var registered = false
 
     /// `stopAll` brakes everything the app drives (coordinator and link); it is called on every cancel.
     init(drive: ExploreDrive, clock: ExploreClock, poses: ExplorePoseSource, gate: ScanHereGate,
@@ -117,31 +120,53 @@ final class ScanHereModel: ObservableObject {
     /// Start button. Ignored while a scan is running.
     func start() {
         guard !state.isRunning, task == nil else { return }
+        // Register runtime cancellation NOW, not when the task gets going: a global STOP that lands between this call and
+        // run() must find the scan, cancel the task, and bump the generation so run() never takes a lease.
+        registerCancel()
+        let generation = cancelGeneration
         task = Task { [weak self] in
-            await self?.run()
+            await self?.run(queuedGeneration: generation)
             self?.task = nil
         }
     }
 
+    private func registerCancel() {
+        guard !registered else { return }
+        registered = true
+        gate.scanStarted(cancel: { [weak self] in self?.cancel() })
+    }
+
+    private func unregisterCancel() {
+        guard registered else { return }
+        registered = false
+        gate.scanEnded()
+    }
+
     /// The whole scan; `start()` runs this in a task. Tests await it directly.
-    func run() async {
+    func run(queuedGeneration: Int? = nil) async {
         guard !state.isRunning else { return }
-        // Cancelled (STOP, backgrounding) before the task got going: do not start.
-        if Task.isCancelled { state = .cancelled; return }
-        if gate.manualToolHeld { state = .refused(reason: "a manual tool is open"); return }
-        if gate.otherTaskActive { state = .refused(reason: "another task is running, stop it first"); return }
+        // Cancelled (STOP, pause, backgrounding) after Start but before this ran: never start, never take a lease.
+        // A new Start is needed; nothing is resumed.
+        if Task.isCancelled || (queuedGeneration != nil && queuedGeneration != cancelGeneration) {
+            unregisterCancel()
+            return
+        }
+        registerCancel()
+        if gate.manualToolHeld { unregisterCancel(); state = .refused(reason: "a manual tool is open"); return }
+        if gate.otherTaskActive { unregisterCancel(); state = .refused(reason: "another task is running, stop it first"); return }
         guard poses.latest().tracking == .normal else {
+            unregisterCancel()
             state = .refused(reason: "tracking is not normal, wait until the camera tracks the room")
             return
         }
         guard let grant = gate.acquireDrive() else {
+            unregisterCancel()
             state = .refused(reason: "the robot's drive is in use")
             return
         }
         let flags = ScanFlags()
         self.flags = flags
         self.grant = grant
-        gate.scanStarted(cancel: { [weak self] in self?.cancel() })
         state = .dwelling(step: 1, total: total)
         let poses = self.poses
         var result = DriveResult.failed
@@ -164,7 +189,7 @@ final class ScanHereModel: ObservableObject {
         grant.revoke()
         self.grant = nil
         if stillOwned { drive.stop() }
-        gate.scanEnded()
+        unregisterCancel()
         if flags.cancelled { state = .cancelled; return }
         if flags.trackingLost || result == .trackingLost { state = .stopped(reason: "tracking was lost"); return }
         switch result {
@@ -177,6 +202,7 @@ final class ScanHereModel: ObservableObject {
 
     /// STOP button, leaving the screen, backgrounding. Always sends STOP, even when no scan is running.
     func cancel() {
+        cancelGeneration += 1
         flags.cancelled = true
         grant?.revoke()          // first: after this returns no scan command can drive
         drive.stop()

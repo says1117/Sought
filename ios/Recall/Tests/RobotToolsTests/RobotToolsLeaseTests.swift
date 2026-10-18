@@ -224,7 +224,7 @@ final class RobotToolsLeaseTests: XCTestCase {
         r.lease.releaseManual("drive")
         r.drain()
         XCTAssertEqual(r.recorder.driveCount, 0)
-        XCTAssertEqual(r.scanEnded, 0, "a refused scan never registered")
+        XCTAssertEqual(r.scanEnded, 2, "each refused scan drops its (start-time) cancel registration")
     }
 
     /// A coordinator task starting mid-scan takes a new lease token, which ends the scan; it never fights for the wheels.
