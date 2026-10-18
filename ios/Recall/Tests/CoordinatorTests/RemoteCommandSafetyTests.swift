@@ -39,6 +39,44 @@ final class RemoteCommandSafetyTests: XCTestCase {
         XCTAssertFalse(r.coordinator.isBusy)
     }
 
+    /// [P1, PR 55 recheck] A STOP during the runner's first context lookup must not be absorbed.
+    func testStopDuringContextLookupIsNotAbsorbed() async {
+        let r = CoordRig()
+        let co = r.coordinator
+        let lookups = RemoteCounter()
+        let run = RemoteCommandRunner(planner: KeywordPlanner(), coordinator: co, plannerTimeout: 60, context: {
+            if lookups.next() == 1 { co.stopAll() }   // STOP lands while the first lookup is running
+            return PlannerContext(waypointNames: ["kitchen"])
+        })
+        let find = Task { await run.run("find my keys") }
+        await coordSettle()
+        XCTAssertEqual(r.finder.started, [], "motion started after STOP")
+        r.finder.finish(.completed(summary: nil))   // only reachable without the fix
+        let outcome = await find.value
+        XCTAssertEqual(outcome, .failed(CommandPoller.stopped))
+        XCTAssertFalse(co.isBusy)
+    }
+
+    /// [P1, PR 55 recheck] A local STOP while GET /next is accepted but its response is held: the claimed
+    /// command must be refused when it lands (this is not a pause, so only the stop epoch can catch it).
+    func testLocalStopWhileClaimInFlightRefusesTheCommand() async {
+        let r = CoordRig()
+        let t = GatedCommandTransport(commands: [("cmd_1", "find my keys")], gateNext: true)
+        let p = poller(t, runner(r))
+        let poll = Task { await p.pollOnce() }
+        await remoteUntil { t.nextGate.waiting > 0 }
+
+        r.coordinator.stopAll()                      // local STOP; the poller keeps running
+        t.nextGate.open()
+        let work = await poll.value.work
+        await coordSettle()
+        XCTAssertEqual(r.finder.started, [], "a command claimed before STOP started after it")
+        r.finder.finish(.completed(summary: nil))
+        await work?.value
+        XCTAssertEqual(t.finalAck?.status, "failed")
+        XCTAssertEqual(t.finalAck?.result, CommandPoller.stopped)
+    }
+
     /// [P1] Pause while a claim (GET /next) is still in flight: the command must never reach the coordinator.
     func testPauseDropsAClaimStillInFlight() async {
         let r = CoordRig()
@@ -153,6 +191,12 @@ private func remoteUntil(_ condition: () -> Bool) async {
 }
 
 final class RemoteTaskBox { var task: Task<Void, Error>? }
+
+final class RemoteCounter {
+    private let lock = NSLock()
+    private var n = 0
+    func next() -> Int { lock.lock(); defer { lock.unlock() }; n += 1; return n }
+}
 
 /// Suspends callers until opened; `waiting` counts the callers parked on it.
 final class RemoteTestGate {

@@ -34,6 +34,8 @@ bar's planner, then `RobotCoordinator.executeRemote`). The `running` ack and the
 success) or `failed` ack are sent alongside and never gate motion, so a "stop" brakes without a network round trip.
 A busy robot (task running, pending or still stopping, manual tool open, another remote command in progress)
 answers `failed` / `busy`; the coordinator re-checks that atomically and never queues remote motion. Any stop
-(remote, local, pause, a manual tool opening) invalidates every remote command claimed before it, and `pause()`
+(remote, local, pause, a manual tool opening) invalidates every remote command claimed before it (the stop epoch is
+read before GET /next is sent and carried with the command, so a stop during the claim also counts; such a command is
+acked `failed` / `stopped`), and `pause()`
 cancels claimed work and drops a claim still in flight (acked `failed`, best effort). Network errors back off
 2, 4, 8 ... 30 s.

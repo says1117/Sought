@@ -36,7 +36,8 @@ final class FakeCommandRunner: CommandRunning {
     var outcome: (String) -> CommandOutcome
     private(set) var ran: [String] = []
     init(_ outcome: @escaping (String) -> CommandOutcome) { self.outcome = outcome }
-    func run(_ text: String) async -> CommandOutcome { ran.append(text); return outcome(text) }
+    func stopEpoch() -> UInt64 { 0 }
+    func run(_ text: String, claimedAt epoch: UInt64) async -> CommandOutcome { ran.append(text); return outcome(text) }
 }
 
 final class CommandPollerTests: XCTestCase {

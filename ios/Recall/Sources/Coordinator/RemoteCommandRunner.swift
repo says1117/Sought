@@ -30,10 +30,18 @@ final class RemoteCommandRunner: CommandRunning {
         self.plannerTimeout = plannerTimeout; self.context = context
     }
 
+    func stopEpoch() -> UInt64 { coordinator.stopGeneration }
+
+    /// A command that arrived just now (find-bar style callers, tests): its epoch is read before anything else.
     func run(_ text: String) async -> CommandOutcome {
+        await run(text, claimedAt: coordinator.stopGeneration)
+    }
+
+    /// `generation` was read before the command was claimed: any stop since then (during the claim, the context
+    /// lookup, planning, or between calls) refuses every call this command would dispatch.
+    func run(_ text: String, claimedAt generation: UInt64) async -> CommandOutcome {
         if (try? KeywordPlanner.parse(text, context: context()))?.contains(.stop) == true { return stop() }
-        // Read before claiming: any stop from here on refuses every call this command dispatches.
-        let generation = coordinator.stopGeneration
+        guard coordinator.stopGeneration == generation else { return .failed(CommandPoller.stopped) }
         guard claim() else { return .failed(CommandPoller.busy) }
         defer { release() }
 

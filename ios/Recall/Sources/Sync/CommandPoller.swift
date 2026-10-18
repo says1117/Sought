@@ -54,7 +54,11 @@ public enum CommandOutcome: Equatable {
 /// Runs one command's text (planner + coordinator in the app). Must refuse with `.failed(CommandPoller.busy)`
 /// instead of queueing motion when the robot is busy or a manual tool is open; a stop is always obeyed.
 public protocol CommandRunning: AnyObject {
-    func run(_ text: String) async -> CommandOutcome
+    /// The robot's stop epoch (opaque; changes on every stop). The poller reads it before sending a claim.
+    func stopEpoch() -> UInt64
+    /// `epoch` is `stopEpoch()` from before the claim was sent: if any stop happened since, refuse with
+    /// `.failed(CommandPoller.stopped)` (a "stop" itself is still obeyed).
+    func run(_ text: String, claimedAt epoch: UInt64) async -> CommandOutcome
 }
 
 /// Polls `GET /api/commands/next` every 2 s while started. Each claimed command goes to the runner at once
@@ -70,6 +74,8 @@ public final class CommandPoller {
     public static let maxResultLength = 500
     /// Final ack result for a command the runtime paused before or while it ran.
     public static let cancelled = "cancelled: robot paused"
+    /// Final ack result for a command a stop overtook before it could start.
+    public static let stopped = "stopped"
     private let transport: CommandTransport
     private let runner: CommandRunning
     private let backoff: Backoff
@@ -123,6 +129,8 @@ public final class CommandPoller {
     @discardableResult
     public func pollOnce() async -> (delay: TimeInterval, work: Task<Void, Never>?) {
         let claimGeneration = currentGeneration()
+        // Before the GET is sent: a stop while the claim is in flight (or later) refuses this command.
+        let epoch = runner.stopEpoch()
         let response: (status: Int, body: Data)
         do {
             response = try await transport.exchange(SyncRequest(method: "GET", path: "/api/commands/next", body: nil, media: nil))
@@ -134,7 +142,7 @@ public final class CommandPoller {
             return (failed(), nil)
         }
         let delay = succeeded()
-        guard let work = launch(command, claimedIn: claimGeneration) else {
+        guard let work = launch(command, claimedIn: claimGeneration, epoch: epoch) else {
             // Paused while this claim was in flight: never run it, just close it out on the server.
             return (delay, Task.detached { [self] in await ack(command.id, status: "failed", result: Self.cancelled) })
         }
@@ -145,12 +153,12 @@ public final class CommandPoller {
 
     /// Start handling a claim unless `stop()` ran since it began. Registered under the same lock as that
     /// check, so `stop()` always sees (and cancels) it.
-    private func launch(_ command: WireCommand, claimedIn claimGeneration: UInt64) -> Task<Void, Never>? {
+    private func launch(_ command: WireCommand, claimedIn claimGeneration: UInt64, epoch: UInt64) -> Task<Void, Never>? {
         lock.lock(); defer { lock.unlock() }
         guard generation == claimGeneration else { return nil }
         let key = UUID()
         let work = Task.detached(priority: .userInitiated) { [self] in
-            await handle(command)
+            await handle(command, epoch: epoch)
             forget(key)
         }
         claimed[key] = work
@@ -159,11 +167,11 @@ public final class CommandPoller {
 
     private func forget(_ key: UUID) { lock.lock(); claimed[key] = nil; lock.unlock() }
 
-    private func handle(_ command: WireCommand) async {
+    private func handle(_ command: WireCommand, epoch: UInt64) async {
         // Acks are their own tasks: a stalled ack never delays the runner, and a pause cannot cancel them.
         let running = Task.detached { [self] in await ack(command.id, status: "running", result: nil) }
         var outcome = CommandOutcome.failed(Self.cancelled)
-        if !Task.isCancelled { outcome = await runner.run(command.text) }
+        if !Task.isCancelled { outcome = await runner.run(command.text, claimedAt: epoch) }
         if Task.isCancelled, case .failed = outcome { outcome = .failed(Self.cancelled) }
         let (status, result): (String, String) = {
             switch outcome {

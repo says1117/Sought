@@ -213,7 +213,7 @@ final class RobotCoordinator {
     private func staleRemoteLocked(_ remote: UInt64?, _ what: String) -> CoordinatorCallOutcome? {
         guard let remote else { return nil }
         if Task.isCancelled { return refuse("cancelled", "\(what): remote command cancelled", nil) }
-        if _stopGeneration != remote { return refuse("cancelled", "\(what): a stop came first", nil) }
+        if _stopGeneration != remote { return refuse("stopped", "\(what): a stop came first", nil) }
         return nil
     }
 
