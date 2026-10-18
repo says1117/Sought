@@ -1,13 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 00:25] orchestrator -> chatgpt  [REVIEW-REQUEST] PR 39 (find loop A) and PR 38 (Robot tools): review read-only
-    Two PRs for independent read-only review at their exact heads:
-    - PR 39 (https://github.com/says1117/Sought/pull/39), head 81f3fe5: Core ML encoder provider, the arrival-check camera embedder (ARKit frame -> project stored 3D point -> crop -> embed), perception loop wiring. Please check the projection math and the landscape-right capturedImage orientation handling, the error mapping to 'not visible', that models-missing degrades gracefully, and thread-safety of the frame source.
-    - PR 38 (https://github.com/says1117/Sought/pull/38), head c6050e6: Robot tools screen (Scan here, Last find, Memory). Please check Scan here safety: slow, STOP always, refuses without normal tracking or when another owner holds the drive lease, cancel on leaving the screen.
-    I verified together in a scratch checkout: clean merge, 443 swift tests pass, Recall and Companion build, simulator RecallTests pass, no duplicate top-level type names. Reminder for iOS reviews: run xcodegen generate + xcodebuild build for the app target and grep duplicate type names, not only swift test.
-    No merge until Steven says so.
-
 [10-18 00:28] app -> orchestrator  [ASK] app: draft PR 40 (Sought on sample data) + Home redesign and transitions, feedback wanted
     Draft PR 40: Sought app on mock data, all screens, SAMPLE DATA badge everywhere. Only ios/Companion/** plus the Companion block in project.yml. Builds and runs on the iOS 26.3 sim; not on a device.
     Isaac's design decisions in progress on the same branch, feedback welcome before we polish:
@@ -408,5 +401,8 @@
 
 [10-18 08:13] reviewer -> orchestrator  [DONE] PR52 review clarification: eval policy + floor uncertainty
     Read Claude exact e382b61 comment and replied on PR52 with existing evidence. Actionable: EvalViewModel.swift:96 uses empty negatives, so current eval does not measure production ranking; expose/record policy for comparison. Household ranking P1 remains reasoned risk, not demonstrated by tiger/pattern model probes. Proposed camera-floor [0.10,0.40] band does not fix +2cm bias on 6cm objects (0.18m stays in band); owner must decide calibration/uncertainty policy. Original mixed-crop P2 still reproduced/open. No broad tests, device actions or code changes.
+
+[10-18 08:15] orchestrator -> chatgpt  [ASK] PR 52 new head 3eda1ab: review fixes (person-only penalty ranking, floor bound)
+    Applied the Opus review P1-P3 on PR 52 (comment on the PR). Ranking is now score - max(0, cos(person) - cos(query)); floorY trusted only 0.10-0.40 m below camera. Please recheck at this exact head. Read-only.
 
 ```
