@@ -68,8 +68,10 @@ final class CoordinatorTurnGuardTests: XCTestCase {
         let controller = w.makeController()
         let status = await leased(w) { await controller.goTo(x: 0, z: -2, stopDistance: 0.3) }
         XCTAssertEqual(status, .failed(.timeout))
-        XCTAssertEqual(robot.movingCommands, 0, "a .clear turn guard must not let goTo move")
-        XCTAssertEqual(robot.position.z, 0)
+        // Detours (controller, 2026-10-18): with the turn guard clear, a held goTo may turn in place to look for a
+        // way around, but it must never translate into what the forward guard sees.
+        XCTAssertEqual(robot.position.x, 0, accuracy: 1e-9, "a .clear turn guard must not let goTo drive")
+        XCTAssertEqual(robot.position.z, 0, accuracy: 1e-9, "a .clear turn guard must not let goTo drive")
     }
 
     func testNoTurnGuardKeepsTheForwardGuardForTurns() async throws {

@@ -68,6 +68,7 @@ final class Controller {
         let startEpoch = since ?? stopEpoch
         defer {
             sink.stop()                              // every exit path leaves the rover stopped
+            stats.detours = session.detoursUsed
             stopLock.lock(); lastStats = stats; stopLock.unlock()
         }
         while true {
@@ -96,6 +97,7 @@ struct ControlRunStats: Equatable {
     var startDistM: Double?
     var closestDistM: Double?
     var lastDistM: Double?
+    var detours = 0
 
     mutating func record(input: TickInput, command: WheelCommand, goal: ControlSession.Goal) {
         ticks += 1
@@ -120,6 +122,7 @@ struct ControlRunStats: Equatable {
                      "fwd guard stop \(pct(forwardGuardStop))"]
         if turnGuardStop > 0 { parts.append("turn guard stop \(pct(turnGuardStop))") }
         if trackingBad > 0 { parts.append("tracking bad \(pct(trackingBad))") }
+        if detours > 0 { parts.append("detours \(detours)") }
         if let s = startDistM, let c = closestDistM, let l = lastDistM {
             parts.append(String(format: "dist %.2f→%.2f m (closest %.2f)", s, l, c))
         }
