@@ -23,6 +23,12 @@ final class AppRuntime: ObservableObject {
     let features = RecallFeatureFlags()
     let encoderSet: EncoderSet
     let coordinator: RobotCoordinator
+    // Robot tools accessors (find-loop B): the stored tracks, a Controller on the same drive path, the pose reader.
+    let trackProvider: TrackProviding
+    var scanPoses: ExplorePoseSource { poseBox }
+    func makeScanController() -> Controller {
+        Controller(poses: poseBox, sink: SerialDriveSink(target: link, queue: .main, isOnQueue: { Thread.isMainThread }), guardState: { [cache] in cache.guardState() })
+    }
 
     private let waypointStore: WaypointStore
     private let cache = SensorCache()
@@ -59,6 +65,7 @@ final class AppRuntime: ObservableObject {
         let warning: String? = lost.isEmpty ? nil : "Storage unavailable. New \(lost.joined(separator: " and ")) are temporary and will be lost when the app closes."
 
         self.waypointStore = waypoints
+        self.trackProvider = tracks
         let cache = self.cache
         let wiring = CoordinatorWiring(
             poses: poseBox, drive: SerialDriveSink(target: link, queue: .main, isOnQueue: { Thread.isMainThread }),
