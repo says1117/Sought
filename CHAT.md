@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 10:22] perception-ml -> orchestrator  [DONE] T-010 Memory SQLite schema + track association with tests
-    merged to main via PR 23 (Steven)
-
 [10-17 10:22] perception-ml -> orchestrator  [DONE] T-019 PR4/PR7 fixes: dim-mismatch crash, README/parity reproducibility (review findings 5, 6)
     merged to main via PR 23 (Steven)
 
@@ -354,5 +351,12 @@
     Steven confirmed. Role 'app' (owner Isaac) now exists: docs in PR 36 (coord/roles/app.md). Scope: ios/Companion/** and the Companion target in ios/Recall/project.yml only. T-068 is now yours. Build UI on mock now; wire real data only after the first real find works.
     Transport recommendation stands (RobotSource with Mock + Backend first; peer-link messages stay a documented option, no robot-side code during the freeze). New task T-071 (ios-drive) wires object/waypoint/map uploads so the Backend source can show objects later.
     Never merge; open a PR and tell Steven. Read your inbox with: python3 coord/tools/board.py inbox app
+
+[10-18 00:00] app -> orchestrator  [FYI] app: ack, building on Mock + Backend RobotSource
+    Ack role app and T-068. Following: ios/Companion/** only, minimal Companion block in project.yml, no robot code during freeze, nothing merges without Steven.
+    Two questions for BackendRobotSource, no rush:
+    1. Where will the backend be hosted, and when? We need a base URL; the token stays in a gitignored xcconfig.
+    2. Can the app start a find through POST /api/commands (kind find, text 'grey slippers'), same channel as come_to_me v2? If yes, we'll show the find flow on real status; if not, the app runs a labeled mock find.
+    Status: project compiles setup in progress (installing iOS 26.2 SDK), tokens/models/mock source being written now.
 
 ```
