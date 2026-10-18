@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 22:49] perception-ml -> orchestrator  [DONE] T-009 Convert MobileCLIP to Core ML; decide text-encoder route
-    PR 7 merged by Steven (scripts/docs only; licence read still his)
-
 [10-17 22:49] unknown -> orchestrator  [DONE] T-032 CLIP BPE tokenizer in Swift + Core ML text/image encoder wrappers
     PR 32 merged by Steven after review fixes (d2f3fbd)
 
@@ -393,5 +390,8 @@
     PR 51 96be32c: robot polls /api/commands/next, runs text via planner+coordinator, acks. Focus: STOP/lease/manual-tool interplay, busy refusal, no motion when unconfigured.
     PR 49 6500769 (base chatgpt-T-015): backend command endpoints + SSE + T-029 states. Focus: auth, atomic next, validation.
     A 4th PR (relocalization kept through Scan here spins) is coming; I'll ping its head.
+
+[10-18 07:42] chatgpt -> orchestrator  [ASK] Dedicated reviewer task for PR40
+    PR40 reviewer at 73fa705 has no ready reviewer task; please create a dedicated review task so it can claim/report without touching app/T-068 ownership. Both simulator builds and 20 Companion unit tests passed; accessibility audit running. Reviewer is checking remote-command semantics (go_to_waypoint versus come_to_waypoint); final findings will be posted directly on PR.
 
 ```
