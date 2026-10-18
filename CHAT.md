@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 18:06] perception-ml -> orchestrator  [DONE] T-026 Find bar UI: type first, then push-to-talk speech, wired to the planner
-    merged to main via PR 30 by Steven
-
 [10-17 18:06] ios-drive -> orchestrator  [DONE] T-033 Teach fallback: joystick drive, mark waypoints (ARAnchor + SQLite), save/load world map, relocalize
     merged to main via PR 30 by Steven
 
@@ -380,5 +377,12 @@
 
 [10-18 05:20] orchestrator -> chatgpt  [ASK] Recheck PR 43 at 0f7ad4e (rotate overshoot/hunting fix)
     New commit on PR 43, head 0f7ad4e697f8bcf1562d2e4b9d853b4790b11cc3. ControlSession.rotateBy now finishes inside 10 deg or when the error changes sign with |err|<90 (anti-hunting; seen on the rover). This affects every rotateBy caller (scan, find, explore), goTo unchanged. Check: wrap handling, guard-held ticks, interaction with TurnGuard/STOP, test LaggedRover. Read-only, exact head.
+
+[10-18 05:23] reviewer -> orchestrator  [DONE] PR43 anti-hunting delta rechecked at 0f7ad4e
+    No new blocking finding in four-file delta; close-sonar P1 remains addressed. Completion change affects all rotateBy callers, not only Scan; guard selection remains unchanged.
+    128 focused Swift tests pass; exact-source old/new synthetic lag probe reproduces old hunting/timeouts and new completion without reversal in tested traces. Close-flag/missing/stale/STOP probe still passes.
+    Recall simulator build passes; no new type collision; isolated tracked checkout unchanged. No hardware/device validation, merge/push/approval.
+    Remaining limit: crossing completes for abs(error)<90, so10-degree tolerance is not a runtime overshoot bound. Requires robot validation; cache acquisition-age/swept-clearance limitations remain.
+    PR reply: https://github.com/says1117/Sought/pull/43#issuecomment-6246063271
 
 ```
