@@ -10,7 +10,7 @@ cd ios/Recall && xcodegen generate
 open Recall.xcodeproj   # scheme: Companion, any iOS 17+ simulator
 ```
 
-Screenshot hooks (launch arguments): `-tab items|map|settings`, `-search "red umbrella"`, `-detail obj_sample0007`.
+Screenshot hooks (launch arguments): `-tab items|map|settings`, `-search "red umbrella"`, `-detail obj_sample0007`, `-find obj_sample0007`.
 
 ## Layout
 

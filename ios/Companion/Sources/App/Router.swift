@@ -16,12 +16,13 @@ final class Router: ObservableObject {
     @Published var detail: TrackedObject?
     @Published var findRequest: FindRequest?
 
-    /// Screenshot and UI test hooks: launch with `-tab items`, `-search "red umbrella"` or `-detail obj_sample0007`.
+    /// Screenshot and UI test hooks: launch with `-tab items`, `-search "red umbrella"` `-detail obj_sample0007` or `-find obj_sample0007`.
     func applyLaunchArguments(robot: RobotSource) {
         let d = UserDefaults.standard
         if let t = d.string(forKey: "tab"), let tab = AppTab(rawValue: t) { self.tab = tab }
         if let q = d.string(forKey: "search") { search(q, in: robot) }
         if let id = d.string(forKey: "detail"), let o = robot.objects.first(where: { $0.id == id }) { detail = o }
+        if let id = d.string(forKey: "find"), let o = robot.objects.first(where: { $0.id == id }) { find(o) }
     }
 
     func find(_ o: TrackedObject) {
