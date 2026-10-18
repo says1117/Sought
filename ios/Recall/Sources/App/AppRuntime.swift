@@ -63,8 +63,11 @@ final class AppRuntime: ObservableObject {
         do { waypoints = try WaypointStore(path: dbPath) } catch {
             waypoints = try! WaypointStore(path: ":memory:"); lost.append("saved places")
         }
-        do { tracks = try TrackStore(path: dbPath) } catch {
-            tracks = try! TrackStore(path: ":memory:"); lost.append("remembered objects")
+        // Tracks are scoped to the saved map the gate says this session uses (see TrackStore, WorldFrameGate).
+        let gateForScope = frameGate
+        let scope: () -> String? = { gateForScope.activeMapId }
+        do { tracks = try TrackStore(path: dbPath, scope: scope) } catch {
+            tracks = try! TrackStore(path: ":memory:", scope: scope); lost.append("remembered objects")
         }
         let waypointsPersistent = !lost.contains("saved places")
         let warning: String? = lost.isEmpty ? nil : "Storage unavailable. New \(lost.joined(separator: " and ")) are temporary and will be lost when the app closes."
@@ -93,7 +96,12 @@ final class AppRuntime: ObservableObject {
             .sink { box.update(pose: $0, tracking: $1) }
         // Persisted targets are only valid after ARKit recognises the saved map again in this session.
         let gate = frameGate
-        pose.onSessionStart = { gate.sessionStarted(loadedSavedMap: $0) }
+        // The saved map's id scopes remembered objects; tracks of any other map are deleted once this one is loaded.
+        pose.onSessionStart = { loaded in
+            let id = loaded ? WorldMapStore(url: WorldMapStore.defaultURL()).currentMapId() : nil
+            gate.sessionStarted(loadedSavedMap: loaded, mapId: id)
+            if let id { _ = try? tracks.purgeOtherMaps(keeping: id) }
+        }
         mappingSubscription = Publishers.CombineLatest(pose.$tracking, pose.$mapping)
             .sink { gate.update(tracking: $0, mapping: $1) }
 

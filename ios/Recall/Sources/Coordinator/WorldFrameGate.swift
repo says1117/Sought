@@ -18,10 +18,30 @@ protocol CoordinatorFrameValidity: AnyObject {
     /// Changes whenever the coordinate frame may have changed (new ARKit run, tracking lost). Observations carry the
     /// generation they were captured in, so a result from an earlier frame is never written next to a later one.
     var generation: Int { get }
+    /// Id of the saved world map this session is (or would be) relocalized against. Stored tracks belong to one map id
+    /// and are only visible while it equals this. A session with no usable saved map has a fresh id nothing stored uses.
+    var activeMapId: String? { get }
+    /// Runs `body` (with the active map id) only if the frame is relocalized and still the one captured as `generation`
+    /// (nil = whichever is current now), and returns nil otherwise. `WorldFrameGate` holds its lock across `body`, so a
+    /// reset or new session cannot land between the check and the writes. The default is a plain check-then-run for
+    /// simple conformers; callers still re-check with `isCurrent` just before committing.
+    func performIfCurrent<T>(generation: Int?, _ body: (_ mapId: String) throws -> T) rethrows -> T?
+    /// True when `mapId` is still the active map, relocalized, and the generation matches.
+    func isCurrent(mapId: String, generation: Int) -> Bool
 }
 
 extension CoordinatorFrameValidity {
     var generation: Int { 0 }
+    var activeMapId: String? { TrackStore.defaultMapId }
+
+    func performIfCurrent<T>(generation: Int?, _ body: (_ mapId: String) throws -> T) rethrows -> T? {
+        guard relocalized, generation == nil || generation == self.generation, let id = activeMapId else { return nil }
+        return try body(id)
+    }
+
+    func isCurrent(mapId: String, generation: Int) -> Bool {
+        relocalized && activeMapId == mapId && self.generation == generation
+    }
 }
 
 /// Test and legacy default: every stored position is trusted. The app wiring always supplies `WorldFrameGate`.
@@ -34,12 +54,14 @@ final class TrustedFrame: CoordinatorFrameValidity {
 /// A new ARKit run (launch, resume, "fresh Teach" reset) is a new frame and invalidates everything until the
 /// saved map is recognised again. Uses Teach's `RelocalizationMonitor` rule: normal tracking AND mapped status.
 final class WorldFrameGate: CoordinatorFrameValidity {
-    private let lock = NSLock()
+    /// Recursive so `performIfCurrent`'s body may read the gate (and a TrackStore scope closure may ask `activeMapId`).
+    private let lock = NSRecursiveLock()
     private let monitor: RelocalizationMonitor
     private let now: () -> Date
     private var frameStart: Date
     private var latched = false
     private var gen = 0
+    private var mapId = "fresh-" + UUID().uuidString
 
     init(now: @escaping () -> Date = { Date() }, monitor: RelocalizationMonitor = RelocalizationMonitor()) {
         self.now = now; self.monitor = monitor; self.frameStart = now()
@@ -47,8 +69,11 @@ final class WorldFrameGate: CoordinatorFrameValidity {
 
     /// ARKit session (re)started. `loadedSavedMap` is false when there was no usable map to relocalize against
     /// (none saved, corrupt, or a reset), so persisted targets stay refused for the whole session.
-    func sessionStarted(loadedSavedMap: Bool) {
+    /// `mapId` identifies the loaded archive (`WorldMapStore.currentMapId`). Without a loaded map (or without an id)
+    /// the session gets a fresh id, so it never sees, and never writes next to, tracks of an earlier map.
+    func sessionStarted(loadedSavedMap: Bool, mapId: String? = nil) {
         lock.lock(); defer { lock.unlock() }
+        self.mapId = (loadedSavedMap ? mapId : nil) ?? "fresh-" + UUID().uuidString
         frameStart = now()
         latched = false
         gen += 1
@@ -64,6 +89,19 @@ final class WorldFrameGate: CoordinatorFrameValidity {
 
     var relocalized: Bool { lock.lock(); defer { lock.unlock() }; return latched }
     var generation: Int { lock.lock(); defer { lock.unlock() }; return gen }
+
+    var activeMapId: String? { lock.lock(); defer { lock.unlock() }; return mapId }
+
+    func performIfCurrent<T>(generation g: Int?, _ body: (_ mapId: String) throws -> T) rethrows -> T? {
+        lock.lock(); defer { lock.unlock() }
+        guard latched, g == nil || g == gen else { return nil }
+        return try body(mapId)
+    }
+
+    func isCurrent(mapId id: String, generation g: Int) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        return latched && mapId == id && gen == g
+    }
 
     func isInCurrentFrame(createdAt isoTimestamp: String) -> Bool {
         lock.lock(); let start = frameStart; lock.unlock()

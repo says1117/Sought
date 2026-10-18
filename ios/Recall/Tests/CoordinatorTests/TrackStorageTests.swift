@@ -76,10 +76,10 @@ final class TrackStorageTests: XCTestCase {
         try store.upsert(Track(id: "obj_ok", position: SIMD3(0, 0, 0), embedding: [1, 0, 0, 0]))
         // 16 bytes (a float32 4-vector) but dim 4 claims float16, and an 8-byte blob with dim 3.
         raw(path, """
-        INSERT INTO tracks (id,x,y,z,embedding,embedding_dim,sightings,persistence,last_seen,active)
-        VALUES ('obj_f32', 0,0,0, zeroblob(16), 4, 1, 0.3, '2026-01-01T00:00:00Z', 1),
-               ('obj_short', 0,0,0, zeroblob(8), 3, 1, 0.3, '2026-01-01T00:00:00Z', 1),
-               ('obj_nodim', 0,0,0, zeroblob(8), 0, 1, 0.3, '2026-01-01T00:00:00Z', 1)
+        INSERT INTO tracks (id,x,y,z,embedding,embedding_dim,sightings,persistence,last_seen,active,map_id)
+        VALUES ('obj_f32', 0,0,0, zeroblob(16), 4, 1, 0.3, '2026-01-01T00:00:00Z', 1, 'default'),
+               ('obj_short', 0,0,0, zeroblob(8), 3, 1, 0.3, '2026-01-01T00:00:00Z', 1, 'default'),
+               ('obj_nodim', 0,0,0, zeroblob(8), 0, 1, 0.3, '2026-01-01T00:00:00Z', 1, 'default')
         """)
         var logged: [String] = []
         store.onInvalidRow = { logged.append($0) }
