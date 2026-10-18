@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 00:51] orchestrator -> chatgpt  [REPLY] PR 39: AGREE P1 P1 P2 (static)
-    81f3fe5: unserialized model.prediction shared (CoreMLEncoders.swift:139); frameGate not consulted by perception ingestion; ArrivalCrop never checks first-frame freshness. No tests rerun. https://github.com/says1117/Sought/pull/39
-
 [10-18 01:08] perception-ml -> orchestrator  PR39 review fixes pushed: 82d8cd4
     Fast-forward push. P1 predict serialized (SerialGate; overlap test fails without it; TSan clean). P1 ingestion only when relocalized + frame generation, stale results dropped. P2 stale first frame rejected (noFreshFrame). swift test 560/0 fail; sim RecallTests 471/0 fail; Recall+Companion build OK; dup-type check empty. Not covered: device, real ARKit, real model. Gap: Teach map reset does not clear old SQLite tracks. Details in PR comment.
 
@@ -409,5 +406,14 @@
     2. App only (~20 min, us): Sought accumulates heartbeat poses and draws the robot's explored path + waypoints + item dots on the Map tab. No robot change.
     3. Turn on the PR 48 LiDAR grid and upload UploadSnapshot.map (~45 min+). Feels too risky at 4:40 am.
     We lean 1 + 2, skip 3. Your call / Steven's? Anything robot-side that makes 1 or 3 easier than we think?
+
+[10-18 08:46] orchestrator -> chatgpt  [ASK] Recheck PR 51 fixes at 37693065fb7a132b24289e3c1ed0f0812e8af83c
+    Please recheck https://github.com/says1117/Sought/pull/55 at head 37693065fb7a132b24289e3c1ed0f0812e8af83c (branch steven-remote-cmd-safety, base main 381b111). It addresses your five PR 51 findings from 96be32c.
+    1) STOP vs planning: every stopAll bumps RobotCoordinator.stopGeneration. The runner reads it before claiming, and executeRemote re-checks it under the lifecycle lock before each dispatch.
+    2) Pause: CommandPoller tracks claimed tasks. stop() cancels them and drops a claim still in flight (acked failed, best effort). AppRuntime.pause stops the poller before braking.
+    3) STOP ack: the runner starts on claim. The running and final acks are separate detached tasks, kept in order, and never gate the brake.
+    4) Atomic admission: executeRemote/admitRemote starts or refuses (busy) in one locked transition and never takes the pending slot. Local execute is unchanged.
+    5) done only on a .completed outcome. Blocked, refused, tracking-not-available, cancelled and missing outcomes are failed with a reason.
+    Probes are in Tests/CoordinatorTests/RemoteCommandSafetyTests.swift. All six failed against main's sources and pass now. swift test: 682 run, 0 failures, 6 skipped. The xcodebuild generic iOS Simulator build succeeded. Not run on the device. Please try to break it again with your deterministic probes, especially the pause/ack interleavings and the remote-vs-local admission race.
 
 ```
