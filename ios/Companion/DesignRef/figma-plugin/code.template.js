@@ -190,8 +190,8 @@ async function text(parent, str, fam, style, size, color, x, y, w, opts = {}) {
   return t;
 }
 
-function photo(parent, hash, x, y, w, h, shadeTo = 0.31) {
-  const r = rect(parent, x, y, w, h, 8);
+function photo(parent, hash, x, y, w, h, shadeTo = 0.31, radius = 20) {
+  const r = rect(parent, x, y, w, h, radius);
   r.fills = [
     { type: 'IMAGE', imageHash: hash, scaleMode: 'FILL' },
     gradient(VERTICAL, [[0, '#0F1E24', 0], [1 - shadeTo, '#39738A', 0.13], [0.98, '#0F1E24', 1]]),
@@ -223,7 +223,7 @@ async function itemCard(parent, x, y, hash, title, meta) {
   photo(card, hash, 0, 0, 169, 141);
   await text(card, title, 'Geist', 'SemiBold', 12, '#24414B', 0, 149, 158);
   await text(card, meta, 'Geist', 'Light', 12, '#24414B', 0, 167, 158);
-  const pill = frame(card, 'Find it', 0, 189, 158, 22, 36);
+  const pill = frame(card, 'Find it', 0, 189, 158, 22, 11);
   pill.fills = [solid('#24414B')];
   const icon = await cloneInto(pill, NODE.search, 45, 5, 12, 12);
   recolor(icon, '#EEF4F5');
@@ -237,9 +237,9 @@ async function homeV2(parent, x, y) {
   await background(f, W, H);
 
   // Badge + status pill
-  const badge = frame(f, 'Sample badge', 24, 62, 140, 26, 13);
+  const badge = frame(f, 'Sample badge', 24, 64, 112, 22, 11);
   badge.fills = [solid('#B7790F')];
-  await text(badge, 'SAMPLE DATA', 'JetBrains Mono', 'Bold', 13, '#FAFCFC', 30, 4, null, { tracking: 1 });
+  await text(badge, 'SAMPLE DATA', 'JetBrains Mono', 'Bold', 11, '#FAFCFC', 22, 4, null, { tracking: 0.6 });
   const pill = frame(f, 'Status pill', 172, 62, 206, 26, 13);
   await applyGlass(pill, 'Pill');
   const dot = figma.createEllipse(); pill.appendChild(dot); dot.resize(6, 6); dot.x = 12; dot.y = 10; dot.fills = [solid('#22D3EE')];
@@ -257,19 +257,20 @@ async function homeV2(parent, x, y) {
   recolor(await cloneInto(search, NODE.mic, 314, 16), '#24414B');
 
   // Map widget (cloned from Home hi-fi)
-  await cloneInto(f, NODE.mapWidget, 24, 294);
+  const mw = await cloneInto(f, NODE.mapWidget, 24, 294);
+  if (mw && 'cornerRadius' in mw) { mw.cornerRadius = 26; mw.clipsContent = true; }
 
   // Card grid: glass Call + glass Activity | tall Live View
-  const call = frame(f, 'Call SoughtBot (glass)', 24, 451, 169, 87, 8);
+  const call = frame(f, 'Call SoughtBot (glass)', 24, 451, 169, 87, 26);
   await applyGlass(call, 'Call');
   recolor(await cloneInto(call, NODE.eye, 12, 25), '#FAFCFC');
   await text(call, 'Call\nSoughtBot', 'JetBrains Mono', 'Bold', 16, '#FAFCFC', 56, 23, 105);
-  const act = frame(f, 'Activity log (glass)', 24, 554, 169, 147, 8);
+  const act = frame(f, 'Activity log (glass)', 24, 554, 169, 147, 26);
   await applyGlass(act, 'Activity');
   await text(act, 'Activity log', 'Geist', 'SemiBold', 14, '#0B5F66', 16, 16, 137);
   await text(act, 'Slippers moved to front door', 'Geist', 'Regular', 16, '#0B5F66', 16, 41, 137);
   await text(act, '2 hours ago', 'Geist', 'Light', 14, '#0B5F66', 16, 110, 137);
-  photo(f, IMG.liveview, 209, 451, 169, 250, 0.48).name = 'Live View';
+  photo(f, IMG.liveview, 209, 451, 169, 250, 0.48, 26).name = 'Live View';
   await text(f, 'Live View', 'Geist', 'Bold', 20, '#FAFCFC', 217, 664);
   recolor(await cloneInto(f, NODE.video, 317, 666), '#FAFCFC');
 
@@ -297,6 +298,7 @@ async function homeV2(parent, x, y) {
   // Notes
   await text(parent, 'Home v2: search is the hero and pins to the top as glass while content scrolls under it. ' +
     'Glass = Glass/* fill + effect style + 1 px white diagonal edge. Tab band is opaque so nothing shows through. ' +
+    'Corners are continuous: cards 26, photos and rows 20, tiles 16, thumbnails 12, buttons capsules. ' +
     'Live View keeps full height. Frame is the full scroll length; the phone shows the top 874.',
     'Geist', 'Regular', 14, '#24414B', x, y + H + 24, W);
   const fold = rect(f, 0, 874, W, 1); fold.fills = [solid('#C8412C', 0.6)]; fold.name = 'Fold (874)';
@@ -309,6 +311,7 @@ const SHOTS = [
   ['home_scrolled', 'Home v2, scrolled (search pinned)'], ['items', 'Item Log'], ['detail', 'Item detail'],
   ['map', 'Map'], ['settings', 'Settings'], ['find_confirm', 'Find 1: confirm'], ['find_searching', 'Find 2: searching'],
   ['find_guiding', 'Find 3: guiding'], ['find_found', 'Find 4: found'], ['find_notseen', 'Find: not seen yet'],
+  ['map_room', 'Map: room + pin card'], ['map_list', 'Map: item list'], ['home_stuck', 'Home: Soughtbot stuck (amber glow)'],
 ];
 
 async function screenshots(parent, x, y) {
