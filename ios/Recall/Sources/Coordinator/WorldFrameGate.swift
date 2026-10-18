@@ -69,6 +69,10 @@ struct MapAdoption: Equatable {
 /// A new ARKit run (launch, resume, "fresh Teach" reset) is a new frame and invalidates everything until the
 /// saved map is recognised again. Uses Teach's `RelocalizationMonitor` rule: a limited -> normal transition after a
 /// run with the saved map. Saving a map in Teach adopts the running session as that map (`adoptSavedMap`).
+/// Inside one run, limited tracking (excessive motion from a Scan-here spin, few features) keeps the latch, and a
+/// frame-reported `.notAvailable` without an interruption re-latches on the next normal: the run's world origin only
+/// moves on `.resetTracking` (see `RelocalizationMonitor` for the ARKit references). An interruption or a new run
+/// still needs real relocalization. `statusDetail` says why and when recognition was last lost or refused.
 final class WorldFrameGate: CoordinatorFrameValidity {
     /// Recursive so `performIfCurrent`'s body may read the gate (and a TrackStore scope closure may ask `activeMapId`).
     private let lock = NSRecursiveLock()
@@ -81,6 +85,8 @@ final class WorldFrameGate: CoordinatorFrameValidity {
     /// True while `mapId` names a saved map (loaded at session start, or adopted after Save map).
     private var realMap = false
     private var waypointCutoff: Date?
+    /// Why recognition last changed (lost, waiting, recognised), with a wall-clock time, for the Memory note and Teach.
+    private var detail: String?
 
     init(now: @escaping () -> Date = { Date() }, monitor: RelocalizationMonitor = RelocalizationMonitor()) {
         self.now = now; self.monitor = monitor; self.frameStart = now()
@@ -101,17 +107,43 @@ final class WorldFrameGate: CoordinatorFrameValidity {
         latched = false
         gen += 1
         monitor.start(hasSavedMap: loadedSavedMap)
+        detail = loadedSavedMap ? "waiting: new AR run at \(stamp()), needs the room recognised"
+            : "no saved map in this AR run (\(stamp()))"
     }
 
     /// Feed every tracking/mapping change. `relocalizing` is true for `limited(.relocalizing)`.
-    /// Losing tracking entirely drops the recognition (ARKit may re-anchor) until ARKit relocalizes again.
+    /// Limited tracking keeps the latch (same run, same frame). A `.notAvailable` here is the same run without an
+    /// interruption (`interrupted` is called first for those): drop the latch and move the generation so captures
+    /// taken while lost are not written, then re-latch on the next `.normal`.
     func update(tracking: TrackingKind, mapping: MappingKind, relocalizing: Bool = false) {
         lock.lock(); defer { lock.unlock() }
         if tracking == .notAvailable {
-            if latched { gen += 1; latched = false; monitor.rearmAfterLoss() } else { monitor.trackingLost() }
+            if latched {
+                gen += 1; latched = false; monitor.rearmInRun()
+                detail = "lost: tracking unavailable at \(stamp()) (no interruption), back on next normal tracking"
+            } else {
+                monitor.trackingDropped()
+            }
             return
         }
-        if monitor.update(tracking: tracking, mapping: mapping, relocalizing: relocalizing) == .relocalized { latched = true }
+        if !latched, monitor.update(tracking: tracking, mapping: mapping, relocalizing: relocalizing) == .relocalized {
+            latched = true
+            detail = "recognised at \(stamp())"
+        }
+    }
+
+    /// ARKit reported an interruption (or the session failed). The device may have moved while ARKit was not
+    /// tracking, so recognition needs `limited(.relocalizing)` -> `.normal` again. Call BEFORE publishing the
+    /// `.notAvailable` tracking state, so `update` does not treat it as an in-run drop.
+    func interrupted(_ why: String = "AR interrupted") {
+        lock.lock(); defer { lock.unlock() }
+        if latched {
+            gen += 1; latched = false; monitor.rearmAfterLoss()
+            detail = "lost: \(why) at \(stamp()), needs relocalizing"
+        } else {
+            monitor.interrupted()
+            if realMap { detail = "waiting: \(why) at \(stamp()), needs relocalizing" }
+        }
     }
 
     /// Teach saved the running session's world map as `mapId`. `getCurrentWorldMap` snapshots this session, so its
@@ -131,6 +163,7 @@ final class WorldFrameGate: CoordinatorFrameValidity {
         latched = true
         gen += 1
         monitor.startFreshTeach()   // nothing to wait for; a later tracking loss re-arms it
+        detail = "map saved and in use at \(stamp())"
         return result
     }
 
@@ -148,6 +181,15 @@ final class WorldFrameGate: CoordinatorFrameValidity {
     }
 
     var activeMapId: String? { lock.lock(); defer { lock.unlock() }; return mapId }
+
+    /// Last recognition change with its time, e.g. "lost: AR interrupted at 03:41:07, needs relocalizing".
+    var statusDetail: String? { lock.lock(); defer { lock.unlock() }; return detail }
+
+    private func stamp() -> String {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm:ss"
+        return f.string(from: now())
+    }
 
     func performIfCurrent<T>(generation g: Int?, _ body: (_ mapId: String) throws -> T) rethrows -> T? {
         lock.lock(); defer { lock.unlock() }

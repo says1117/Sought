@@ -61,6 +61,49 @@ final class RelocalizationMonitorTests: XCTestCase {
         XCTAssertEqual(m.update(tracking: .normal, mapping: .mapped), .relocalized)
     }
 
+    func testRearmInRunRecoversOnNextNormal() {
+        let m = RelocalizationMonitor(clock: FakeClock())
+        m.startFreshTeach()
+        m.rearmInRun()
+        XCTAssertEqual(m.state, .waiting(elapsed: 0))
+        XCTAssertEqual(m.update(tracking: .limited, mapping: .limited), .waiting(elapsed: 0), "excessive motion")
+        XCTAssertEqual(m.update(tracking: .normal, mapping: .limited), .relocalized)
+    }
+
+    // Steven's phone after Scan here: "Rescan needed" and never recovered. An in-run drop must recover even late.
+    func testRearmInRunRecoversAfterRescanNeeded() {
+        let c = FakeClock(); let m = RelocalizationMonitor(clock: c)
+        m.startFreshTeach()
+        m.rearmInRun()
+        c.t += 25
+        XCTAssertEqual(m.tick(), .rescanNeeded)
+        XCTAssertEqual(m.update(tracking: .limited, mapping: .limited), .rescanNeeded, "excessive motion")
+        XCTAssertEqual(m.update(tracking: .normal, mapping: .mapped), .relocalized)
+    }
+
+    func testInterruptionAfterRearmInRunNeedsRelocalizing() {
+        let m = RelocalizationMonitor(clock: FakeClock())
+        m.startFreshTeach()
+        m.rearmInRun()
+        m.interrupted()
+        XCTAssertEqual(m.update(tracking: .normal, mapping: .mapped), .waiting(elapsed: 0))
+        XCTAssertEqual(m.update(tracking: .limited, mapping: .limited), .waiting(elapsed: 0))
+        XCTAssertEqual(m.update(tracking: .normal, mapping: .mapped), .waiting(elapsed: 0))
+        XCTAssertEqual(m.update(tracking: .limited, mapping: .limited, relocalizing: true), .waiting(elapsed: 0))
+        XCTAssertEqual(m.update(tracking: .normal, mapping: .mapped), .relocalized)
+    }
+
+    func testTrackingDroppedKeepsAnEarlierInterruptionRequirement() {
+        let m = RelocalizationMonitor(clock: FakeClock())
+        m.start(hasSavedMap: true)
+        m.interrupted()
+        m.trackingDropped()
+        XCTAssertEqual(m.update(tracking: .limited, mapping: .limited), .waiting(elapsed: 0))
+        XCTAssertEqual(m.update(tracking: .normal, mapping: .mapped), .waiting(elapsed: 0))
+        XCTAssertEqual(m.update(tracking: .limited, mapping: .limited, relocalizing: true), .waiting(elapsed: 0))
+        XCTAssertEqual(m.update(tracking: .normal, mapping: .mapped), .relocalized)
+    }
+
     func testRescanNeededAtTwentySeconds() {
         let c = FakeClock(); let m = RelocalizationMonitor(clock: c)
         m.start(hasSavedMap: true)
