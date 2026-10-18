@@ -18,8 +18,9 @@ Screenshot hooks (launch arguments): `-tab items|map|settings`, `-search "red um
 cd ios/Recall && xcodebuild test -project Recall.xcodeproj -scheme Companion -destination 'platform=iOS Simulator,name=<iPhone>'
 ```
 
-`Tests/SoughtLogicTests.swift` (12 unit tests): status copy and offline rule, activity events, search matching, pins
-never counting as finds, pin place names, backend date and config parsing. `UITests/` runs the accessibility audit.
+`Tests/SoughtLogicTests.swift` (13 unit tests): status copy and offline rule, activity events, search matching, pins
+never counting as finds, pin place names, backend date and config parsing. `Tests/CommandClientTests.swift` (7): the
+remote command client against a fake transport (request shape, poll to done, failed, busy, timeout, error copy). `UITests/` runs the accessibility audit.
 
 ## Accessibility audit
 
@@ -48,7 +49,7 @@ glass and custom fonts (the file says how each was checked by hand). Large text:
 Two sources behind one `RobotSource`:
 
 - `MockRobotSource`: sample data from the Figma, always labeled SAMPLE DATA. Used when no server is configured or when Settings > Use sample data is on.
-- `BackendRobotSource`: reads `GET /api/robot/status` (2 s), `/api/objects`, `/api/waypoints`, `/api/map`, `/api/metadata` (10 s) and `/media/{id}.jpg`. Keeps the SAMPLE DATA badge on when the server reports `mock: true`. Read-only: a find shows where Soughtbot last saw the item, since there is no command route yet (T-070).
+- `BackendRobotSource`: reads `GET /api/robot/status` (2 s), `/api/objects`, `/api/waypoints`, `/api/map`, `/api/metadata` (10 s) and `/media/{id}.jpg`. Keeps the SAMPLE DATA badge on when the server reports `mock: true`. Find and Come to me send commands (contract 2.9, `CommandClient`): `POST /api/commands {"text": "find red umbrella"}` or `"go to kitchen table"` (a taught spot name), then `GET /api/commands/{id}` every 1 s until done or failed (90 s timeout). The Find flow shows queued, running, then the robot's `result` words; cancel sends `"stop"`. A server without the command route (404) falls back to showing where Soughtbot last saw the item.
 
 Configure with the same keys as the robot app (`BACKEND_BASE_URL`, `RECALL_TOKEN` in the gitignored `Config/Secrets.xcconfig`), or type the address and token in Settings > Connection (token goes to the Keychain).
 
@@ -59,5 +60,5 @@ Peer-link messages (`robot_status`, `objects_digest`, `find`) are a documented f
 ## Not done or not verified
 
 - Not run on a physical iPhone. Speech input and haptics are untested on device.
-- Come to me (T-068) is the waypoint version on sample data: pick where you are, Soughtbot drives there and stops about 1 m short. Real wiring needs the command route (T-067, T-070) and waits for the first real find.
+- Come to me (T-068) is the waypoint version: pick where you are, and with a server it sends `go to <spot>`. Commands were run in the simulator against a local stub server only, not yet against the real backend and robot.
 - `ComeToMeTestView` (Settings > For testing) is the original T-028 UWB screen, unchanged in behavior.

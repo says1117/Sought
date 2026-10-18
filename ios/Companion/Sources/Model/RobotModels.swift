@@ -121,11 +121,15 @@ struct MapSnapshot: Equatable {
 // MARK: - Find
 
 enum FindPhase: Equatable {
+    /// Backend source: the command is on the server, waiting for Soughtbot to pick it up (contract 2.9 "queued").
+    case queued
     case searching               // robot is checking memory / planning
     case driving(distanceM: Double?)
     case arrived
     /// Backend source: no way to send Soughtbot yet, so the app shows where it last saw the item.
     case remembered
+    /// Backend source: the robot finished the command and said this (contract 2.9 "result").
+    case reported(result: String)
     case notFound
     case failed(reason: String)
     case cancelled
@@ -171,4 +175,6 @@ enum ComePhase: Equatable {
 struct ComeProgress: Equatable {
     var target: ComeTarget
     var phase: ComePhase
+    /// Backend source: what the robot said when the command finished.
+    var result: String? = nil
 }

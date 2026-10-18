@@ -212,4 +212,15 @@ final class MockRobotSource: RobotSource {
         status.state = .idle
         status.task = nil
     }
+
+    /// Walks a command through queued, running, done on sample data. Find and Come to me keep their own walks above.
+    override func sendCommand(_ text: String, onUpdate: @escaping (RobotCommand) -> Void = { _ in }) async throws -> RobotCommand {
+        var cmd = RobotCommand(id: "cmd_sample\(Int.random(in: 100_000...999_999))", text: text, created_at: nil, status: .queued, result: nil)
+        onUpdate(cmd)
+        try await Task.sleep(nanoseconds: 800_000_000)
+        cmd.status = .running; onUpdate(cmd)
+        try await Task.sleep(nanoseconds: 1_500_000_000)
+        cmd.status = .done; cmd.result = "Sample: Soughtbot would run \u{201C}\(text)\u{201D}."; onUpdate(cmd)
+        return cmd
+    }
 }
