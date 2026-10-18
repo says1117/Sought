@@ -221,7 +221,8 @@ struct FindFlowView: View {
     private func secondary(_ s: String, id: String, _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(s).font(SoughtFont.button).foregroundStyle(p.text).frame(maxWidth: .infinity, minHeight: 52)
-                .background(Capsule().stroke(p.text, lineWidth: 1.5))
+                .soughtGlass(.pill, in: Capsule())
+                .overlay(Capsule().strokeBorder(p.text, lineWidth: 1.5))
         }
         .buttonStyle(.plain).accessibilityIdentifier(id)
     }

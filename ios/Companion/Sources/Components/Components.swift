@@ -95,9 +95,9 @@ struct ScreenHeader: View {
             HStack(alignment: .firstTextBaseline) {
                 titleText
                 Spacer(minLength: Space.s)
-                StatusLine(singleLine: true)
+                StatusPill()
             }
-            VStack(alignment: .leading, spacing: Space.xs) { titleText; StatusLine() }
+            VStack(alignment: .leading, spacing: Space.xs) { titleText; StatusPill(singleLine: false) }
         }
     }
 
@@ -156,7 +156,7 @@ struct SearchBar: View {
         }
         .padding(.leading, Space.l)
         .padding(.trailing, 6)
-        .frame(height: height)
+        .frame(minHeight: height)
         .soughtGlass(.search, in: Capsule())
         .modifier(OptionalHero(id: heroKey))
         .onChange(of: speech.transcript) { _, t in if !t.isEmpty { text = t } }
@@ -211,6 +211,7 @@ struct ItemCard: View {
     var onOpen: (TrackedObject) -> Void
     @EnvironmentObject private var robot: RobotSource
     @EnvironmentObject private var router: Router
+    @Environment(\.dynamicTypeSize) private var dts
     private var heroKey: String { "\(heroPrefix)-\(item.id)" }
     @Environment(\.palette) private var p
 
@@ -223,9 +224,9 @@ struct ItemCard: View {
             }
             .buttonStyle(.plain)
             VStack(alignment: .leading, spacing: Space.xs) {
-                Text(item.label).font(SoughtFont.cardTitle).foregroundStyle(p.text).lineLimit(2)
+                Text(item.label).font(SoughtFont.cardTitle).foregroundStyle(p.text).lineLimit(dts.isAccessibilitySize ? 4 : 2)
                 Text("\(item.whereText): \(StatusCopy.ago(item.lastSeen, now: robot.now))")
-                    .font(SoughtFont.cardMeta).foregroundStyle(p.text).lineLimit(2)
+                    .font(SoughtFont.cardMeta).foregroundStyle(p.text).lineLimit(dts.isAccessibilitySize ? 5 : 2)
                 FindItButton { router.pendingHero = heroKey; onFind(item) }.padding(.top, Space.xs)
             }
             .frame(width: width - 11, alignment: .leading)
@@ -241,6 +242,13 @@ struct ItemCard: View {
     }
 }
 
+/// Card width that grows with text size so names and places do not truncate.
+func itemCardWidth(_ dts: DynamicTypeSize, base: CGFloat = 169) -> CGFloat {
+    if dts.isAccessibilitySize { return 280 }
+    if dts >= .xxxLarge { return max(base, 200) }
+    return base
+}
+
 struct ItemRow: View {
     let title: String
     let items: [TrackedObject]
@@ -249,6 +257,7 @@ struct ItemRow: View {
     var onFind: (TrackedObject) -> Void
     var onOpen: (TrackedObject) -> Void
     @Environment(\.palette) private var p
+    @Environment(\.dynamicTypeSize) private var dts
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s) {
@@ -261,7 +270,7 @@ struct ItemRow: View {
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(alignment: .top, spacing: Space.l) {
-                        ForEach(items) { ItemCard(item: $0, heroPrefix: title, onFind: onFind, onOpen: onOpen) }
+                        ForEach(items) { ItemCard(item: $0, width: itemCardWidth(dts), heroPrefix: title, onFind: onFind, onOpen: onOpen) }
                     }
                     .padding(.horizontal, Space.margin)
                     .padding(.vertical, Space.s)
@@ -283,7 +292,7 @@ struct SampleBanner: View {
     var body: some View {
         if robot.isSample {
             HStack(spacing: 4) {
-                Image(systemName: "flask").font(.system(size: 10, weight: .bold))
+                Image(systemName: "flask").font(SoughtFont.badge)
                 Text("SAMPLE DATA").font(SoughtFont.badge).tracking(0.6)
             }
             .foregroundStyle(p.onPrimary)

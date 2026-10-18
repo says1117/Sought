@@ -53,9 +53,10 @@ struct MapCanvas: View {
                     ForEach(map.rooms) { r in
                         VStack(spacing: 0) {
                             Text(r.name.uppercased()).font(SoughtFont.findIt).tracking(0.8)
-                            if let n = roomCounts[r.name] { Text("\(n) \(n == 1 ? "item" : "items")").font(SoughtFont.cardMeta) }
+                            if let n = roomCounts[r.name] { Text("\(n) \(n == 1 ? "item" : "items")").font(SoughtFont.cardTitle) }
                         }
-                        .foregroundStyle(p.text.opacity(focusRoom == nil || focusRoom == r.name ? 0.85 : 0.35))
+                        .foregroundStyle(p.text.opacity(focusRoom == nil || focusRoom == r.name ? 1 : 0.4))
+                        .dynamicTypeSize(...DynamicTypeSize.large)   // drawn into the map; chips and list carry it at full size
                         .scaleEffect(markerScale)
                         .position(tf.point((r.minX + r.maxX) / 2, r.maxZ - 0.35))
                         .accessibilityHidden(true)
@@ -102,8 +103,7 @@ struct MapCanvas: View {
                     .scaleEffect(markerScale)
                     .position(pt)
                     .zIndex(3)
-                    .accessibilityElement()
-                    .accessibilityLabel("Soughtbot")
+                    .accessibilityHidden(true)   // the map container's label says where Soughtbot is
                     .animation(reduceMotion ? nil : .easeInOut(duration: 1.6), value: r)
                 }
             }

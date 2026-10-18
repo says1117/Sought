@@ -50,14 +50,14 @@ struct Palette {
         title: Color(hex: 0x3E7C8A), sectionTitle: Color(hex: 0x2E4A66), text: Color(hex: 0x24414B),
         textOnDark: Color(hex: 0xFAFCFC), placeholder: Color(hex: 0x434C4E),
         primary: Color(hex: 0x24414B), call: Color(hex: 0x2F6672),
-        activityText: Color(hex: 0x0B5F66), activityFill: Color(red: 150 / 255, green: 226 / 255, blue: 238 / 255, opacity: 0.2),
+        activityText: Color(hex: 0x094E55), activityFill: Color(red: 150 / 255, green: 226 / 255, blue: 238 / 255, opacity: 0.2),
         searchFill: Color(red: 152 / 255, green: 193 / 255, blue: 205 / 255, opacity: 0.15),
         micFill: Color(red: 152 / 255, green: 193 / 255, blue: 205 / 255, opacity: 0.26),
         tabGlass: Color(red: 87 / 255, green: 169 / 255, blue: 178 / 255, opacity: 0.2),
         tabGradientTop: Color(red: 187 / 255, green: 203 / 255, blue: 204 / 255, opacity: 0),
         tabGradientBottom: Color(hex: 0x57A9B2),
         mapRoom: Color(hex: 0xE3EBED), mapWall: Color(hex: 0xA9C3CA), mapPath: Color(hex: 0x0E7C86),
-        signal: Color(hex: 0x22D3EE), searching: Color(hex: 0xB7790F), found: Color(hex: 0x1F9D6B), alert: Color(hex: 0xC8412C),
+        signal: Color(hex: 0x22D3EE), searching: Color(hex: 0x8F5E0A), found: Color(hex: 0x1F9D6B), alert: Color(hex: 0xC8412C),
         photoShade: Color(hex: 0x0F1E24))
 
     // High contrast: the dark token set from the plan (night background, glacier text).

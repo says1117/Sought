@@ -111,7 +111,8 @@ struct MapWidget: View {
                            startPoint: .top, endPoint: .bottom)
                 .allowsHitTesting(false)
             Text(robot.currentRoom ?? (robot.status.isOnline(now: robot.now) ? "Mapping" : "Last known spot"))
-                .font(SoughtFont.mapLabel).foregroundStyle(Color(hex: 0x0F1E24))
+                .font(SoughtFont.mapLabel).foregroundStyle(p.isHighContrast ? p.text : Color(hex: 0x0F1E24))
+                .padding(.trailing, 4)   // italic overhang
                 .padding(.horizontal, Space.l).padding(.bottom, Space.s)
         }
         .frame(height: 141)

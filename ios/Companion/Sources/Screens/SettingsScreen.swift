@@ -18,19 +18,19 @@ struct SettingsScreen: View {
                         Text("Sought is showing sample data. Real items appear once Soughtbot shares what it has seen.")
                             .font(SoughtFont.cardMeta)
                     }
-                } header: { Text("Soughtbot") }
+                } header: { Text("Soughtbot").foregroundStyle(p.text) }
                 .listRowBackground(p.surface)
 
                 Section {
                     TextField("Your name", text: $settings.userName).textContentType(.givenName)
-                } header: { Text("You") }
+                } header: { Text("You").foregroundStyle(p.text) }
                 .listRowBackground(p.surface)
 
                 Section {
                     Toggle("High contrast", isOn: $settings.highContrast)
                     Toggle("Speak updates", isOn: $settings.voiceFeedback)
                     Toggle("Haptics while guiding", isOn: $settings.haptics)
-                } header: { Text("Seeing and hearing") } footer: {
+                } header: { Text("Seeing and hearing").foregroundStyle(p.text) } footer: {
                     Text("Sought also follows your iPhone's text size, Reduce Motion and Reduce Transparency settings.")
                 }
                 .listRowBackground(p.surface)
@@ -38,12 +38,12 @@ struct SettingsScreen: View {
                 Section {
                     Text("Video and Soughtbot's memory of your home stay on your devices. Only item photos, names, positions and status are shared with this app.")
                     Text("Sample data is always labeled. Nothing in Sought pretends to be live when it is not.")
-                } header: { Text("Privacy") }
+                } header: { Text("Privacy").foregroundStyle(p.text) }
                 .listRowBackground(p.surface)
 
                 Section {
                     Button("Come to me test (two iPhones)") { showComeToMeTest = true }
-                } header: { Text("For testing") } footer: {
+                } header: { Text("For testing").foregroundStyle(p.text) } footer: {
                     Text("Ultra Wideband distance test from the original companion app. Needs the robot phone nearby.")
                 }
                 .listRowBackground(p.surface)

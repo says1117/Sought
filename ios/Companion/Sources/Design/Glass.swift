@@ -11,7 +11,7 @@ enum GlassStyle {
         switch self {
         case .search: Color(hex: 0x98C1CD, alpha: 0.45)
         case .activity: Color(red: 150 / 255, green: 226 / 255, blue: 238 / 255, opacity: 0.32)
-        case .call: p.call.opacity(0.9)              // keeps white text above 5:1
+        case .call: p.call.opacity(0.96)             // keeps white text above 5:1 even over the busy glow
         case .pill: Color.white.opacity(0.28)
         case .tabBar: Color(hex: 0x57A9B2, alpha: 0.35)
         case .sheet: Color.white.opacity(0.35)

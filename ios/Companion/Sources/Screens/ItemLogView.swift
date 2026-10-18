@@ -74,6 +74,7 @@ struct ItemLogView: View {
 
 struct ItemDetailView: View {
     let itemId: String
+    @Environment(\.dynamicTypeSize) private var dts
     @EnvironmentObject private var robot: RobotSource
     @EnvironmentObject private var router: Router
     @Environment(\.palette) private var p
@@ -118,7 +119,8 @@ struct ItemDetailView: View {
                 Button { toggleEssential(item) } label: {
                     Label(item.isEssential ? "Remove from Essentials" : "Pin as Essential", systemImage: item.isEssential ? "pin.slash" : "pin")
                         .font(SoughtFont.button).foregroundStyle(p.text).frame(maxWidth: .infinity, minHeight: 50)
-                        .background(Capsule().stroke(p.text, lineWidth: 1.5))
+                        .soughtGlass(.pill, in: Capsule())
+                        .overlay(Capsule().strokeBorder(p.text, lineWidth: 1.5))
                 }
                 if item.history.count > 1 {
                     Text("History").font(SoughtFont.sectionTitle).foregroundStyle(p.sectionTitle).accessibilityAddTraits(.isHeader)
@@ -140,9 +142,14 @@ struct ItemDetailView: View {
     }
 
     private func fact(_ k: String, _ v: String) -> some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(k.uppercased()).font(SoughtFont.readout).foregroundStyle(p.text.opacity(0.8)).frame(width: 100, alignment: .leading)
-            Text(v).font(SoughtFont.body).foregroundStyle(p.text)
+        let key = Text(k.uppercased()).font(SoughtFont.readout).foregroundStyle(p.text)
+        let value = Text(v).font(SoughtFont.body).foregroundStyle(p.text)
+        return Group {
+            if dts >= .xxxLarge {
+                VStack(alignment: .leading, spacing: 2) { key; value }
+            } else {
+                HStack(alignment: .firstTextBaseline) { key.frame(width: 100, alignment: .leading); value }
+            }
         }
         .accessibilityElement(children: .combine)
     }

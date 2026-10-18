@@ -20,24 +20,37 @@ struct SoughtApp: App {
     }
 }
 
-/// Keeps every tab alive (scroll position survives) and crossfades between them.
+/// Crossfades between tabs. Only the selected tab (and the one fading out) exists, so VoiceOver can never land on
+/// an invisible tab. Keeping every tab alive at opacity 0 left their text in the accessibility tree (Settings' Form
+/// ignored accessibilityHidden), which the accessibility audit caught. Trade-off: a tab's scroll position resets.
 struct TabContainer: View {
     let selection: AppTab
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("homeV1") private var homeV1 = false
+    @State private var fading: AppTab?
 
     var body: some View {
         ZStack {
             ForEach(AppTab.allCases) { tab in
                 let on = tab == selection
-                page(tab)
-                    .opacity(on ? 1 : 0)
-                    .offset(y: on || reduceMotion ? 0 : 8)
-                    .allowsHitTesting(on)
-                    .accessibilityHidden(!on)
+                if on || tab == fading {
+                    page(tab)
+                        .opacity(on ? 1 : 0)
+                        .offset(y: on || reduceMotion ? 0 : 8)
+                        .allowsHitTesting(on)
+                        .accessibilityHidden(!on)
+                        .transition(.opacity)
+                }
             }
         }
         .animation(reduceMotion ? Motion.fade : Motion.spring, value: selection)
+        .onChange(of: selection) { old, _ in
+            fading = old
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 450_000_000)
+                if fading == old { fading = nil }
+            }
+        }
     }
 
     @ViewBuilder private func page(_ t: AppTab) -> some View {

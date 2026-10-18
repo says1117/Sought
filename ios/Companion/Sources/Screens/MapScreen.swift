@@ -20,6 +20,7 @@ struct MapScreen: View {
     @State private var userZoom: CGFloat = 1
     @State private var pan: CGSize = .zero
     @GestureState private var livePan: CGSize = .zero
+    @Environment(\.dynamicTypeSize) private var dts
 
     enum Sort: String, CaseIterable, Identifiable { case recent = "Recent", nearest = "Nearest", name = "A to Z"; var id: String { rawValue } }
 
@@ -156,7 +157,8 @@ struct MapScreen: View {
         .animation(reduceMotion ? Motion.fade : Motion.spring, value: room)
         .animation(reduceMotion ? Motion.fade : .easeInOut(duration: 1.2), value: follow ? robot.status.pose : nil)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Floor map" + (room.map { ", showing the \($0.lowercased())" } ?? ""))
+        .accessibilityLabel("Floor map" + (room.map { ", showing the \($0.lowercased())" } ?? "")
+                            + (robot.currentRoom.map { ". Soughtbot is in the \($0.lowercased())" } ?? ""))
     }
 
     /// Zoom and offset that bring the focused room, or the robot when following, to the middle of the card.
@@ -209,29 +211,35 @@ struct MapScreen: View {
     }
 
     private func pinCard(_ o: TrackedObject) -> some View {
-        HStack(spacing: Space.m) {
-            ShadedPhoto(photo: o.photo, shadeTo: 0, radius: Radius.thumb).frame(width: 64, height: 64)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(o.label).font(SoughtFont.bodyMedium).foregroundStyle(p.text)
-                Text("\(o.whereText) · \(StatusCopy.ago(o.lastSeen, now: robot.now))").font(SoughtFont.cardMeta).foregroundStyle(p.text)
-                Text(o.certaintyWord).font(SoughtFont.cardMeta).foregroundStyle(p.text)
+        VStack(alignment: .leading, spacing: Space.s) {
+            HStack(alignment: .top, spacing: Space.m) {
+                ShadedPhoto(photo: o.photo, shadeTo: 0, radius: Radius.thumb).frame(width: 56, height: 56)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(o.label).font(SoughtFont.bodyMedium).foregroundStyle(p.text)
+                    Text("\(o.whereText) · \(StatusCopy.ago(o.lastSeen, now: robot.now))").font(SoughtFont.cardMeta).foregroundStyle(p.text)
+                    Text(o.certaintyWord).font(SoughtFont.cardMeta).foregroundStyle(p.text)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Button { withAnimation(Motion.spring) { selected = nil } } label: {
+                    Image(systemName: "xmark").font(.footnote.weight(.bold)).foregroundStyle(p.text)
+                        .frame(width: 44, height: 44).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close summary")
             }
-            Spacer(minLength: 0)
-            VStack(spacing: Space.xs) {
+            HStack(spacing: Space.s) {
                 Button { router.find(o) } label: {
-                    Label("Find", systemImage: "magnifyingglass").font(SoughtFont.findIt).foregroundStyle(p.onPrimary)
-                        .padding(.horizontal, Space.m).frame(minHeight: 36).background(Capsule().fill(p.primary))
+                    Label("Find it", systemImage: "magnifyingglass").font(SoughtFont.findIt).foregroundStyle(p.onPrimary)
+                        .frame(maxWidth: .infinity, minHeight: 44).background(Capsule().fill(p.primary))
                 }
                 Button { router.open(o) } label: {
-                    Text("Details").font(SoughtFont.findIt).foregroundStyle(p.text).frame(minHeight: 32)
+                    Text("Details").font(SoughtFont.findIt).foregroundStyle(p.text)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .overlay(Capsule().strokeBorder(p.text, lineWidth: 1.2))
+                        .contentShape(Capsule())
                 }
             }
             .buttonStyle(.plain)
-            Button { withAnimation(Motion.spring) { selected = nil } } label: {
-                Image(systemName: "xmark").font(.footnote.weight(.bold)).foregroundStyle(p.text).frame(width: 32, height: 44)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Close summary")
         }
         .padding(Space.s)
         .soughtGlass(.sheet, in: RoundedRectangle(cornerRadius: Radius.row, style: .continuous))
@@ -243,36 +251,40 @@ struct MapScreen: View {
     private var robotCard: some View {
         let s = robot.status
         let online = s.isOnline(now: robot.now)
-        return HStack(alignment: .center, spacing: Space.m) {
-            ZStack {
-                Circle().fill(online ? p.signal.opacity(0.25) : p.text.opacity(0.08)).frame(width: 44, height: 44)
-                Circle().fill(p.mapPath).frame(width: 14, height: 14).overlay(Circle().stroke(.white, lineWidth: 2.5))
+        let info = VStack(alignment: .leading, spacing: 2) {
+            Text(robot.currentRoom.map { "Soughtbot · \($0)" } ?? "Soughtbot").font(SoughtFont.bodyMedium).foregroundStyle(p.text)
+            Text(StatusCopy.line(s, now: robot.now)).font(SoughtFont.cardMeta).foregroundStyle(p.text)
+            if let t = s.lastHeartbeat {
+                Text(online ? "Checked in \(Int(max(0, robot.now.timeIntervalSince(t)))) s ago" : "Last check-in \(StatusCopy.ago(t, now: robot.now))")
+                    .font(SoughtFont.cardMeta).foregroundStyle(p.text)
             }
-            .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(robot.currentRoom.map { "Soughtbot · \($0)" } ?? "Soughtbot").font(SoughtFont.bodyMedium).foregroundStyle(p.text)
-                Text(StatusCopy.line(s, now: robot.now)).font(SoughtFont.cardMeta).foregroundStyle(p.text).lineLimit(2)
-                if let t = s.lastHeartbeat {
-                    Text(online ? "Checked in \(Int(max(0, robot.now.timeIntervalSince(t)))) s ago" : "Last check-in \(StatusCopy.ago(t, now: robot.now))")
-                        .font(SoughtFont.cardMeta).foregroundStyle(p.text.opacity(0.85))
-                }
+        }
+        let dot = ZStack {
+            Circle().fill(online ? p.signal.opacity(0.25) : p.text.opacity(0.08)).frame(width: 44, height: 44)
+            Circle().fill(p.mapPath).frame(width: 14, height: 14).overlay(Circle().stroke(.white, lineWidth: 2.5))
+        }
+        .accessibilityHidden(true)
+        let call = Button {
+            Haptics.shared.tap()
+            if robot.canComeToMe && online { robot.comeToMe() }
+        } label: {
+            Text(s.state == .comingToUser ? "Coming" : "Call").font(SoughtFont.findIt).foregroundStyle(p.onPrimary)
+                .padding(.horizontal, Space.l).frame(minHeight: 44)
+                .frame(maxWidth: dts.isAccessibilitySize ? .infinity : nil)
+                .background(Capsule().fill(p.call))
+        }
+        .buttonStyle(.plain)
+        .disabled(!(robot.canComeToMe && online))
+        .accessibilityLabel(s.state == .comingToUser ? "Soughtbot is coming to you" : "Call Soughtbot")
+        return Group {
+            if dts.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: Space.m) { HStack(spacing: Space.m) { dot; info }; call }
+            } else {
+                HStack(alignment: .center, spacing: Space.m) { dot; info; Spacer(minLength: 0); call }
             }
-            Spacer(minLength: 0)
-            Button {
-                Haptics.shared.tap()
-                if robot.canComeToMe && online { robot.comeToMe() }
-            } label: {
-                Text(s.state == .comingToUser ? "Coming" : "Call").font(SoughtFont.findIt).foregroundStyle(p.onPrimary)
-                    .padding(.horizontal, Space.l).frame(minHeight: 44)
-                    .background(Capsule().fill(p.call))
-            }
-            .buttonStyle(.plain)
-            .disabled(!(robot.canComeToMe && online))
-            .accessibilityLabel(s.state == .comingToUser ? "Soughtbot is coming to you" : "Call Soughtbot")
         }
         .padding(Space.m)
         .soughtGlass(.activity, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
-        .accessibilityElement(children: .combine)
     }
 
     private func counts(_ map: MapSnapshot) -> some View {
@@ -282,11 +294,12 @@ struct MapScreen: View {
             ("\(map.waypoints.count)", "taught spots"),
             (StatusCopy.ago(map.updatedAt, now: robot.now).replacingOccurrences(of: " ago", with: ""), "map updated"),
         ]
-        return HStack(spacing: Space.s) {
+        let columns = Array(repeating: GridItem(.flexible(), spacing: Space.s), count: dts >= .xxLarge ? 2 : 4)
+        return LazyVGrid(columns: columns, spacing: Space.s) {
             ForEach(tiles, id: \.1) { v, label in
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(v).font(SoughtFont.readout).foregroundStyle(p.text).lineLimit(1).minimumScaleFactor(0.7)
-                    Text(label).font(SoughtFont.cardMeta).foregroundStyle(p.text.opacity(0.85)).lineLimit(2)
+                    Text(v).font(SoughtFont.readout).foregroundStyle(p.text)
+                    Text(label).font(SoughtFont.cardMeta).foregroundStyle(p.text)
                 }
                 .frame(maxWidth: .infinity, minHeight: 56, alignment: .topLeading)
                 .padding(Space.s)
@@ -300,18 +313,20 @@ struct MapScreen: View {
 
     private var itemList: some View {
         let list = sorted(room.map(items(in:)) ?? robot.objects)
+        let title = Text(room.map { "In the \($0)" } ?? "Everything").font(SoughtFont.sectionTitle).foregroundStyle(p.sectionTitle)
+            .accessibilityAddTraits(.isHeader)
+        let sortMenu = Menu {
+            Picker("Sort", selection: $sort) { ForEach(Sort.allCases) { Text($0.rawValue).tag($0) } }
+        } label: {
+            Label(sort.rawValue, systemImage: "arrow.up.arrow.down").font(SoughtFont.findIt).foregroundStyle(p.text)
+                .frame(minHeight: 44)
+        }
+        .accessibilityLabel("Sort, \(sort.rawValue)")
         return VStack(alignment: .leading, spacing: Space.s) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(room.map { "In the \($0)" } ?? "Everything").font(SoughtFont.sectionTitle).foregroundStyle(p.sectionTitle)
-                    .accessibilityAddTraits(.isHeader)
-                Spacer()
-                Menu {
-                    Picker("Sort", selection: $sort) { ForEach(Sort.allCases) { Text($0.rawValue).tag($0) } }
-                } label: {
-                    Label(sort.rawValue, systemImage: "arrow.up.arrow.down").font(SoughtFont.findIt).foregroundStyle(p.text)
-                        .frame(minHeight: 44)
-                }
-                .accessibilityLabel("Sort, \(sort.rawValue)")
+            if dts.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 0) { title; sortMenu }
+            } else {
+                HStack(alignment: .firstTextBaseline) { title; Spacer(); sortMenu }
             }
             if list.isEmpty {
                 Text("Nothing remembered here yet.").font(SoughtFont.body).foregroundStyle(p.text)
@@ -321,34 +336,54 @@ struct MapScreen: View {
     }
 
     private func row(_ o: TrackedObject) -> some View {
-        HStack(spacing: Space.m) {
-            Button { withAnimation(Motion.spring) { room = o.room; selected = o; follow = false } } label: {
-                HStack(spacing: Space.m) {
-                    ShadedPhoto(photo: o.photo, shadeTo: 0, radius: Radius.thumb).frame(width: 56, height: 56)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(o.label).font(SoughtFont.bodyMedium).foregroundStyle(p.text)
-                        Text("\(o.whereText) · \(StatusCopy.ago(o.lastSeen, now: robot.now))").font(SoughtFont.cardMeta).foregroundStyle(p.text)
-                        HStack(spacing: 6) {
-                            Circle().fill(certaintyColor(o)).frame(width: 7, height: 7).accessibilityHidden(true)
-                            Text(o.certaintyWord + (distance(o).map { " · " + String(format: "%.1f m away", $0) } ?? ""))
-                                .font(SoughtFont.cardMeta).foregroundStyle(p.text).lineLimit(1).minimumScaleFactor(0.85)
-                                .accessibilityLabel(o.certaintyWord + (distance(o).map { ", " + String(format: "%.1f meters from Soughtbot", $0) } ?? ""))
-                        }
-                    }
-                    Spacer(minLength: 0)
-                }
-                .contentShape(Rectangle())
+        let big = dts.isAccessibilitySize
+        let details = VStack(alignment: .leading, spacing: 2) {
+            Text(o.label).font(SoughtFont.bodyMedium).foregroundStyle(p.text)
+            Text("\(o.whereText) · \(StatusCopy.ago(o.lastSeen, now: robot.now))").font(SoughtFont.cardMeta).foregroundStyle(p.text)
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Circle().fill(certaintyColor(o)).frame(width: 7, height: 7).accessibilityHidden(true)
+                Text(o.certaintyWord + (distance(o).map { " · " + String(format: "%.1f m away", $0) } ?? ""))
+                    .font(SoughtFont.cardMeta).foregroundStyle(p.text).lineLimit(big ? 4 : 1).minimumScaleFactor(0.85)
+                    .accessibilityLabel(o.certaintyWord + (distance(o).map { ", " + String(format: "%.1f meters from Soughtbot", $0) } ?? ""))
             }
-            .buttonStyle(.plain)
-            .accessibilityHint("Shows it on the map.")
-            Button { router.find(o) } label: {
-                Image(systemName: "magnifyingglass").font(.body.weight(.semibold)).foregroundStyle(p.onPrimary)
-                    .frame(width: 44, height: 44).background(Circle().fill(p.primary))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Find \(o.label)")
         }
-        .padding(Space.s)
+        let show = Button { withAnimation(Motion.spring) { room = o.room; selected = o; follow = false } } label: {
+            Group {
+                if big {
+                    VStack(alignment: .leading, spacing: Space.s) {
+                        ShadedPhoto(photo: o.photo, shadeTo: 0, radius: Radius.thumb).frame(height: 120)
+                        details
+                    }
+                } else {
+                    HStack(spacing: Space.m) {
+                        ShadedPhoto(photo: o.photo, shadeTo: 0, radius: Radius.thumb).frame(width: 56, height: 56)
+                        details
+                        Spacer(minLength: 0)
+                    }
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("Shows it on the map.")
+        let find = Button { router.find(o) } label: {
+            Group {
+                if big {
+                    Label("Find it", systemImage: "magnifyingglass").font(SoughtFont.button).foregroundStyle(p.onPrimary)
+                        .frame(maxWidth: .infinity, minHeight: 52).background(Capsule().fill(p.primary))
+                } else {
+                    Image(systemName: "magnifyingglass").font(.body.weight(.semibold)).foregroundStyle(p.onPrimary)
+                        .frame(width: 44, height: 44).background(Circle().fill(p.primary))
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Find \(o.label)")
+        return Group {
+            if big { VStack(alignment: .leading, spacing: Space.m) { show; find } }
+            else { HStack(spacing: Space.m) { show; find } }
+        }
+        .padding(big ? Space.m : Space.s)
         .soughtGlass(.pill, in: RoundedRectangle(cornerRadius: Radius.row, style: .continuous))
     }
 

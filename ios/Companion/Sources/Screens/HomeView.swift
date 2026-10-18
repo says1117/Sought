@@ -13,6 +13,7 @@ struct HomeView: View {
     @State private var showActivity = false
     @State private var showLive = false
     @State private var pinned = false
+    @Environment(\.dynamicTypeSize) private var dts
 
     var body: some View {
         GeometryReader { geo in
@@ -26,12 +27,21 @@ struct HomeView: View {
                             .onTapGesture { router.tab = .map }
                             .accessibilityAddTraits(.isButton)
                             .accessibilityHint("Double tap to open the map.")
-                        HStack(alignment: .top, spacing: Space.l) {
+                        if dts.isAccessibilitySize {
+                            // Large text: one column so nothing is squeezed.
                             VStack(spacing: Space.l) {
-                                CallCard().frame(width: col)
-                                ActivityCard { showActivity = true }.frame(width: col)
+                                CallCard()
+                                ActivityCard { showActivity = true }
+                                LiveViewCard { showLive = true }.frame(height: 240)
                             }
-                            LiveViewCard { showLive = true }.frame(width: col, height: 87 + Space.l + 147)
+                        } else {
+                            HStack(alignment: .top, spacing: Space.l) {
+                                VStack(spacing: Space.l) {
+                                    CallCard().frame(width: col)
+                                    ActivityCard { showActivity = true }.frame(width: col)
+                                }
+                                LiveViewCard { showLive = true }.frame(width: col, height: 87 + Space.l + 147)
+                            }
                         }
                         recentFinds(col: col).id("recent")
                     } header: {
@@ -122,7 +132,7 @@ struct HomeView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(alignment: .top, spacing: Space.l) {
                         ForEach(robot.recentFinds.prefix(8)) { o in
-                            ItemCard(item: o, width: col, heroPrefix: "home", onFind: router.find, onOpen: router.open)
+                            ItemCard(item: o, width: itemCardWidth(dts, base: col), heroPrefix: "home", onFind: router.find, onOpen: router.open)
                         }
                     }
                     .padding(.vertical, Space.s)
@@ -135,15 +145,22 @@ struct HomeView: View {
 }
 
 /// Status line as a small glass pill (top right of Home).
+/// Status line as a small glass pill. Tapping it opens the Map, where Soughtbot is.
 struct StatusPill: View {
     var singleLine = true
     @EnvironmentObject private var robot: RobotSource
+    @EnvironmentObject private var router: Router
     var body: some View {
-        StatusLine(singleLine: singleLine)
-            .padding(.horizontal, Space.m)
-            .padding(.vertical, 6)
-            .soughtGlass(.pill, in: Capsule())
-            .contentTransition(.opacity)
-            .animation(Motion.fade, value: robot.status.state)
+        Button { router.tab = .map } label: {
+            StatusLine(singleLine: singleLine)
+                .padding(.horizontal, Space.m)
+                .padding(.vertical, 6)
+                .soughtGlass(.pill, in: Capsule())
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint(router.tab == .map ? "" : "Double tap to see Soughtbot on the map.")
+        .animation(Motion.fade, value: robot.status.state)
     }
 }
