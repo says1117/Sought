@@ -17,8 +17,13 @@ final class TeachPanelModel: ObservableObject {
         case failed(String)
         /// Stop was pressed while this command was pending; the panel no longer follows it.
         case stopped
+        /// Accepted, then the app lost track of it (network, timeout, status error). It may still be moving, so the
+        /// drive buttons stay locked until Stop.
+        case unknown(String)
 
-        var inFlight: Bool { self == .sending || self == .queued || self == .running }
+        var inFlight: Bool {
+            switch self { case .sending, .queued, .running, .unknown: return true; default: return false }
+        }
     }
 
     struct Line: Equatable {
@@ -131,7 +136,12 @@ final class TeachPanelModel: ObservableObject {
             } catch is CancellationError {
                 return
             } catch {
-                if self.generation == g { self.current?.phase = .failed(Self.reason(error)) }
+                guard self.generation == g else { return }
+                if let e = error as? CommandError, BackendRobotSource.isTransportProblem(e) {
+                    self.current?.phase = .unknown(e.message)
+                } else {
+                    self.current?.phase = .failed(Self.reason(error))
+                }
             }
         }
     }

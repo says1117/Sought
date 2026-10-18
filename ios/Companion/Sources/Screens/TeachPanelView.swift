@@ -171,6 +171,7 @@ struct TeachPanelView: View {
         case .done: return "DONE"
         case .failed: return "FAILED"
         case .stopped: return "STOPPED"
+        case .unknown: return "LOST CONTACT"
         }
     }
 
@@ -180,6 +181,7 @@ struct TeachPanelView: View {
         case .done(let r): return r
         case .failed(let r): return r
         case .stopped: return "Stop sent; no longer following this command."
+        case .unknown(let r): return "\(r) It may still be moving. Press Stop to unlock the buttons."
         }
     }
 
@@ -187,7 +189,7 @@ struct TeachPanelView: View {
         switch phase {
         case .sending, .queued, .running: return p.searching
         case .done: return p.found
-        case .failed, .stopped: return p.alert
+        case .failed, .stopped, .unknown: return p.alert
         }
     }
 

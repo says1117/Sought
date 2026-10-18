@@ -105,4 +105,59 @@ final class CommandClientTests: XCTestCase {
                        "kitchen table")
         XCTAssertEqual(BackendRobotSource.placeName(ComeTarget(waypointId: nil, name: "the hallway", x: 0, z: 0), waypoints: wps), "hallway")
     }
+
+    // MARK: Accepted, then the status checks fail (PR 40 residual): the command may still run, so keep Stop.
+
+    private let pollFailures: [Int] = [401, 403, 404, 405, 409, 423, 429, 500]
+
+    func testStatusCheckErrorsAfterAcceptanceAreLostTrackNotTerminal() async {
+        for code in pollFailures {
+            let server = FakeServer([(201, cmd("queued")), (code, "{}")])
+            do { _ = try await client(server).run("find red umbrella"); XCTFail("\(code)") } catch {
+                XCTAssertEqual(error as? CommandError, .lostTrack(code == 403 ? 401 : code == 405 ? 404 : [423, 429].contains(code) ? 409 : code), "\(code)")
+                XCTAssertTrue(BackendRobotSource.isTransportProblem(error as! CommandError), "\(code)")
+            }
+        }
+        // A rejected POST is still a plain answer, and a robot-reported failure stays terminal.
+        do { _ = try await client(FakeServer([(409, "{}")])).run("find keys"); XCTFail() } catch { XCTAssertEqual(error as? CommandError, .busy) }
+        do { _ = try await client(FakeServer([(201, cmd("running")), (200, cmd("failed", result: "blocked"))])).run("x"); XCTFail() } catch {
+            XCTAssertEqual(error as? CommandError, .failed("blocked"))
+        }
+    }
+
+    private func source(_ server: FakeServer) -> BackendRobotSource {
+        BackendRobotSource(config: config, commands: client(server))
+    }
+
+    private func settle(_ done: @escaping () -> Bool) async {
+        for _ in 0..<200 where !done() { try? await Task.sleep(nanoseconds: 10_000_000) }
+    }
+
+    func testFindKeepsStopWhenStatusChecksFailAfterAcceptance() async {
+        for code in pollFailures {
+            let server = FakeServer([(201, cmd("running")), (code, "{}"), (201, cmd("queued"))])
+            let s = source(server)
+            s.startFind("red umbrella", match: nil)
+            await settle { if case .lostContact? = s.find?.phase { return true }; return false }
+            guard case .lostContact? = s.find?.phase else { XCTFail("\(code): \(String(describing: s.find?.phase))"); continue }
+            s.cancelFind()   // Stop is offered and actually posts "stop"
+            await settle { server.requests.count >= 3 }
+            let last = server.requests.last.flatMap { $0.httpBody }.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: String] }
+            XCTAssertEqual(last?["text"], "stop", "\(code)")
+        }
+    }
+
+    func testComeToMeKeepsStopWhenStatusChecksFailAfterAcceptance() async {
+        for code in pollFailures {
+            let server = FakeServer([(201, cmd("running")), (code, "{}"), (201, cmd("queued"))])
+            let s = source(server)
+            s.comeToMe(to: ComeTarget(waypointId: nil, name: "the sofa", x: 0, z: 0))
+            await settle { if case .lostContact? = s.come?.phase { return true }; return false }
+            guard case .lostContact? = s.come?.phase else { XCTFail("\(code): \(String(describing: s.come?.phase))"); continue }
+            s.cancelComeToMe()
+            await settle { server.requests.count >= 3 }
+            let last = server.requests.last.flatMap { $0.httpBody }.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: String] }
+            XCTAssertEqual(last?["text"], "stop", "\(code)")
+        }
+    }
 }

@@ -77,7 +77,7 @@ final class BackendRobotSource: RobotSource {
     override var sourceName: String {
         serverIsMock ? "Soughtbot server (sample data)" : itemsAreSample ? "Soughtbot server (live status, sample items)" : "Soughtbot server"
     }
-    override var canComeToMe: Bool { true }   // POST /api/commands "go to <taught spot>"
+    override var canComeToMe: Bool { true }   // POST /api/commands "come to the <taught spot>"
 
     private var loop: Task<Void, Never>?
     private var photos: [String: Data] = [:]
@@ -90,9 +90,10 @@ final class BackendRobotSource: RobotSource {
     private var findTask: Task<Void, Never>?
     private var comeTask: Task<Void, Never>?
 
-    init(config: BackendConfig) {
+    /// `commands` is injectable for the unit tests (fake transport, fast polling).
+    init(config: BackendConfig, commands: CommandClient? = nil) {
         self.config = config
-        self.commands = CommandClient(config: config)
+        self.commands = commands ?? CommandClient(config: config)
         super.init()
         isLoading = true
     }
@@ -295,7 +296,7 @@ final class BackendRobotSource: RobotSource {
 
     /// Network, timeout and server errors leave the command's real state unknown; failed/busy come from the robot.
     static func isTransportProblem(_ e: CommandError) -> Bool {
-        switch e { case .network, .timeout, .http: return true; default: return false }
+        switch e { case .network, .timeout, .http, .lostTrack: return true; default: return false }
     }
 
     /// "find red umbrella" for a known item; the person's own words when they already start with find / where.

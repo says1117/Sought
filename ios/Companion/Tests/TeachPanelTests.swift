@@ -118,7 +118,8 @@ final class TeachPanelTests: XCTestCase {
         XCTAssertFalse(m.busy)
     }
 
-    /// End to end through CommandClient: the robot never finishes, so the client times out.
+    /// End to end through CommandClient: the robot never finishes, so the client times out. The rover may still be
+    /// moving, so the drive buttons stay locked until Stop (PR 40 residual), and Stop unlocks them.
     func testTimeoutThroughCommandClient() async {
         let running = #"{"id":"cmd_t","text":"scan here","created_at":null,"status":"running","result":null}"#
         let client = CommandClient(
@@ -127,7 +128,10 @@ final class TeachPanelTests: XCTestCase {
             pollInterval: 0.01, timeout: 0.05)
         let m = TeachPanelModel { text, onUpdate in try await client.run(text, onUpdate: onUpdate) }
         m.scanHere()
-        await until("timeout") { m.current?.phase == .failed(CommandError.timeout.message) }
+        await until("timeout") { m.current?.phase == .unknown(CommandError.timeout.message) }
+        XCTAssertTrue(m.busy)
+        m.stop()
+        XCTAssertEqual(m.current?.phase, .stopped)
         XCTAssertFalse(m.busy)
     }
 

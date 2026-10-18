@@ -18,6 +18,9 @@ struct RobotCommand: Decodable, Equatable {
 enum CommandError: Error, Equatable {
     case unauthorized, busy, notAvailable, http(Int), network, timeout
     case failed(String?)
+    /// The robot accepted the command, then a status check failed (401/403/404/409/5xx...). The command may still
+    /// be running, so this is never a terminal answer from the robot.
+    case lostTrack(Int)
 
     /// Plain words for the Find flow and the Come-to-me sheet.
     var message: String {
@@ -28,6 +31,7 @@ enum CommandError: Error, Equatable {
         case .http(let c): return "The server answered with an error (\(c))."
         case .network: return "Can\u{2019}t reach Soughtbot\u{2019}s server. Check the Wi-Fi and try again."
         case .timeout: return "Soughtbot didn\u{2019}t finish in time. It may still be working; watch the status line."
+        case .lostTrack: return "Soughtbot took the command, then the server stopped answering about it."
         case .failed(let r):
             let t = r?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             return t.isEmpty ? "Soughtbot couldn\u{2019}t do that." : t
@@ -56,6 +60,7 @@ struct CommandClient {
 
     /// Sends `text`, then polls every `pollInterval` until done or failed. `onUpdate` sees each new status.
     /// Returns the done command; throws `CommandError.failed(result)` when the robot reports failure.
+    /// Once the POST is accepted, a failed status check throws `.lostTrack` (or `.timeout`), never a terminal error.
     func run(_ text: String, onUpdate: (RobotCommand) -> Void = { _ in }) async throws -> RobotCommand {
         var cmd = try await send(text)
         onUpdate(cmd)
@@ -76,7 +81,19 @@ struct CommandClient {
                 cmd = next
             } catch CommandError.network {
                 continue   // one dropped poll on hotel Wi-Fi is not a failure; the deadline still applies
+            } catch let e as CommandError {
+                throw CommandError.lostTrack(Self.code(e))
             }
+        }
+    }
+
+    private static func code(_ e: CommandError) -> Int {
+        switch e {
+        case .unauthorized: return 401
+        case .notAvailable: return 404
+        case .busy: return 409
+        case .http(let c): return c
+        default: return 0
         }
     }
 
