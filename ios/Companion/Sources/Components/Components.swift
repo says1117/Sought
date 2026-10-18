@@ -324,8 +324,10 @@ struct SampleBanner: View {
                 .foregroundStyle(p.text)
                 .padding(.horizontal, 8).padding(.vertical, 3)
                 .soughtGlass(.pill, in: Capsule())
+                .frame(minHeight: 44, idealHeight: 44)   // header rows are 44 pt tall anyway; meets the target-size rule
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(robot.sampleSpoken)
+            .accessibilityAddTraits(.isStaticText)   // a label, not a control
             .accessibilityIdentifier("sampleBanner")
         }
     }

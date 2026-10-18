@@ -47,14 +47,19 @@ final class AccessibilityAuditTests: XCTestCase {
                 issue.element.map { "\($0.elementType) '\($0.label)' frame=\($0.frame)" } ?? issue.detailedDescription
             }
             var screenFailures = 0
-            try app.performAccessibilityAudit(for: gate) { issue in
+            // The audit waits for the screen to settle; the animated background can make it time out once.
+            func audit(_ types: XCUIAccessibilityAuditType, _ handler: @escaping (XCUIAccessibilityAuditIssue) -> Bool) throws {
+                do { try app.performAccessibilityAudit(for: types, handler) }
+                catch let e as NSError where e.code == -56 { sleep(2); try app.performAccessibilityAudit(for: types, handler) }
+            }
+            try audit(gate) { issue in
                 if let e = issue.element, e.frame.maxY > bandTop { return true }
                 screenFailures += 1
                 print("A11Y|\(name)|\(issue.compactDescription)|\(describe(issue))")
                 return true
             }
             var notes = 0
-            try app.performAccessibilityAudit(for: info) { issue in
+            try audit(info) { issue in
                 if let e = issue.element, e.frame.maxY > bandTop { return true }
                 notes += 1
                 print("A11Y-INFO|\(name)|\(issue.compactDescription)|\(describe(issue))")

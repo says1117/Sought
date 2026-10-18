@@ -107,7 +107,7 @@ struct ActivitySheet: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Space.s) {
                 HStack {
-                    SampleBanner().fixedSize()
+                    SampleBanner()
                     Spacer()
                     Button("Done") { dismiss() }.font(SoughtFont.bodyMedium).foregroundStyle(p.text).frame(minWidth: 44, minHeight: 44)
                 }
