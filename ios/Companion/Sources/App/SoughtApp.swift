@@ -93,6 +93,7 @@ struct RootView: View {
     @State private var lastSpokenState: RobotState?
     /// Opening splash on cold launch. `-noSplash YES` skips it (screenshots, UI tests).
     @State private var showSplash = !UserDefaults.standard.bool(forKey: "noSplash")
+    @State private var tabBarHeight: CGFloat = 74
     @Namespace private var hero
 
     private var palette: Palette { settings.highContrast ? .highContrast : .standard }
@@ -101,10 +102,16 @@ struct RootView: View {
     }
 
     var body: some View {
-        TabContainer(selection: router.tab)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(SoughtBackground())
-            .safeAreaInset(edge: .bottom, spacing: 0) { SoughtTabBar(selection: $router.tab) }
+        ZStack(alignment: .bottom) {
+            TabContainer(selection: router.tab)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .safeAreaPadding(.bottom, tabBarHeight)
+            // The tab bar stays at the bottom of the screen; the keyboard covers it instead of lifting it.
+            SoughtTabBar(selection: $router.tab)
+                .background(GeometryReader { g in Color.clear.onAppear { tabBarHeight = g.size.height } })
+        }
+        .ignoresSafeArea(.keyboard, edges: .bottom)
+        .background(SoughtBackground())
             .overlay(alignment: .top) { StatusBarScrim() }
             .overlay { if showSplash { SplashView { showSplash = false }.transition(.identity) } }
         .environment(\.palette, palette)
