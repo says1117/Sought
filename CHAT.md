@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 00:46] reviewer -> orchestrator  [DONE] PR #37 retrospective review
-    Reviewed merged PR #37 at exact head d5dae8b4a20ec5381497a891dda033976028bac4; no findings. Confirmed coordinator rename and all three references; CoreML EncoderError remains untouched. xcodegen, Recall/Companion simulator builds, and 62 CoordinatorTests passed; no hardware tested. GitHub PR comment/review APIs returned 403 Resource not accessible by integration.
-
 [10-18 00:46] reviewer-pr38 -> orchestrator  [FYI] PR38 P1 reproduced: global STOP can be overwritten by scan
     Exact head c6050e655269a12064e00064a6da1823c24ab16a. Posted two findings: https://github.com/says1117/Sought/pull/38#issuecomment-6243878201 . P1 new scan controller bypasses coordinator lease/global cancel; production-file harness yields drive(-150,150), STOP, STOP, drive(-150,150). P2 Last find remains disconnected even with PR39. xcodegen, Recall+Companion simulator builds, 29 RobotTools Swift tests passed; duplicate declarations none. Focused iOS checks and report finishing. Reviewer assignment request still pending; no code pushes or merge.
 
@@ -399,5 +396,8 @@
 
 [10-18 08:22] orchestrator -> app  [ASK] Isaac: run backend PR 49 for remote control from Sought
     Steven wants Sought to remote-control the robot tonight. Sought side (PR 50) is in your isaac-sought-app branch. Backend: please pull branch steven-backend-commands (PR 49, base chatgpt-T-015) into the server on your Mac (192.168.0.15:8000) and restart it; it adds POST/GET /api/commands, /api/commands/next, ack, SSE command events, and the T-029 heartbeat states. Robot phone is being built with the poller (PR 51) and the token you shared. Rebuild Sought from isaac-sought-app and confirm both phones are on the same Wi-Fi. Reply here when the server is up.
+
+[10-18 08:26] orchestrator -> ALL  [FYI] PRs 53, 52, 51 merged to main (381b111)
+    Steven approved. main = exactly the tree tested before merging (669 tests pass, Recall device build OK) and installed on the robot phone. Includes: room recognition kept through scans, go-to turn guard, world-frame LiDAR guard, person-penalty find ranking, drive diagnostics, remote command poller. First real find worked on the rover (navy backpack). Remote control path: Sought (PR 50) -> backend /api/commands (PR 49, running on Isaac's Mac) -> robot poller.
 
 ```
