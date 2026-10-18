@@ -143,6 +143,7 @@ final class AppRuntime: ObservableObject {
             gate.sessionStarted(loadedSavedMap: loaded, mapId: id, waypointCutoff: id.flatMap { mapStore.waypointCutoff(mapId: $0) })
             if let id { _ = try? tracks.purgeOtherMaps(keeping: id) }
         }
+        pose.onInterruption = { gate.interrupted($0) }
         mappingSubscription = Publishers.CombineLatest3(pose.$tracking, pose.$mapping, pose.$trackingReason)
             .sink { gate.update(tracking: $0, mapping: $1, relocalizing: $2 == "relocalizing") }
         // Teach saved the running session's map: it is this frame, so use it now (no relaunch). If the session was
@@ -248,6 +249,9 @@ final class AppRuntime: ObservableObject {
     /// Teach banner state: recognised, relocalizing (elapsed), rescan needed, or idle (no saved map in use).
     func relocalizationState() -> RelocalizationState { frameGate.relocalizationState() }
 
+    /// Why and when recognition was last lost, refused or regained (Teach banner, Memory note).
+    func relocalizationDetail() -> String? { frameGate.statusDetail }
+
     /// Teach saved the current world map as `mapId`; `generation` is `frameGeneration` read before the save began.
     func mapSaved(mapId: String, generation: Int?) { adoptSavedMap?(mapId, generation) }
 
@@ -262,8 +266,9 @@ final class AppRuntime: ObservableObject {
         refreshSensors()
         guard let perception else { return }
         // Persistent memory is only written in the saved map's frame (see MemoryIngestor), so wait for it.
+        let why = frameGate.statusDetail.map { " (\($0))" } ?? ""
         let note = perception.ingestor.canIngest ? "Memory fills while parked"
-            : frameGate.usesSavedMap ? "Room not recognised yet: look around, not saving objects"
+            : frameGate.usesSavedMap ? "Room not recognised yet: look around, not saving objects" + why
             : "No room map in use: Teach → Save map"
         if perceptionNote != note { perceptionNote = note }
         guard perception.ingestor.canIngest else { return }

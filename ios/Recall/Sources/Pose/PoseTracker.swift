@@ -27,6 +27,9 @@ final class PoseTracker: NSObject, ObservableObject, ARSessionDelegate {
 
     /// Called on every (re)start with whether a saved map was loaded: a new ARKit run is a new coordinate frame.
     var onSessionStart: ((_ loadedSavedMap: Bool) -> Void)?
+    /// Called on an interruption or session failure, BEFORE `.notAvailable` is published: the device may have moved
+    /// while ARKit was blind, so the frame gate must wait for real relocalization (unlike an in-run tracking drop).
+    var onInterruption: ((_ why: String) -> Void)?
 
     override init() {
         super.init()
@@ -91,13 +94,14 @@ final class PoseTracker: NSObject, ObservableObject, ARSessionDelegate {
         floorY = PoseMath.floorY(planes: Array(floorPlanes.values))
     }
 
-    func sessionWasInterrupted(_ session: ARSession) { tracking = .notAvailable; pose = nil }
+    func sessionWasInterrupted(_ session: ARSession) { onInterruption?("AR interrupted"); tracking = .notAvailable; pose = nil }
     func sessionInterruptionEnded(_ session: ARSession) { /* tracking state resumes via frames */ }
     /// After an interruption, ask ARKit to relocalize into the same frame (it then reports `limited(.relocalizing)`)
     /// instead of continuing in a frame that may have shifted.
     func sessionShouldAttemptRelocalization(_ session: ARSession) -> Bool { true }
     func session(_ session: ARSession, didFailWithError error: Error) {
         isRunning = false
+        onInterruption?("AR session failed")
         tracking = .notAvailable
         trackingReason = error.localizedDescription
         pose = nil

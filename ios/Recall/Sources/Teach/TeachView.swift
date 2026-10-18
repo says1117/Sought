@@ -11,6 +11,9 @@ struct TeachView: View {
     @ObservedObject var tracker: PoseTracker
     /// The app's frame gate state (`AppRuntime.relocalizationState`): one source of truth with Memory.
     let relocState: () -> RelocalizationState
+    /// Why and when recognition was last lost or refused (`AppRuntime.relocalizationDetail`), shown under the banner.
+    var relocDetail: () -> String? = { nil }
+    @State private var relocWhy: String?
     let hasSavedMap: Bool
     @State private var reloc: RelocalizationState = .idle
     @GestureState private var held: DriveIntent?
@@ -74,10 +77,11 @@ struct TeachView: View {
         }
         .onChange(of: tracker.tracking) { _, _ in reloc = relocState() }
         .onChange(of: model.isSaving) { _, _ in reloc = relocState() }
-        .onReceive(ticker) { _ in reloc = relocState() }
+        .onReceive(ticker) { _ in reloc = relocState(); relocWhy = relocDetail() }
         .onAppear {
             model.beginSession(hasSavedMap: hasSavedMap)
             reloc = relocState()
+            relocWhy = relocDetail()
         }
         .onDisappear { model.stopDriving() }
     }
@@ -89,6 +93,13 @@ struct TeachView: View {
     }
 
     @ViewBuilder private var relocBanner: some View {
+        relocStateBanner
+        if reloc != .relocalized, let why = relocWhy {
+            Text(why).font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder private var relocStateBanner: some View {
         switch reloc {
         case .relocalized:
             Text("Room recognised: memory is on").font(.callout).foregroundStyle(.green)
@@ -146,7 +157,7 @@ struct TeachContainer: View {
 
     var body: some View {
         TeachView(model: session.model, link: link, tracker: tracker, relocState: { [runtime] in runtime.relocalizationState() },
-                  hasSavedMap: session.adapter.hasSavedMap)
+                  relocDetail: { [runtime] in runtime.relocalizationDetail() }, hasSavedMap: session.adapter.hasSavedMap)
     }
 }
 

@@ -67,16 +67,107 @@ final class FrameGateUnitTests: XCTestCase {
         XCTAssertEqual(g.relocalizationState(), .relocalized)
     }
 
-    func testLostTrackingNeedsARelocalizingTransitionToRecover() {
+    func testInterruptionNeedsARelocalizingTransitionToRecover() {
         let g = WorldFrameGate()
         g.sessionStarted(loadedSavedMap: true, mapId: "map-A")
         g.update(tracking: .limited, mapping: .limited, relocalizing: true); g.update(tracking: .normal, mapping: .mapped)
         XCTAssertTrue(g.relocalized)
+        let gen = g.generation
+        g.interrupted()                                     // PoseTracker calls this before publishing .notAvailable
         g.update(tracking: .notAvailable, mapping: .notAvailable)
+        XCTAssertGreaterThan(g.generation, gen)
+        XCTAssertTrue(g.statusDetail?.hasPrefix("lost: AR interrupted at ") == true, g.statusDetail ?? "nil")
+        XCTAssertTrue(g.statusDetail?.hasSuffix("needs relocalizing") == true)
         g.update(tracking: .limited, mapping: .limited)
         g.update(tracking: .normal, mapping: .mapped)
         XCTAssertFalse(g.relocalized, "came back without relocalizing: may be a new frame")
         g.update(tracking: .limited, mapping: .limited, relocalizing: true); g.update(tracking: .normal, mapping: .limited)
+        XCTAssertTrue(g.relocalized)
+    }
+
+    // Scan here spins hard: ARKit goes limited(excessiveMotion) and back inside the same run. Same frame: keep the latch.
+    func testExcessiveMotionSpinKeepsTheLatchAndGeneration() {
+        let g = WorldFrameGate()
+        g.sessionStarted(loadedSavedMap: true, mapId: "map-A")
+        g.update(tracking: .limited, mapping: .limited, relocalizing: true); g.update(tracking: .normal, mapping: .mapped)
+        let gen = g.generation
+        for _ in 0..<4 {
+            g.update(tracking: .limited, mapping: .limited)             // excessive motion
+            XCTAssertTrue(g.relocalized)
+            g.update(tracking: .limited, mapping: .limited)             // insufficient features
+            g.update(tracking: .normal, mapping: .extending)
+        }
+        XCTAssertTrue(g.relocalized)
+        XCTAssertEqual(g.generation, gen, "nothing in flight is dropped")
+        XCTAssertEqual(g.relocalizationState(), .relocalized)
+    }
+
+    // A frame-reported .notAvailable inside the same run, with no interruption: the run's origin is unchanged.
+    func testNotAvailableWithoutInterruptionRecoversOnNextNormal() {
+        let g = WorldFrameGate()
+        g.sessionStarted(loadedSavedMap: true, mapId: "map-A")
+        g.update(tracking: .limited, mapping: .limited, relocalizing: true); g.update(tracking: .normal, mapping: .mapped)
+        let gen = g.generation
+        g.update(tracking: .notAvailable, mapping: .notAvailable)
+        XCTAssertFalse(g.relocalized, "not trusted while lost")
+        XCTAssertGreaterThan(g.generation, gen, "captures taken while lost are dropped")
+        XCTAssertTrue(g.statusDetail?.contains("tracking unavailable") == true, g.statusDetail ?? "nil")
+        if case .waiting = g.relocalizationState() {} else { XCTFail("expected waiting") }
+        g.update(tracking: .limited, mapping: .limited)                 // excessive motion, not relocalizing
+        XCTAssertFalse(g.relocalized)
+        g.update(tracking: .normal, mapping: .limited)
+        XCTAssertTrue(g.relocalized, "same run, same frame: back on the next normal")
+        XCTAssertTrue(g.statusDetail?.hasPrefix("recognised at ") == true)
+    }
+
+    func testNotAvailableStraightToNormalAlsoRecovers() {
+        let g = WorldFrameGate()
+        g.sessionStarted(loadedSavedMap: false)
+        _ = g.adoptSavedMap(mapId: "map-B", ifGeneration: nil)
+        g.update(tracking: .notAvailable, mapping: .notAvailable)
+        XCTAssertFalse(g.relocalized)
+        g.update(tracking: .normal, mapping: .mapped)
+        XCTAssertTrue(g.relocalized)
+        XCTAssertEqual(g.activeMapId, "map-B")
+    }
+
+    func testInterruptionAfterAnInRunDropStillNeedsRelocalizing() {
+        let g = WorldFrameGate()
+        g.sessionStarted(loadedSavedMap: true, mapId: "map-A")
+        g.update(tracking: .limited, mapping: .limited, relocalizing: true); g.update(tracking: .normal, mapping: .mapped)
+        g.update(tracking: .notAvailable, mapping: .notAvailable)       // in-run drop first
+        g.interrupted()                                                  // then the camera is taken away
+        XCTAssertTrue(g.statusDetail?.hasPrefix("waiting: AR interrupted at ") == true, g.statusDetail ?? "nil")
+        g.update(tracking: .limited, mapping: .limited); g.update(tracking: .normal, mapping: .mapped)
+        XCTAssertFalse(g.relocalized, "the interruption wins: needs relocalizing")
+        g.update(tracking: .limited, mapping: .limited, relocalizing: true); g.update(tracking: .normal, mapping: .mapped)
+        XCTAssertTrue(g.relocalized)
+    }
+
+    func testNewRunNeedsRelocalization() {
+        let g = WorldFrameGate()
+        g.sessionStarted(loadedSavedMap: true, mapId: "map-A")
+        g.update(tracking: .limited, mapping: .limited, relocalizing: true); g.update(tracking: .normal, mapping: .mapped)
+        let gen = g.generation
+        g.update(tracking: .notAvailable, mapping: .notAvailable)       // PoseTracker.start resets tracking first
+        g.sessionStarted(loadedSavedMap: true, mapId: "map-A")          // then the new run (resume, relaunch)
+        XCTAssertGreaterThan(g.generation, gen)
+        XCTAssertFalse(g.relocalized)
+        XCTAssertTrue(g.statusDetail?.hasPrefix("waiting: new AR run at ") == true, g.statusDetail ?? "nil")
+        g.update(tracking: .normal, mapping: .mapped)
+        XCTAssertFalse(g.relocalized, "a stale normal of the old run is not recognition, even after an in-run drop")
+        g.update(tracking: .limited, mapping: .limited, relocalizing: true); g.update(tracking: .normal, mapping: .mapped)
+        XCTAssertTrue(g.relocalized)
+    }
+
+    func testInRunDropWhileStillWaitingNeedsAFreshLimitedThenNormal() {
+        let g = WorldFrameGate()
+        g.sessionStarted(loadedSavedMap: true, mapId: "map-A")
+        g.update(tracking: .limited, mapping: .limited, relocalizing: true)
+        g.update(tracking: .notAvailable, mapping: .notAvailable)
+        g.update(tracking: .normal, mapping: .mapped)
+        XCTAssertFalse(g.relocalized, "not recognised before the drop, so the drop proves nothing")
+        g.update(tracking: .limited, mapping: .limited, relocalizing: true); g.update(tracking: .normal, mapping: .mapped)
         XCTAssertTrue(g.relocalized)
     }
 
@@ -100,6 +191,7 @@ final class FrameGateUnitTests: XCTestCase {
         XCTAssertFalse(g.predatesActiveMap(createdAt: iso(t.addingTimeInterval(-20))))
         g.update(tracking: .normal, mapping: .limited)
         XCTAssertTrue(g.relocalized, "stays adopted")
+        g.interrupted()
         g.update(tracking: .notAvailable, mapping: .notAvailable)
         XCTAssertFalse(g.relocalized)
         // The monitor runs on the system clock here, so elapsed is tiny but not exactly 0.
