@@ -100,9 +100,9 @@ struct LiveViewCard: View {
                         Text("Last snapshot, \(StatusCopy.ago(latest.lastSeen, now: robot.now))").font(SoughtFont.cardMeta)
                     }
                     HStack(spacing: Space.xs) {
-                        Text(robot.liveFrame == nil ? "Snapshot" : "Live View").font(SoughtFont.liveView)
+                        Text(robot.liveFrame == nil ? "Snapshot" : robot.liveCameraIsSample ? "Sample camera" : "Live View").font(SoughtFont.liveView)
                         Image("icon_video").renderingMode(.template)
-                        if robot.liveFrame != nil { Circle().fill(p.signal).frame(width: 7, height: 7) }
+                        if robot.liveFrame != nil && !robot.liveCameraIsSample { Circle().fill(p.signal).frame(width: 7, height: 7) }
                     }
                 }
                 .foregroundStyle(p.textOnDark)
@@ -112,8 +112,8 @@ struct LiveViewCard: View {
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(robot.liveFrame != nil ? "Live view from Soughtbot's camera" :
-                                "Last snapshot from Soughtbot" + (latest.map { ", \(StatusCopy.agoSpoken($0.lastSeen, now: robot.now))" } ?? ""))
+        .accessibilityLabel(robot.liveFrame != nil ? (robot.liveCameraIsSample ? "Sample camera image" : "Live view from Soughtbot's camera") :
+                                (latest.map { "Last snapshot from Soughtbot, \(StatusCopy.agoSpoken($0.lastSeen, now: robot.now))" } ?? "Open Soughtbot’s camera"))
         .accessibilityHint("Double tap to open full screen.")
         .accessibilityIdentifier("liveViewCard")
     }
@@ -125,19 +125,31 @@ struct LiveViewScreen: View {
     @EnvironmentObject private var robot: RobotSource
     @Environment(\.dismiss) private var dismiss
     @Environment(\.palette) private var p
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
+        TimelineView(.periodic(from: .now, by: 0.5)) { _ in
+          ZStack(alignment: .topLeading) {
             Color.black.ignoresSafeArea()
             Group {
-                if let f = robot.liveFrame { Image(uiImage: f).resizable().scaledToFit() }
-                else if let o = robot.recentFinds.first { PhotoView(photo: o.photo).scaledToFit() }
+                if robot.liveCameraIsSample, let f = robot.liveFrame {
+                    Image(uiImage: f).resizable().scaledToFit()
+                } else if let frame = robot.liveCameraFrame, frame.age() < LiveCameraFeed.maxAge {
+                    Image(uiImage: frame.image).resizable().scaledToFit()
+                } else {
+                    VStack(spacing: Space.s) {
+                        Image(systemName: "video.slash").font(.largeTitle)
+                        Text(robot.liveCameraState == .waiting ? "Waiting for a fresh camera frame…" : "Camera unavailable. Waiting for a fresh frame.")
+                            .font(SoughtFont.body).multilineTextAlignment(.center)
+                    }
+                    .foregroundStyle(.white).padding(Space.l)
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .accessibilityLabel(robot.liveFrame != nil ? "Live camera view" : "Last snapshot")
+            .accessibilityLabel(cameraDescription)
             VStack(alignment: .leading, spacing: Space.s) {
                 HStack {
-                    SampleBanner()
+                    if robot.liveCameraIsSample { Text("SAMPLE CAMERA IMAGE").font(SoughtFont.badge).foregroundStyle(.white) }
                     Spacer()
                     Button { dismiss() } label: {
                         Image(systemName: "xmark").font(.title2.weight(.semibold)).foregroundStyle(.white)
@@ -145,12 +157,32 @@ struct LiveViewScreen: View {
                     }
                     .accessibilityLabel("Close")
                 }
-                Text(robot.liveFrame != nil ? "Live from Soughtbot. Stays on your home network, never uploaded."
-                                            : "No live video in this build. Showing the last snapshot.")
+                Text(cameraDescription)
                     .font(SoughtFont.cardMeta).foregroundStyle(.white)
                     .padding(Space.s).background(RoundedRectangle(cornerRadius: Radius.thumb, style: .continuous).fill(.black.opacity(0.45)))
+                if !robot.liveCameraIsSample {
+                    Text("Camera frames refresh about once a second through your configured server. No recording.")
+                        .font(SoughtFont.cardMeta).foregroundStyle(.white)
+                }
             }
             .padding(Space.l)
+          }
         }
+        .onAppear { if scenePhase == .active { robot.beginLiveView() } }
+        .onDisappear { robot.endLiveView() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { robot.beginLiveView() } else { robot.endLiveView() }
+        }
+        .onChange(of: ObjectIdentifier(robot)) { _, _ in
+            if scenePhase == .active { robot.beginLiveView() }
+        }
+    }
+
+    private var cameraDescription: String {
+        if robot.liveCameraIsSample { return "Sample image. This is not a live camera feed." }
+        guard let frame = robot.liveCameraFrame, frame.age() < LiveCameraFeed.maxAge else {
+            return robot.liveCameraState == .waiting ? "Connecting to Soughtbot’s camera…" : "No fresh camera frame."
+        }
+        return String(format: "LIVE · updated %.1f s ago", frame.age())
     }
 }

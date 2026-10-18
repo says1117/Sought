@@ -60,6 +60,7 @@ final class AppRuntime: ObservableObject {
     private var storageWarningSpoken = false
     private let heartbeatSource = CoordinatorHeartbeatSource()
     private var heartbeat: HeartbeatPublisher?
+    private var liveCamera: LiveCameraCapture?
     private var uploader: BackendUploader?          // T-071 backend uploads (see the T-071 block in init)
     private var commandPoller: CommandPoller?       // remote commands from Sought (see the REMOTE COMMANDS block in init)
     private var sensorTimer: Timer?
@@ -183,6 +184,7 @@ final class AppRuntime: ObservableObject {
         }
         if let cfg = SyncConfig.fromBundle() {
             heartbeat = HeartbeatPublisher(transport: URLSessionTransport(config: cfg), provider: { hb.snapshot() })
+            liveCamera = LiveCameraCapture(session: pose.session, config: cfg)
         }
         // BEGIN T-071 backend uploads: objects of the active map + waypoints, in the background (Sources/Sync).
         // Objects only while the session is relocalized against that map (one locked read of both).
@@ -261,6 +263,7 @@ final class AppRuntime: ObservableObject {
         RunLoop.main.add(t, forMode: .common)
         sensorTimer = t
         heartbeat?.start()
+        liveCamera?.start()
         commandPoller?.start()
     }
 
@@ -299,6 +302,7 @@ final class AppRuntime: ObservableObject {
     func mapSaved(mapId: String, generation: Int?) { adoptSavedMap?(mapId, generation) }
 
     func pause() {
+        liveCamera?.stop()
         // Remote commands first, so nothing claimed before the pause can start after the brake below.
         commandPoller?.stop()
         stopEverything()

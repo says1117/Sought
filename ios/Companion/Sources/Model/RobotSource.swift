@@ -15,7 +15,11 @@ class RobotSource: ObservableObject {
     }
     @Published var objects: [TrackedObject] = []
     @Published var map: MapSnapshot?
-    @Published var liveFrame: UIImage?          // nil when no live frames (fallback: latest thumbnail)
+    @Published var liveFrame: UIImage?
+    @Published var liveCameraFrame: LiveCameraFrame?
+    @Published var liveCameraState: LiveCameraState = .idle
+    /// Camera provenance is independent of the sample object catalog.
+    var liveCameraIsSample: Bool { true }
     @Published var come: ComeProgress?
     @Published var find: FindProgress? {
         didSet { logFindResult(from: oldValue, to: find) }
@@ -68,7 +72,9 @@ class RobotSource: ObservableObject {
     // Commands. Subclasses override.
     func start() {}
     /// Stop timers and network loops (called when Settings switches the data source).
-    func stop() { clock?.invalidate(); freshness?.invalidate() }
+    func stop() { endLiveView(); clock?.invalidate(); freshness?.invalidate() }
+    func beginLiveView() {}
+    func endLiveView() {}
     func startFind(_ query: String, match: TrackedObject?) {}
     func cancelFind() { if var f = find { f.phase = .cancelled; find = f } }
     func clearFind() { find = nil }

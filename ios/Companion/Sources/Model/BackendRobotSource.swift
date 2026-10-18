@@ -89,9 +89,13 @@ final class BackendRobotSource: RobotSource {
     private let commands: CommandClient
     private var findTask: Task<Void, Never>?
     private var comeTask: Task<Void, Never>?
+    private var cameraFeed: LiveCameraFeed?
+    private let cameraTransport: LiveCameraFeed.Transport
+    override var liveCameraIsSample: Bool { false }
 
-    init(config: BackendConfig) {
+    init(config: BackendConfig, cameraTransport: @escaping LiveCameraFeed.Transport = LiveCameraFeed.boundedTransport) {
         self.config = config
+        self.cameraTransport = cameraTransport
         self.commands = CommandClient(config: config)
         super.init()
         isLoading = true
@@ -112,6 +116,22 @@ final class BackendRobotSource: RobotSource {
     }
 
     override func stop() { super.stop(); loop?.cancel(); loop = nil; findTask?.cancel(); comeTask?.cancel() }
+
+    override func beginLiveView() {
+        if cameraFeed == nil {
+            cameraFeed = LiveCameraFeed(config: config, transport: cameraTransport) { [weak self] frame, state in
+                self?.liveFrame = frame?.image
+                self?.liveCameraFrame = frame
+                self?.liveCameraState = state
+            }
+        }
+        cameraFeed?.start()
+    }
+
+    override func endLiveView() {
+        cameraFeed?.stop()
+        liveFrame = nil; liveCameraFrame = nil; liveCameraState = .idle
+    }
 
     // MARK: Fetching
 
