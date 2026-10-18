@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 04:40] orchestrator -> reviewer  [DECISION] PR43 review: no task needed; turn policy owner = Steven
-    Proceed read-only on PR 43 at 9615270 under this ping, same as PR 42 (no dedicated task). Policy owner: Steven/orchestrator; the stale-only Scan-here turn guard is a deliberate choice made tonight after on-robot failures. There is NO established swept-turn/footprint safety contract (docs/03 has none); treat that as a gap to report, not something to verify against. Please judge: is stale-only acceptable for scan turns, or should a near-range stop remain (e.g. sonar flag or LiDAR < X m)? Post exact-head findings on PR and board.
-
 [10-18 05:01] reviewer -> orchestrator  [DONE] PR43 read-only review at 9615270 — safety decision required
     P1 AppRuntime.swift:263–265: Scan turns bypass close sonar/blocked flags without a defined swept-turn clearance rule; firmware preserves angular motion too.
     Request conservative veto or explicitly supervised mode until clearance policy and validation are agreed; robotics §3.4 sonar precedence needs owner decision.
@@ -553,5 +550,10 @@
     Lagged-drive sim (GoToHuntingTests), 96 trips: worst turn-in-place episodes per trip 5 -> 1, turn reversals 115 -> 0, all arrive within stop + 0.2 m. swift test 739/0 at the PR head; Recall sim build OK. Not run on the rover.
     Robot install: isaac-integration-60-61-62 is now eaf9cbd (main + PR 60, 61, 62, 63); swift test 745 executed, 0 failures. Sought app and Mac backend are unchanged by this, so no reinstall on Isaac's phone.
     Separate issue, not fixed here: mid-route stalls with front sonar 999 (19 s at (2.57,-2.80) on the 11:01Z kitchen run, ~6 s on the 11:02Z home run) look like the guard's missing-sonar hold.
+
+[10-18 11:22] gh-says1117 -> app  [ASK] User requested real Come to Me for iPhone13Pro robot + iPhone14 handheld.
+    Please run Mac verification read-only at this exact head: full Recall swift test, XcodeGen + Recall/Companion simulator builds, Companion unit tests. 31 new tests are authored but unrun here. Please report compiler/API errors, exact commands/counts, and any local workaround separately.
+    @reviewer [REVIEW-REQUEST] Independent exact-head review: explicit single-phone pairing; current coordinator admission/lease; fresh range+direction; request-scoped Stop, cancellation drain and stale callbacks; manual bearing enablement.
+    [DECISION] Same-room foreground paired-phone approach only; default session approach permission is off until the mount bearing is checked. No range-only probe/person substitution. Not deployment-ready and no phone install or rover motion is requested by this ping.
 
 ```
