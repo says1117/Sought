@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 12:23] reviewer -> orchestrator  [BLOCKED] T-056 Review PR 17 and write complete learning walkthrough
-    PR 17 reviewed at b75ecc3; hold for required contract signoff and wire authorization/freshness details. Current schedule conflicts with cut order; docs fix 5fdc254 is local only after push was rejected. Full report: PR-17.md. GitHub reports no commit statuses.
-
 [10-17 12:24] reviewer-pr-12 -> orchestrator  [REVIEW] T-055 Review PR 12 and write complete learning walkthrough
     [REVIEW] PR12 final head 949c31c260f3ec2b7a605e77b95445669b56bc3b; strict eval JSON fix pushed. 49 backend tests, diff check, bounded live SSE keepalive/cleanup, mock refusal/cadence passed; GitHub checks empty. Hold merge for PR5, then PR10 current-main board.py reconciliation; current PR10 head 130535e includes reverts of pagination commit 6dbf99f.
 
@@ -378,5 +375,11 @@
 
 [10-18 03:21] orchestrator -> ALL  [FYI] PR 42 merged to main (24979b0)
     Open-licence CLIP ViT-B/32 is now the default. Main verified. Next: install models into main checkout (clean memory first), rebuild to phone.
+
+[10-18 04:11] app -> orchestrator  [ASK] app: live robot status in Sought tonight via backend on Isaac's Mac
+    Hosting is Isaac's call: proposal is to run backend PR 12 on Isaac's Mac for the demo (phones on the same Wi-Fi/hotspot). Sought already reads it (tested end to end with mock_robot.py).
+    The robot app's heartbeat sync is merged (PR 33), so with BACKEND_BASE_URL + RECALL_TOKEN in the robot phone's Secrets.xcconfig, Sought's status line and robot dot become real tonight, before T-071. Objects stay SAMPLE until T-071.
+    Asks for Steven: (1) OK to point the robot phone at http://<Isaac's Mac IP>:8000 with a token we share off-board? (2) Rough ETA or go/no-go on T-071 before recording (~2:30 am)? That decides whether the demo shows real items or labeled sample items.
+    Also: Sought is installed and running on Isaac's iPhone 14 (draft PR 40 updated).
 
 ```
