@@ -54,12 +54,29 @@ enum ScanHereState: Equatable {
     }
 }
 
+/// The scan's revocable authority to drive: one drive-lease token, taken when the scan starts.
+/// Anything that takes the drive over (global STOP, pause, another task, a manual tool) makes it not current,
+/// after which no scan tick can reach the robot.
+protocol ScanDriveGrant: AnyObject {
+    /// False once the grant was revoked, superseded, or a manual tool took the link.
+    var isCurrent: Bool { get }
+    /// Runs `body` so every drive command it issues (including child tasks) carries this grant.
+    func run(_ body: () async -> Void) async
+    /// Revoke this grant now. Synchronous: once it returns no scan command can still be in flight.
+    func revoke()
+}
+
 /// What else might own the drive. The app answers from the coordinator; tests use a fake.
 protocol ScanHereGate: AnyObject {
     /// A coordinator task (find, go to, explore...) is running or queued.
     var otherTaskActive: Bool { get }
     /// A manual tool (Manual drive, Teach, Self-test) holds the drive lease.
     var manualToolHeld: Bool { get }
+    /// Take the drive lease for a scan; nil when it cannot be had.
+    func acquireDrive() -> ScanDriveGrant?
+    /// Register with runtime cancellation: global STOP, pause and backgrounding call `cancel`. Cleared by `scanEnded`.
+    func scanStarted(cancel: @escaping () -> Void)
+    func scanEnded()
 }
 
 /// Lock-protected flags read by the scan routine's synchronous `shouldAbort` from any thread.
@@ -86,6 +103,7 @@ final class ScanHereModel: ObservableObject {
     private let config: ScanConfig
     private var task: Task<Void, Never>?
     private var flags = ScanFlags()
+    private var grant: ScanDriveGrant?
 
     /// `stopAll` brakes everything the app drives (coordinator and link); it is called on every cancel.
     init(drive: ExploreDrive, clock: ExploreClock, poses: ExplorePoseSource, gate: ScanHereGate,
@@ -108,27 +126,45 @@ final class ScanHereModel: ObservableObject {
     /// The whole scan; `start()` runs this in a task. Tests await it directly.
     func run() async {
         guard !state.isRunning else { return }
+        // Cancelled (STOP, backgrounding) before the task got going: do not start.
+        if Task.isCancelled { state = .cancelled; return }
         if gate.manualToolHeld { state = .refused(reason: "a manual tool is open"); return }
         if gate.otherTaskActive { state = .refused(reason: "another task is running, stop it first"); return }
         guard poses.latest().tracking == .normal else {
             state = .refused(reason: "tracking is not normal, wait until the camera tracks the room")
             return
         }
+        guard let grant = gate.acquireDrive() else {
+            state = .refused(reason: "the robot's drive is in use")
+            return
+        }
         let flags = ScanFlags()
         self.flags = flags
+        self.grant = grant
+        gate.scanStarted(cancel: { [weak self] in self?.cancel() })
         state = .dwelling(step: 1, total: total)
         let poses = self.poses
-        let result = await ScanRoutine(config: config).run(
-            stopIndex: 0,
-            drive: ProgressDrive(model: self, inner: drive, flags: flags),
-            hook: NoCaptureHook(),
-            clock: ProgressClock(model: self, inner: clock),
-            shouldAbort: {
-                if flags.cancelled { return true }
-                if poses.latest().tracking != .normal { flags.trackingLost = true; return true }
-                return false
-            })
-        drive.stop()
+        var result = DriveResult.failed
+        await grant.run {
+            result = await ScanRoutine(config: config).run(
+                stopIndex: 0,
+                drive: ProgressDrive(model: self, inner: drive, flags: flags, grant: grant),
+                hook: NoCaptureHook(),
+                clock: ProgressClock(model: self, inner: clock),
+                shouldAbort: {
+                    if flags.cancelled { return true }
+                    // Revoked from outside (global STOP, another task took the drive): end, never resume.
+                    if !grant.isCurrent { flags.cancelled = true; return true }
+                    if poses.latest().tracking != .normal { flags.trackingLost = true; return true }
+                    return false
+                })
+        }
+        // Brake only if this scan still owns the drive; a successor's drive is not ours to stop.
+        let stillOwned = grant.isCurrent
+        grant.revoke()
+        self.grant = nil
+        if stillOwned { drive.stop() }
+        gate.scanEnded()
         if flags.cancelled { state = .cancelled; return }
         if flags.trackingLost || result == .trackingLost { state = .stopped(reason: "tracking was lost"); return }
         switch result {
@@ -142,6 +178,7 @@ final class ScanHereModel: ObservableObject {
     /// STOP button, leaving the screen, backgrounding. Always sends STOP, even when no scan is running.
     func cancel() {
         flags.cancelled = true
+        grant?.revoke()          // first: after this returns no scan command can drive
         drive.stop()
         stopAll()
         task?.cancel()
@@ -174,14 +211,29 @@ final class ScanHereModel: ObservableObject {
         private weak var model: ScanHereModel?
         private let inner: ExploreDrive
         private let flags: ScanFlags
+        private let grant: ScanDriveGrant
         private var turns = 0
-        init(model: ScanHereModel, inner: ExploreDrive, flags: ScanFlags) { self.model = model; self.inner = inner; self.flags = flags }
+        init(model: ScanHereModel, inner: ExploreDrive, flags: ScanFlags, grant: ScanDriveGrant) {
+            self.model = model; self.inner = inner; self.flags = flags; self.grant = grant
+        }
         func goTo(x: Double, z: Double, stopDistance: Double) async -> DriveResult { .failed }   // never used by a scan
         func rotateBy(_ deg: Double) async -> DriveResult {
-            if flags.cancelled || Task.isCancelled { return .cancelled }
+            if flags.cancelled || Task.isCancelled || !grant.isCurrent { return .cancelled }
             turns += 1
             await model?.beginTurn(after: turns)
-            return await inner.rotateBy(deg)
+            // The turn runs in its own task (it inherits the lease token). A watcher cancels it as soon as the grant
+            // is revoked from outside, so a revoked scan stops looping instead of idling until the turn times out.
+            let inner = self.inner, grant = self.grant, flags = self.flags
+            let turn = Task { await inner.rotateBy(deg) }
+            let watcher = Task {
+                while !Task.isCancelled {
+                    try? await Task.sleep(nanoseconds: 20_000_000)
+                    if !grant.isCurrent || flags.cancelled { turn.cancel(); return }
+                }
+            }
+            let result = await withTaskCancellationHandler { await turn.value } onCancel: { turn.cancel() }
+            watcher.cancel()
+            return result
         }
         func stop() { inner.stop() }
     }

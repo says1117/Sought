@@ -26,6 +26,14 @@ final class RTFakeScanRig: ExploreDrive, ExploreClock, ExplorePoseSource, ScanHe
     var blockRotate = false
     private var blocked: CheckedContinuation<Void, Never>?
     private var stoppedWhileBlocked = false
+    var driveAvailable = true
+    var grantCurrent = true
+    var registeredCancel: (() -> Void)?
+    var scanEndedCount = 0
+
+    func acquireDrive() -> ScanDriveGrant? { guard driveAvailable else { return nil }; grantCurrent = true; return RTFakeGrant(rig: self) }
+    func scanStarted(cancel: @escaping () -> Void) { registeredCancel = cancel }
+    func scanEnded() { scanEndedCount += 1; registeredCancel = nil }
 
     func goTo(x: Double, z: Double, stopDistance: Double) async -> DriveResult { .failed }
     func rotateBy(_ deg: Double) async -> DriveResult {
@@ -41,6 +49,14 @@ final class RTFakeScanRig: ExploreDrive, ExploreClock, ExplorePoseSource, ScanHe
     func now() -> Double { 0 }
     func sleep(_ seconds: Double) async { sleeps.append(seconds); events.append("dwell"); onSleep?(sleeps.count) }
     func latest() -> (pose: Pose2D?, tracking: TrackingKind) { (Pose2D(x: 0, z: 0, yawDeg: 0), tracking) }
+}
+
+final class RTFakeGrant: ScanDriveGrant {
+    private unowned let rig: RTFakeScanRig
+    init(rig: RTFakeScanRig) { self.rig = rig }
+    var isCurrent: Bool { rig.grantCurrent }
+    func run(_ body: () async -> Void) async { await body() }
+    func revoke() { rig.grantCurrent = false }
 }
 
 @MainActor

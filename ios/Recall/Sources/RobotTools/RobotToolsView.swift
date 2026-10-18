@@ -4,6 +4,7 @@ import SwiftUI
 struct RobotToolsView: View {
     @ObservedObject var runtime: AppRuntime
     @StateObject private var scan: ScanHereModel
+    @Environment(\.scenePhase) private var scenePhase
     @State private var tab = 0
     @State private var trace = FindTraceDisplay.make(from: nil, connected: false)
     @State private var memory = MemoryInspectorDisplay.make(tracks: .success([]), now: 0, modelsInstalled: true)
@@ -16,7 +17,7 @@ struct RobotToolsView: View {
         self.onClose = onClose
         _scan = StateObject(wrappedValue: ScanHereModel(
             drive: ControllerScanDrive(controller: runtime.makeScanController()), clock: ScanSystemClock(),
-            poses: runtime.scanPoses, gate: RuntimeScanGate(coordinator: runtime.coordinator),
+            poses: runtime.scanPoses, gate: runtime.makeScanGate(),
             stopAll: { Task { @MainActor in runtime.stopEverything() } }))
     }
 
@@ -43,6 +44,7 @@ struct RobotToolsView: View {
         .toolbar { ToolbarItem(placement: .topBarLeading) { Button("Done") { scan.cancel(); onClose() } } }
         .onAppear(perform: refresh)
         .onChange(of: tab) { _, _ in refresh() }
+        .onChange(of: scenePhase) { _, phase in if phase != .active { scan.cancel() } }   // never resumes: needs a new tap
         .onDisappear { scan.cancel() }          // leaving the screen cancels a scan and sends STOP
     }
 
