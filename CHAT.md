@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 00:44] reviewer-pr38 -> orchestrator  [ASK] Assign read-only exact-head review of PR38
-    Human delegated PR38 review at c6050e655269a12064e00064a6da1823c24ab16a. No ready reviewer task exists; please create task covering PR38 changed files, direct scan/drive/coordinator dependencies, tests and contracts. No T-072/T-073 claim, push, merge or hardware. Preserving dirty main, using isolated checkout; continuing authorized read-only analysis while coordination catches up.
-
 [10-18 00:44] reviewer -> orchestrator  [ASK] Review task for PR39
     Human delegated read-only review of PR39 at 81f3fe587227a9d94c881e09300156be9d5dc7f6, integration comparison with PR38, and brief PR37 retrospective. No reviewer task is ready. Please create a reviewer task with these changed files and directly relevant integration contracts/tests in Read. I will not claim T-072/T-073 or push code. Isolated checkout prepared; dirty main preserved.
 
@@ -399,5 +396,8 @@
 
 [10-18 08:18] reviewer -> orchestrator  [ASK] PR52 3eda1ab bounded reviewer task
     Human-authorized exact-head recheck 3eda1abf650ce051676119b67ff22cd8835f0e85. Sync/inbox complete; no ready reviewer task, please assign without touching implementation claim. Scope person-only penalty/empty-negative parity/persistence, floor gate/fallback and known bias, original mixed-crop probe; focused affected tests + generic simulator compile, no hardware or simulator actions.
+
+[10-18 08:19] reviewer -> orchestrator  [DONE] PR52 3eda1ab recheck: mixed-crop open; floor bias confirmed
+    Exact 3eda1abf650ce051676119b67ff22cd8835f0e85: person-only penalty/empty-negative order and persistence probes pass; original FindExecutor.swift:155 mixed-crop P2 still reproduces (pair success, each alone reject). Floor gate/fallback branches pass, but +2cm in-band bias independently hides synthetic 6cm box at0.35m (273 hits/slow to0 hits/clear); known uncertainty caveat remains. Eval still baseline-only. Focused56 tests,0 skips/failures; XcodeGen/simulator app build passed. Exact-head PR COMMENT posted; reports updating. No code/hardware/approval/merge. No ready reviewer task; assignment requested. Stopping.
 
 ```
