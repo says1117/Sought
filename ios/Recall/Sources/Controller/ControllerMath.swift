@@ -101,6 +101,9 @@ struct TickInput {
     var tracking: TrackingKind
     var guardState: GuardState
     var now: Double            // seconds, any monotonic clock
+    /// Guard used by rotateBy instead of `guardState` when set. A turn in place has no forward motion, so a caller
+    /// can pass a guard that only stops on stale sensors (Scan here). nil = rotateBy obeys `guardState`.
+    var turnGuardState: GuardState? = nil
 }
 
 struct TickOutput: Equatable {
@@ -160,7 +163,7 @@ struct ControlSession {
             return TickOutput(command: ControllerMath.wheels(linear: lin, angular: ang), status: .running)
 
         case .rotateBy(let deg):
-            if input.guardState == .stop {
+            if (input.turnGuardState ?? input.guardState) == .stop {
                 doneStreak = 0
                 return TickOutput(command: .zero, status: .running)
             }

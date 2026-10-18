@@ -167,6 +167,42 @@ final class ControllerTests: XCTestCase {
         XCTAssertEqual(o.status, .running)
     }
 
+    func testRotateObeysGuardStopWithoutTurnGuard() {
+        var s = ControlSession(goal: .rotateBy(deg: 90))
+        let o = s.tick(TickInput(pose: Pose2D(x: 0, z: 0, yawDeg: 0), tracking: .normal, guardState: .stop, now: 0))
+        XCTAssertEqual(o.command, .zero)
+    }
+
+    func testTurnGuardClearLetsRotateTurnPastForwardStop() {
+        var s = ControlSession(goal: .rotateBy(deg: 90))
+        let o = s.tick(TickInput(pose: Pose2D(x: 0, z: 0, yawDeg: 0), tracking: .normal, guardState: .stop, now: 0,
+                                 turnGuardState: .clear))
+        XCTAssertLessThan(o.command.left, 0)       // left turn: left wheel back, right forward
+        XCTAssertGreaterThan(o.command.right, 0)
+    }
+
+    func testTurnGuardStopHoldsRotateEvenWhenForwardClear() {
+        var s = ControlSession(goal: .rotateBy(deg: 90))
+        let o = s.tick(TickInput(pose: Pose2D(x: 0, z: 0, yawDeg: 0), tracking: .normal, guardState: .clear, now: 0,
+                                 turnGuardState: .stop))
+        XCTAssertEqual(o.command, .zero)
+    }
+
+    func testTurnGuardDoesNotAffectGoTo() {
+        var s = ControlSession(goal: .goTo(x: 0, z: -3, stopDistance: 0.3))
+        let o = s.tick(TickInput(pose: Pose2D(x: 0, z: 0, yawDeg: 0), tracking: .normal, guardState: .stop, now: 0,
+                                 turnGuardState: .clear))
+        XCTAssertEqual(o.command, .zero)
+    }
+
+    func testControllerRotateCompletesWithForwardStopWhenTurnGuardClear() async {
+        let sim = SimRover(x: 0, z: 0, yawDeg: 0)
+        let c = Controller(poses: sim, sink: sim, guardState: { .stop }, turnGuard: { .clear },
+                           clock: { sim.time }, sleep: { sim.advance($0) })
+        let status = await c.rotateBy(90)
+        XCTAssertEqual(status, .done)
+    }
+
     // MARK: failure paths
 
     func testTimeoutAfter30Seconds() async {

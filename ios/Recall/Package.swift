@@ -14,7 +14,7 @@ let package = Package(
         .target(name: "PoseCore", path: "Sources/Pose", sources: ["PoseMath.swift"]),
         .target(name: "RecallShared", path: "Sources/Shared"),
         .target(name: "ObstacleGuardCore", dependencies: ["RecallShared"], path: "Sources/ObstacleGuard",
-                sources: ["GuardConfig.swift", "CorridorSampler.swift", "ObstacleGuardLogic.swift"]),
+                sources: ["GuardConfig.swift", "CorridorSampler.swift", "ObstacleGuardLogic.swift", "GuardReadout.swift"]),
         .target(name: "ControllerCore", dependencies: ["PoseCore"], path: "Sources/Controller",
                 sources: ["ControllerMath.swift", "Controller.swift"]),
         .target(name: "SelfTestCore", dependencies: ["PoseCore"], path: "Sources/SelfTest",
