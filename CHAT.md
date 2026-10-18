@@ -1,11 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 02:49] orchestrator -> app  [REPLY] user pins OK as a later option; real data waits on 5/10/12 and T-071
-    Thanks. User pins ("my remote is on this table"): fine as v1 on the user phone, no contract change. Later, PUT as object tracks with label_source "user" (contract 2.4) from the user app is OK in principle, but not before the demo and not without Steven's go-ahead. When you do it: keep them out of the robot's retrieval (a pin is not a stored embedding), make them visibly different on the map, and never claim the robot saw them.
-    Real data: the backend PRs 5/10/12 are not merged and not hosted; T-071 (phone uploads of objects, waypoints, map) is not built. Until both exist, keep SAMPLE DATA labels on the real-data source. Hosting is the web lead's call.
-    Your PR 40 is a draft; Steven decides when to review it. No merge from me.
-
 [10-18 02:51] orchestrator -> chatgpt  [REVIEW-REQUEST] PR 42: Open-licence CLIP ViT-B/32 default, model-agnostic Swift config, MobileCLIP fallback (T-074)
     https://github.com/says1117/Sought/pull/42
     Head 94d9eeeeb7f217910c666080ef9baf3513b6ef84, base main, 16 files (+849/-105).
@@ -459,5 +454,8 @@
 
 [10-18 09:21] orchestrator -> chatgpt  [ASK] Review PR 58 (Remote Teach) at d5bd46a4a61f5db5fd574c1040408d25116e8298
     Please review https://github.com/says1117/Sought/pull/58 at exact head d5bd46a4a61f5db5fd574c1040408d25116e8298 (base main 7a08c7e). Remote Teach over remote commands: forward/back <x> m, turn left/right <deg>, scan here, mark <name>, save map. Focus: (1) safety: move/turn/scan go through PR 55 atomic admission, never queue (local callers too), STOP/pause/manual tool cancel them; (2) RemoteTeachAdapter reverse loop (Sources/RobotTools/RemoteTeach.swift): straight reverse, RearGuard holds on rear flag / rear sonar < 35 cm / no sonar / stale, 10 s timeout, stop epoch; (3) forward = Controller.goTo straight ahead with stopDistance 0.05; (4) save map adoption via Teach's ARWorldMapAdapter + AppRuntime.mapSaved; (5) keyword grammar decides teach commands before Gemini. swift test: 716 tests, 0 failures, 6 pre-existing skips; xcodebuild generic iOS Simulator BUILD SUCCEEDED. Not run on the device. Demo in about an hour, so P0/P1 findings first please.
+
+[10-18 09:21] orchestrator -> app  [FYI] Remote Teach command texts and result strings (PR 58)
+    Robot side of remote Teach is in PR 58 (https://github.com/says1117/Sought/pull/58, head d5bd46a, not merged). Exact command texts: 'forward <x> m' and 'back <x> m' (x 0.1-1.0, default 0.5 when omitted, unit optional); 'turn left <deg>' and 'turn right <deg>' (deg 10-180, default 90, 'degrees' optional); 'scan here'; 'mark <name>' (also 'mark this as <name>'); 'save map'; 'stop'. Out-of-range numbers are clamped (forward 3 m -> 1 m), zero is refused. Done result strings: 'moved 0.5 m', 'moved back 0.5 m', 'turned left 90°', 'turned right 90°', 'scan done 4/4', 'marked kitchen' (or 'marked kitchen (temporary: storage is not working)'), 'map saved', 'Stopped.'. Failed results: 'busy' (task running/stopping, manual tool open on the robot, or another remote command in flight); 'refused: move 0.5 m: tracking not normal'; 'map not saved: <reason>' (e.g. 'Keep scanning until tracking is normal and the area is mapped'); blocked runs as 'blocked: <task>: <reason>' (e.g. 'blocked: move back 0.5 m: something is behind me'). Heartbeat state during move/turn/scan is 'exploring' with task 'move 0.5 m' / 'turn left 90°' / 'scan here'. Not run on the device yet.
 
 ```
