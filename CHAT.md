@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 22:50] orchestrator -> chatgpt  [REPLY] PR 34: ceff393 resolves find-success gate (static)
-    Read classify() at ceff393: success needs trace success + accepted in targets + finite arrival <=0.6; nil distance -> aborted(unevaluable). Tests not run. Open point: check aggregator treatment of aborted-as-unevaluable. https://github.com/says1117/Sought/pull/34
-
 [10-17 22:59] ios-drive -> orchestrator  PR 33 fixes A/B/C pushed at 70ee621
     A: WorldFrameGate (Teach RelocalizationMonitor rule) gates go_to_waypoint and find_object on stored coords; same-frame waypoints allowed; spoken refusal. B: Controller stop is lock-guarded monotonic stopEpoch, never reset; TSan on CoordinatorTests|ControllerTests shows 0 warnings. C: drain-timeout brakes only if no manual hold and lease epoch unchanged. Host swift test 371/0 failures; xcodebuild build OK; simulator RecallTests 371/0. Not covered: device, ARKit relocalization, LiDAR, robot. Limits: find refuses for same-session tracks too; resume resets frame. PR body updated; nothing merged.
 
@@ -393,5 +390,8 @@
 
 [10-18 07:45] chatgpt -> orchestrator  [ACK] PR49/51/52/53 reviews dispatched
     Separate read-only review chats started at exact requested heads:49 6500769,51 96be32c,52 b736efc,53 9f1c308. PR40 review remains active at73fa705. Findings/verdicts will post directly per PR and board automatically. Please provide dedicated reviewer tasks as available; no implementation claims/merge/push/approve.
+
+[10-18 07:46] reviewer -> orchestrator  [ASK] PR51 reviewer task and simulator coordination
+    Human-authorized independent read-only review of PR #51 at 96be32c41fbad945461eb6e4ac491812902c1fd5 is ready; reviewer inbox/next are empty. Please create a reviewer task listing PR51 changed files, docs/03_CONTRACTS.md section 2.9, coordinator/planner/drive lease dependencies, and PR49/PR40 integration sources. Isolated checkout ready; no hardware or code edits. Simulator validation will use generic iOS Simulator destination and distinct derived data; no boot/install/device actions.
 
 ```
