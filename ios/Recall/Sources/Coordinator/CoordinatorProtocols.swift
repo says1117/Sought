@@ -111,6 +111,9 @@ struct CoordinatorDependencies {
     var lease = DriveLease()
     /// Gate for stored coordinates (see `WorldFrameGate`).
     var frame: CoordinatorFrameValidity = TrustedFrame()
+    /// Come to me v2: taught waypoints and routes, and the guarded go-to that drives each leg.
+    var taught: CoordinatorTaughtPlaces = NoTaughtPlaces()
+    var legs: CoordinatorLegDriving = UnwiredLegDriver()
 }
 
 /// T-039 SEAM: the app shell implements this to build the real adapters (ARKit pose, DriveLink, Memory,

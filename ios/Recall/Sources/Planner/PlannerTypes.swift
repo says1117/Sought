@@ -16,6 +16,8 @@ enum ToolCall: Equatable {
     case say(text: String)
     case explore(maxMinutes: Int?)
     case comeToMe
+    /// Come to me v2: drive to the user at a taught place ("come to me in the kitchen").
+    case comeToWaypoint(name: String)
 
     /// Wire name, identical to the Gemini function declaration name.
     var toolName: String {
@@ -30,6 +32,7 @@ enum ToolCall: Equatable {
         case .say: return "say"
         case .explore: return "explore"
         case .comeToMe: return "come_to_me"
+        case .comeToWaypoint: return "come_to_waypoint"
         }
     }
 }
@@ -148,6 +151,9 @@ enum PlannerTools {
         ToolSpec(name: "come_to_me",
                  description: "Drive to the companion iPhone the user is carrying.",
                  params: []),
+        ToolSpec(name: "come_to_waypoint",
+                 description: "Come to the user at a taught place they name, e.g. 'come to me in the kitchen' or 'come to the kitchen'. Follows taught routes and stops about 1 m short. The name must be one of the known waypoints.",
+                 params: [ToolParam(name: "name", kind: .string, description: "Waypoint name from the known list.", required: true)]),
     ]
 
     static func spec(named name: String) -> ToolSpec? { specs.first { $0.name == name } }
@@ -193,6 +199,7 @@ extension ToolCall {
             guard v >= 1, v <= PlannerTools.maxExploreMinutes else { throw bad("max_minutes out of range") }
             return .explore(maxMinutes: v)
         case "come_to_me": return .comeToMe
+        case "come_to_waypoint": return .comeToWaypoint(name: try string("name", max: PlannerTools.maxNameLength))
         default: throw PlannerError.unknownTool(name)
         }
     }
@@ -211,6 +218,9 @@ extension ToolCall {
                 throw PlannerError.unresolvedTarget(tool: toolName, name: n)
             }
             return .checkRoute(name: r)
+        case .comeToWaypoint(let n):
+            guard let r = ctx.resolveWaypoint(n) else { throw PlannerError.unresolvedTarget(tool: toolName, name: n) }
+            return .comeToWaypoint(name: r)
         default:
             return self
         }

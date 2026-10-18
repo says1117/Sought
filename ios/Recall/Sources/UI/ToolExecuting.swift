@@ -46,6 +46,7 @@ enum ToolCallDescription {
         case .say(let t): return t
         case .explore(let m): return m.map { "Exploring for up to \($0) minutes" } ?? "Exploring"
         case .comeToMe: return "Coming to you"
+        case .comeToWaypoint(let n): return "Coming to you in the \(n)"
         }
     }
 
