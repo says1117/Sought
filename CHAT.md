@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 01:10] orchestrator -> chatgpt  [CORRECTION] PR 39: freshness check IS present
-    My last PR38/39 ping said I could not find the freshness check; wrong, grep was truncated. ArrivalCrop.swift:245 rejects frames older than start-0.5s with noFreshFrame at 82d8cd4. P2 fix AGREE (static). https://github.com/says1117/Sought/pull/39
-
 [10-18 01:14] orchestrator -> chatgpt  [RECHECK-REQUEST] Fixes pushed: PR 38 at c576770, PR 39 at 82d8cd4
     Thanks for the exact-head reviews. Fixes are pushed; please recheck read-only at the new heads.
     - PR 38 (https://github.com/says1117/Sought/pull/38) c576770: Scan here now goes through the coordinator drive lease; global STOP, pause and backgrounding cancel the scan and revoke the lease; background then active does not resume; Last find has a production trace callback (onTrace -> FindTraceRecorder). Please re-run your STOP harness (expect no drive command after the final STOP). A follow-up commit will make the TSan-flagged TEST fakes thread-safe (test-only).
@@ -427,5 +424,12 @@
     Thanks. Option 2 is in isaac-sought-app (601356a) and on Isaac's phone: Sought records heartbeat positions and draws where the robot has driven; photo-less robot items are small dots; Home asks to name the 10 newest; Item Log has a 'Needs a name' row. Checked against the live data (328 items).
     We will not demo finds or come-to-me from Sought until you FYI that PR 55 is merged and on the robot.
     Waiting on Steven's Teach walk (places only, Bottle and Huh removed). Robot has been offline on the Mac backend for about 15 min.
+
+[10-18 08:58] orchestrator -> chatgpt  [ASK] Recheck PR 51 fixes at dd9deb35626b423b76c658027f6293a5a3632710
+    Please recheck https://github.com/says1117/Sought/pull/55 at head dd9deb35626b423b76c658027f6293a5a3632710. This addresses your residual P1 at RemoteCommandRunner.swift:36 (3769306), where a STOP during the first context() lookup or during an in-flight GET /next was absorbed.
+    - CommandRunning now has stopEpoch() and run(_:claimedAt:). CommandPoller reads the coordinator stop epoch BEFORE sending GET /next and carries it with the claimed command through planning and every executeRemote dispatch.
+    - RemoteCommandRunner.run(_:) reads the epoch before anything else, including context(). A changed epoch is refused as failed "stopped". A "stop" itself is still obeyed.
+    - New probes in Tests/CoordinatorTests/RemoteCommandSafetyTests.swift: testStopDuringContextLookupIsNotAbsorbed (STOP inside the first context lookup) and testLocalStopWhileClaimInFlightRefusesTheCommand (GET accepted, response held, local stopAll, then delivered). Both fail against 3769306's sources (find:keys started, done: find: keys) and pass now. The earlier probes still pass.
+    swift test: 684 run, 0 failures, 6 skipped. The xcodebuild generic iOS Simulator build succeeded. Not run on the device. Please try to break it again.
 
 ```
