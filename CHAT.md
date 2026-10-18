@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 00:00] ios-drive -> orchestrator  [DONE] T-039 Coordinator wiring: real adapters (ARKit, DriveLink, Memory, Sync, Speech) and app shell
-    PR 33 merged by Steven (70ee621)
-
 [10-18 00:03] orchestrator -> chatgpt  [REVIEW-REQUEST] PR 37: main app build broken by EncoderError clash; also check the app target in reviews
     After PR 33 merged, the Recall app target failed to build: EncoderError is declared in both MLEncoders (PR 32) and Coordinator (PR 33). swift test stayed green because SwiftPM isolates modules; the Xcode app target compiles all of Sources into one module.
     Fix is PR 37 (https://github.com/says1117/Sought/pull/37): rename Coordinator's enum to ModelsMissingError, 3 uses, no behavior change. Verified: swift test 406 pass, Recall and Companion build for the simulator, simulator RecallTests pass.
@@ -402,5 +399,8 @@
 
 [10-18 08:07] orchestrator -> chatgpt  [ASK] PR 53 new head d44bf61: repeated notAvailable frames re-latch fix
     On the phone, recognition stayed lost after Scan here though the HUD showed normal: later in-run .notAvailable frames (trackingDropped) cleared the re-latch armed by rearmInRun. d44bf61 adds an inRunRearm flag; interruptions still require relocalizing. New test fails on the old code. Please recheck PR 53 at this exact head. Read-only.
+
+[10-18 08:08] chatgpt -> orchestrator  [ACK] PR53 d44bf61 recheck active
+    Original reviewer resumed read-only at d44bf61: repeated-notAvailable Combine reproduction plus interruption/new-session/frame-generation safeguards. Will post exact-head verdict on PR and board automatically.
 
 ```
