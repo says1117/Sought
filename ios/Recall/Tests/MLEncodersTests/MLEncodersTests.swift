@@ -515,3 +515,49 @@ final class MLEncodersTests: XCTestCase {
         #endif
     }
 }
+
+// PR 39 review P1: one MLModel must never be entered by two threads at once. A fake "model" that records overlap.
+final class ML39OverlapProbe {
+    private let lock = NSLock()
+    private var inside = 0
+    private(set) var maxInside = 0
+    private(set) var calls = 0
+    func predict() -> Int {
+        lock.lock(); inside += 1; calls += 1; maxInside = max(maxInside, inside); lock.unlock()
+        Thread.sleep(forTimeInterval: 0.002)
+        lock.lock(); inside -= 1; lock.unlock()
+        return 1
+    }
+}
+
+final class ML39SerialGateTests: XCTestCase {
+    private func hammer(_ probe: ML39OverlapProbe, gate: SerialGate?) {
+        let group = DispatchGroup()
+        for _ in 0..<8 {
+            DispatchQueue.global().async(group: group) {
+                for _ in 0..<20 { _ = gate.map { $0.run { probe.predict() } } ?? probe.predict() }
+            }
+        }
+        group.wait()
+    }
+
+    func testHarnessDetectsOverlapWithoutTheGate() {
+        let probe = ML39OverlapProbe()
+        hammer(probe, gate: nil)
+        XCTAssertGreaterThan(probe.maxInside, 1, "sanity: the probe sees concurrent entry when unserialized")
+    }
+
+    func testGateNeverLetsTwoPredictionsOverlap() {
+        let probe = ML39OverlapProbe()
+        hammer(probe, gate: SerialGate())
+        XCTAssertEqual(probe.maxInside, 1)
+        XCTAssertEqual(probe.calls, 160)
+    }
+
+    func testGatePropagatesErrorsAndReleases() {
+        struct Boom: Error {}
+        let gate = SerialGate()
+        XCTAssertThrowsError(try gate.run { throw Boom() })
+        XCTAssertEqual(gate.run { 7 }, 7, "lock released after a throw")
+    }
+}

@@ -338,7 +338,7 @@ TEST(pwm_direction_sign_and_trim) {
   CHECK_EQ(nav::sideDrive(255, 1, 150).pwm, MAX_PWM);                 // trim cannot exceed the cap
   CHECK_EQ(nav::sideDrive(1, 1, 50).pwm, 35);
   CHECK(nav::sideDrive(0, -1, 50).brake);                             // zero is always a short brake
-  CHECK_EQ(LEFT_SIGN, 1); CHECK_EQ(RIGHT_SIGN, 1); CHECK_EQ(LEFT_TRIM, 100); CHECK_EQ(RIGHT_TRIM, 100);
+  CHECK_EQ(LEFT_SIGN, 1); CHECK_EQ(RIGHT_SIGN, -1);   // right side measured inverted on the rover CHECK_EQ(LEFT_TRIM, 100); CHECK_EQ(RIGHT_TRIM, 100);
 }
 
 // ------------------------------------------------------------------ scenarios (simulated time)

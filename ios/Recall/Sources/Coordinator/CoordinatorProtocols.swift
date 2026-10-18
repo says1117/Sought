@@ -11,6 +11,9 @@ enum CoordinatorTaskResult: Equatable {
     /// The task could not continue (controller gave up, no route, nothing found to drive to...).
     case blocked(reason: String)
     case cancelled
+    /// The task cannot run in this build or state (e.g. image models not installed). The coordinator speaks
+    /// `spoken`, returns to idle, and does not treat it as a failure.
+    case refused(spoken: String)
 }
 
 enum CoordinatorTracking: String, Equatable {
@@ -24,8 +27,11 @@ struct CoordinatorWaypoint: Equatable {
     var x: Double
     var z: Double
     var yawDeg: Double
-    init(name: String, x: Double, z: Double, yawDeg: Double = 0) {
-        self.name = name; self.x = x; self.z = z; self.yawDeg = yawDeg
+    /// True when recorded in the coordinate frame in use right now. Defaults to false: a stored waypoint is
+    /// only driven to after relocalization against the saved map.
+    var inCurrentFrame: Bool
+    init(name: String, x: Double, z: Double, yawDeg: Double = 0, inCurrentFrame: Bool = false) {
+        self.name = name; self.x = x; self.z = z; self.yawDeg = yawDeg; self.inCurrentFrame = inCurrentFrame
     }
 }
 
@@ -63,6 +69,12 @@ protocol CoordinatorWaypoints: AnyObject {
     func lookup(_ name: String) -> CoordinatorWaypoint?
     /// Save the robot's current pose under `name`. Throws if there is no pose or the save fails.
     func markHere(name: String) throws -> CoordinatorWaypoint
+    /// False when saves only live in memory (persistent storage failed to open). Spoken confirmations say so.
+    var isPersistent: Bool { get }
+}
+
+extension CoordinatorWaypoints {
+    var isPersistent: Bool { true }
 }
 
 /// Synchronous drive brake. Must be safe to call from any thread, at any time, many times.
@@ -95,6 +107,10 @@ struct CoordinatorDependencies {
     var speaker: CoordinatorSpeaking
     var clock: CoordinatorClock
     var pose: CoordinatorPoseSource
+    /// Shared with the drive sink the runners use; the coordinator grants, revokes and holds it.
+    var lease = DriveLease()
+    /// Gate for stored coordinates (see `WorldFrameGate`).
+    var frame: CoordinatorFrameValidity = TrustedFrame()
 }
 
 /// T-039 SEAM: the app shell implements this to build the real adapters (ARKit pose, DriveLink, Memory,
