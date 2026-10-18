@@ -106,6 +106,18 @@ Machine: macOS 27.0.1, arm64 Apple Silicon, Python 3.11, coremltools 9.0, torch 
   fp16, median of 30 warm runs after 2 warm-ups): `CPU_ONLY` image 6.2 ms (p95 7.7), text 4.5 ms (p95 6.5);
   `ALL` image 7.6 ms (p95 11.3), text 4.3 ms (p95 5.0). **Phone latency is not measured**, nor is thermal behaviour.
 
+### Switching encoder family (rule)
+
+CLIP ViT-B/32 and MobileCLIP-S0 both output 512-d unit vectors, so the dimension checks in `Memory` and `Retrieval` accept
+a mix, but vectors from the two families are not comparable, and saved tracks carry no encoder identity. After a switch,
+old tracks would stay rankable against new queries and new observations would fail to associate or duplicate tracks,
+silently. **Rule: every switch of family, in either direction and including the fallback, requires clearing the phone's
+saved object memory and world maps first. Delete the Recall app from the phone (that removes its container), then install
+and run the new build.** `install_models.sh` enforces the cheap half: it refuses to replace one family's packages with the
+other's unless you pass `--memory-cleared`, and it prints the reminder on every install (it cannot see the phone). Tagging
+embeddings with an encoder identity so the app can invalidate them itself would be the proper fix; it touches the stored
+track format and `docs/03_CONTRACTS.md`, so it is not done here (needs a `[DECISION]`).
+
 ### NOT run / open items (default model)
 
 - No phone run: not installed on a device, no Neural Engine/GPU numbers from an iPhone, no thermal data.
@@ -226,12 +238,10 @@ Machine: macOS 27.0.1, arm64 (Apple Silicon), Python 3.11, coremltools 9.0, torc
 
 ### NOT run / open items (fallback)
 
-- **No on-device run.** No iPhone, no Xcode on this Mac (Command Line Tools only), so `.mlmodelc`
-  compilation, Neural Engine / GPU execution and **latency were not measured**. Parity ran on this Mac's CPU
-  only. To do on the phone: time `MLModel.prediction` for each encoder with `computeUnits = .all`
-  (first call includes compile/load, report warm numbers separately) and re-run the cosine check on
-  device using `golden_tokens.json` ids.
-- The Swift tokenizer is specified and has golden vectors but is **not written or compiled**.
-- Crop preprocessing in the app (aspect-ratio handling of detector crops: squash vs pad vs center-crop)
-  is undecided; this conversion assumes the model receives a 256x256 RGB image.
-- Licence terms need a human read (see caveat above).
+- The MobileCLIP-S0 numbers above were measured before Xcode was installed; the Swift side has since been built and tested
+  (tokenizer, preprocessing at 256 px, Core ML runners, `ModelLocator`; see `ios/Recall/Sources/MLEncoders/README.md`), but
+  the MobileCLIP-S0 Core ML models were not re-converted or re-run for the config change, and its latency on a phone was
+  never measured.
+- Crop fitting is decided: `CropFitMode.centerCrop` (resize the short side, centre-crop) is the default and what the PIL
+  comparison above measures; `.squash` exists for callers that need the whole detector box.
+- Licence: research-only, see the caveat above. Not suitable for a product.

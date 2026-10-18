@@ -157,7 +157,13 @@ public final class CoreMLImageRunner: ImageModelRunning {
 /// One call from the app: locate files, build the real encoders.
 public enum CoreMLEncoderFactory {
     public static func make(locator: ModelLocator = ModelLocator()) throws -> (text: CoreMLTextEncoder, image: CoreMLImageEmbedder) {
-        let loc = try locator.locateAll()
+        try build(try locator.locateAll())
+    }
+
+    /// Builds both encoders from located files, carrying the located `ModelConfig` (image size, embedding dimension)
+    /// into the encoders and checking the image model's input size against it. Every caller that has `ModelLocations`
+    /// (the app's EncoderProvider included) must build through here, or a 224 px model gets 256 px crops.
+    public static func build(_ loc: ModelLocations) throws -> (text: CoreMLTextEncoder, image: CoreMLImageEmbedder) {
         let tok = try CLIPTokenizer(vocabURL: loc.vocab, mergesURL: loc.merges)
         return (CoreMLTextEncoder(tokenizer: tok, runner: try CoreMLTextRunner(modelURL: loc.textModel), config: loc.config),
                 CoreMLImageEmbedder(runner: try CoreMLImageRunner(modelURL: loc.imageModel, expectedImageSize: loc.config.imageSize),
