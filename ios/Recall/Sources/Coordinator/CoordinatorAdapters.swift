@@ -207,6 +207,9 @@ struct CoordinatorWiring {
     var poses: PoseSource
     var drive: DriveSink
     var guardState: () -> GuardState
+    /// Guard for the coordinator's turns in place (find's final facing turn). nil = turns obey `guardState`.
+    /// The app passes Scan here's turn guard (SensorCache.turnGuardState); goTo always obeys `guardState`.
+    var turnGuard: (() -> GuardState)? = nil
     var waypointStore: WaypointStore
     var trackStore: TrackProviding
     var encoders: EncoderProvider
@@ -229,8 +232,7 @@ struct CoordinatorWiring {
     /// (see `PoseSnapshotBox`): the coordinator and Controller run off the main thread.
     func makeCoordinator() -> RobotCoordinator {
         let lease = self.lease
-        let controller = Controller(poses: poses, sink: LeasedDriveSink(base: drive, lease: lease), guardState: guardState,
-                                    clock: controllerClock, sleep: controllerSleep)
+        let controller = makeController()
         let driver = ControllerApproachDriver(controller: controller, poses: poses)
         let finder = FindRunnerAdapter(tracks: trackStore, encoders: encoders, driver: driver, speaker: speaker, frame: frame,
                                        onTrace: onFindTrace, stopMotion: { controller.stop() })
@@ -244,5 +246,11 @@ struct CoordinatorWiring {
                 drive: DriveStopAdapter(sink: drive), speaker: speaker, clock: clock,
                 pose: ControllerPoseAdapter(source: poses), lease: lease, frame: frame),
             config: cfg)
+    }
+
+    /// The coordinator's Controller: drives under the shared lease; goTo obeys `guardState`, rotateBy `turnGuard`.
+    func makeController() -> Controller {
+        Controller(poses: poses, sink: LeasedDriveSink(base: drive, lease: lease), guardState: guardState,
+                   turnGuard: turnGuard, clock: controllerClock, sleep: controllerSleep)
     }
 }

@@ -103,7 +103,7 @@ final class AppRuntime: ObservableObject {
         self.driveLease = lease
         var wiring = CoordinatorWiring(
             poses: poseBox, drive: sink,
-            guardState: { cache.guardState() }, waypointStore: waypoints, trackStore: tracks,
+            guardState: { cache.guardState() }, turnGuard: { cache.turnGuardState() }, waypointStore: waypoints, trackStore: tracks,
             encoders: encoders, speaker: SpeakerAdapter(speaker: speaker), features: features,
             waypointsPersistent: waypointsPersistent, frame: frameGate)
         wiring.lease = lease
