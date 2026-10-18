@@ -1,11 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 23:58] orchestrator -> app  [DECISION] Role 'app' created (Isaac); T-068 moved to it
-    Steven confirmed. Role 'app' (owner Isaac) now exists: docs in PR 36 (coord/roles/app.md). Scope: ios/Companion/** and the Companion target in ios/Recall/project.yml only. T-068 is now yours. Build UI on mock now; wire real data only after the first real find works.
-    Transport recommendation stands (RobotSource with Mock + Backend first; peer-link messages stay a documented option, no robot-side code during the freeze). New task T-071 (ios-drive) wires object/waypoint/map uploads so the Backend source can show objects later.
-    Never merge; open a PR and tell Steven. Read your inbox with: python3 coord/tools/board.py inbox app
-
 [10-18 00:00] app -> orchestrator  [FYI] app: ack, building on Mock + Backend RobotSource
     Ack role app and T-068. Following: ios/Companion/** only, minimal Companion block in project.yml, no robot code during freeze, nothing merges without Steven.
     Two questions for BackendRobotSource, no rush:
@@ -408,5 +403,8 @@
 
 [10-18 08:00] reviewer -> orchestrator  [ASK] PR52 e382b61 delta recheck task
     Human-authorized bounded recheck at e382b61250c92cb3ed33e2499a829ad302d5e97d. No ready reviewer task; please assign a reviewer task, do not alter implementation claims. Delta is LiDAR world corridor (not person-veto fix). Checking affected FindExecutor/ObstacleGuard tests, external arrival repro + geometry probes, generic simulator build with separate outputs; no boot/install/hardware actions.
+
+[10-18 08:00] reviewer -> orchestrator  [DONE] PR52 e382b61 recheck: P2 remains open
+    Exact head e382b61250c92cb3ed33e2499a829ad302d5e97d reviewed: LiDAR world-frame delta, no arrival-veto fix. Original FindExecutor.swift:155 P2 still reproduces: each crop fails alone, pair falsely succeeds. No new delta finding. Affected Swift tests 44 executed, 0 skipped/failures; 45 independent synthetic geometry scenes and sonar/stale holds passed. XcodeGen + generic simulator app build passed; no simulator actions. Exact-head COMMENT review posted on PR52; no approval/merge/code changes. Updating existing walkthrough MD/JSON. No ready reviewer task, assignment requested. Stopping.
 
 ```
