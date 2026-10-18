@@ -20,6 +20,8 @@ class RobotSource: ObservableObject {
     @Published var findLog: [FindRecord] = []
     /// Soughtbot's own notable state changes seen in its check-ins (Activity log).
     @Published var robotLog: [RobotLogEntry] = []
+    /// Pins the person left (saved on this iPhone, shared by every data source).
+    @Published var pins: [UserPin] = PinStore.load()
     /// True until the first data arrives. Screens show shimmering placeholders, not an empty state.
     @Published var isLoading = false
     /// Ticks so "N min ago" and the offline check refresh without new data.
@@ -80,13 +82,21 @@ class RobotSource: ObservableObject {
         }
     }
 
+    /// Everything the person can look for: Soughtbot's sightings plus their own pins.
+    var items: [TrackedObject] { objects + pins.map(\.asItem) }
+
+    /// Soughtbot's sightings only (pins are not "finds").
     var recentFinds: [TrackedObject] { objects.sorted { $0.lastSeen > $1.lastSeen } }
     var essentials: [TrackedObject] { objects.filter(\.isEssential).sorted { $0.lastSeen > $1.lastSeen } }
     var frequentlySought: [TrackedObject] { objects.filter { $0.timesSought > 0 }.sorted { $0.timesSought > $1.timesSought } }
+    var pinnedItems: [TrackedObject] { pins.sorted { $0.createdAt > $1.createdAt }.map(\.asItem) }
+
+    func addPin(_ pin: UserPin) { pins.append(pin); PinStore.save(pins) }
+    func removePin(id: String) { pins.removeAll { $0.id == id }; PinStore.save(pins) }
 
     /// Rooms in a stable order with their objects, for the Item Log.
     var byRoom: [(room: String, items: [TrackedObject])] {
-        let grouped = Dictionary(grouping: objects.filter { $0.room != nil }, by: { $0.room! })
+        let grouped = Dictionary(grouping: items.filter { $0.room != nil }, by: { $0.room! })
         return grouped.keys.sorted().map { ($0, grouped[$0]!.sorted { $0.lastSeen > $1.lastSeen }) }
     }
 
@@ -102,7 +112,7 @@ class RobotSource: ObservableObject {
         let words = Self.words(query).subtracting(stop)
         guard !words.isEmpty else { return nil }
         var best: (TrackedObject, Int)?
-        for o in objects {
+        for o in items {
             let hay = Self.words(o.label + " " + (o.description ?? ""))
             let s = words.filter { w in hay.contains { h in Self.close(h, w) } }.count
             guard s > 0 else { continue }

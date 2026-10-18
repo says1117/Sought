@@ -7,6 +7,7 @@ import SwiftUI
 struct FindFlowView: View {
     let request: FindRequest
     @EnvironmentObject private var robot: RobotSource
+    @EnvironmentObject private var router: Router
     @EnvironmentObject private var settings: AppSettings
     @Environment(\.palette) private var p
     @Environment(\.dismiss) private var dismiss
@@ -32,7 +33,9 @@ struct FindFlowView: View {
 
             ScrollView {
                 VStack(spacing: Space.xl) {
-                    if !started { confirm } else { phaseView }
+                    // A pin opened from its card shows right away; a search that matched a pin asks "Looking for …?" first.
+                    if request.match?.isPin == true && (request.confirmed || started) { pinnedResult }
+                    else if !started { confirm } else { phaseView }
                 }
                 .id(phaseKey)
                 .transition(reduceMotion ? AnyTransition.opacity : AnyTransition(.blurReplace))
@@ -42,7 +45,11 @@ struct FindFlowView: View {
         }
         .background(Color.clear)
         .animation(reduceMotion ? Motion.fade : Motion.spring, value: phaseKey)
-        .onAppear { if request.confirmed { start() } }
+        .onAppear {
+            if request.match?.isPin == true, request.confirmed, let m = request.match {
+                say("Your \(m.label) should be \(m.whereText.lowercased()). You pinned it.")
+            } else if request.confirmed { start() }
+        }
         .onChange(of: robot.find?.phase) { _, phase in react(to: phase) }
         .onDisappear { pulseTask?.cancel() }
     }
@@ -66,15 +73,20 @@ struct FindFlowView: View {
         switch ph { case .searching, .driving: return true; default: return false }
     }
 
-    private var label: String { (request.match?.label ?? request.query).lowercased() }
+    /// Robot labels read naturally in lowercase ("your red umbrella"); pin names keep the person's own capitals.
+    private var label: String {
+        if let m = request.match, m.isPin { return m.label }
+        return (request.match?.label ?? request.query).lowercased()
+    }
 
     // MARK: Confirm
 
     @ViewBuilder private var confirm: some View {
         if let m = request.match {
-            photo(m.photo)
-            title("Looking for \(m.label.lowercased())?")
-            body("Last seen \(m.whereText.lowercased()), \(StatusCopy.ago(m.lastSeen, now: robot.now)).")
+            ItemPhoto(item: m, radius: Radius.card).aspectRatio(4 / 3, contentMode: .fit).softShadow()
+            title("Looking for \(m.isPin ? m.label : m.label.lowercased())?")
+            body(m.isPin ? "You pinned it \(m.whereText.lowercased()), \(StatusCopy.ago(m.lastSeen, now: robot.now))."
+                         : "Last seen \(m.whereText.lowercased()), \(StatusCopy.ago(m.lastSeen, now: robot.now)).")
             primary("Yes, find it", id: "confirmFind") { start() }
             secondary("Not that", id: "notThat") { close() }
         } else {
@@ -82,8 +94,33 @@ struct FindFlowView: View {
             title("Soughtbot has not seen \u{201C}\(request.query)\u{201D} yet")
             body("It can look around for it. This works best for things in rooms it has already explored.")
             primary("Ask Soughtbot to look", id: "confirmFind") { start() }
-            secondary("Never mind", id: "notThat") { close() }
+            secondary("Pin where I left it", id: "pinIt") { pinInstead() }
+            tertiary("Never mind", id: "notThat") { close() }
         }
+    }
+
+    // MARK: Pinned item (no robot involved)
+
+    @ViewBuilder private var pinnedResult: some View {
+        if let m = request.match {
+            ActivityPill(text: "Pinned by you · \(StatusCopy.ago(m.lastSeen, now: robot.now))")
+            title("Your \(label) should be \(m.whereText.prefix(1).lowercased() + m.whereText.dropFirst())")
+            body([m.pin?.note.map { "Note: \($0)." }, "Soughtbot hasn\u{2019}t confirmed this."].compactMap { $0 }.joined(separator: " "))
+            if case .jpeg = m.photo { photo(m.photo).frame(maxHeight: 180) }
+            if let map = robot.map { MiniMoveMap(map: map, object: m, from: nil, to: nil) }
+            primary("Got it", id: "findDone") { close() }
+            secondary("It\u{2019}s not there · remove pin", id: "removePin") {
+                robot.removePin(id: m.id)
+                say("Pin removed.")
+                close()
+            }
+        }
+    }
+
+    private func pinInstead() {
+        robot.cancelFind()
+        robot.clearFind()
+        router.startPin(named: request.query)
     }
 
     // MARK: Phases
@@ -125,9 +162,10 @@ struct FindFlowView: View {
         case .notFound:
             icon("magnifyingglass.circle", color: p.searching)
             title("Soughtbot could not find your \(label)")
-            body("It may be somewhere Soughtbot has not explored yet. Try another name, or check the Item Log.")
+            body("It may be somewhere Soughtbot has not explored yet. Try another name, or pin where you left it.")
             primary("Try again", id: "tryAgain") { start() }
-            secondary("Close", id: "findDone") { close() }
+            secondary("Pin where I left it", id: "pinIt") { pinInstead() }
+            tertiary("Close", id: "findDone") { close() }
         case let .failed(reason):
             icon("exclamationmark.triangle.fill", color: p.alert)
             title("Soughtbot stopped")
@@ -143,6 +181,7 @@ struct FindFlowView: View {
     // MARK: Actions
 
     private func start() {
+        if request.match?.isPin == true { started = true; return }   // pins never send the robot
         started = true
         Haptics.shared.tap()
         robot.startFind(request.query, match: request.match)
@@ -227,6 +266,13 @@ struct FindFlowView: View {
         Button(action: action) {
             Text(s).font(SoughtFont.button).foregroundStyle(p.onPrimary).frame(maxWidth: .infinity, minHeight: 60)
                 .background(Capsule().fill(p.primary))
+        }
+        .buttonStyle(.plain).accessibilityIdentifier(id)
+    }
+
+    private func tertiary(_ s: String, id: String, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(s).font(SoughtFont.button).foregroundStyle(p.text).frame(maxWidth: .infinity, minHeight: 48)
         }
         .buttonStyle(.plain).accessibilityIdentifier(id)
     }

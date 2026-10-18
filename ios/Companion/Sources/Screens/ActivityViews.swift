@@ -232,10 +232,16 @@ struct MiniMoveMap: View {
                                        style: StrokeStyle(lineWidth: 2.5, lineCap: .round, dash: [2, 6]))
                         }
                     }
-                    PhotoView(photo: object.photo)
-                        .frame(width: 30, height: 30).clipShape(Circle())
-                        .overlay(Circle().stroke(p.found, lineWidth: 3))
-                        .position(b)
+                    Group {
+                        if object.isPin {
+                            UserPinMarker(selected: true).offset(y: -14)
+                        } else {
+                            PhotoView(photo: object.photo)
+                                .frame(width: 30, height: 30).clipShape(Circle())
+                                .overlay(Circle().stroke(p.found, lineWidth: 3))
+                        }
+                    }
+                    .position(b)
                 }
             }
             .frame(height: 150)

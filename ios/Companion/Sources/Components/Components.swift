@@ -218,14 +218,15 @@ struct ItemCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s) {
             Button { router.pendingHero = heroKey; onOpen(item) } label: {
-                ShadedPhoto(photo: item.photo).frame(width: width, height: width * 141 / 169)
+                ItemPhoto(item: item).frame(width: width, height: width * 141 / 169)
                     .heroSource(heroKey)
                     .softShadow()
             }
             .buttonStyle(.plain)
             VStack(alignment: .leading, spacing: Space.xs) {
                 Text(item.label).font(SoughtFont.cardTitle).foregroundStyle(p.text).lineLimit(dts.isAccessibilitySize ? 4 : 2)
-                Text("\(item.whereText): \(StatusCopy.ago(item.lastSeen, now: robot.now))")
+                Text(item.isPin ? "\(item.whereText) · pinned \(StatusCopy.ago(item.lastSeen, now: robot.now))"
+                                : "\(item.whereText): \(StatusCopy.ago(item.lastSeen, now: robot.now))")
                     .font(SoughtFont.cardMeta).foregroundStyle(p.text).lineLimit(dts.isAccessibilitySize ? 5 : 2)
                 FindItButton { router.pendingHero = heroKey; onFind(item) }.padding(.top, Space.xs)
             }
@@ -309,5 +310,29 @@ private struct OptionalHero: ViewModifier {
     let id: String?
     func body(content: Content) -> some View {
         if let id { content.heroSource(id, radius: 28) } else { content }
+    }
+}
+
+/// An item's picture; a pin without a photo shows its teardrop on a soft tile instead of a blank.
+struct ItemPhoto: View {
+    let item: TrackedObject
+    var radius: CGFloat = Radius.photo
+    @Environment(\.palette) private var p
+
+    var body: some View {
+        if item.isPin, case .none = item.photo {
+            RoundedRectangle(cornerRadius: radius, style: .continuous).fill(p.surface.opacity(0.85))
+                .overlay(UserPinMarker(selected: false).scaleEffect(1.6))
+                .overlay(alignment: .bottomLeading) {
+                    Text("Pinned by you").font(SoughtFont.pillSmall).foregroundStyle(p.activityText)
+                        .padding(.horizontal, 7).padding(.vertical, 3).background(Capsule().fill(.white.opacity(0.6))).padding(8)
+                }
+                .accessibilityHidden(true)
+        } else {
+            ShadedPhoto(photo: item.photo, shadeTo: item.isPin ? 0.2 : 0.31, radius: radius)
+                .overlay(alignment: .topLeading) {
+                    if item.isPin { UserPinMarker().scaleEffect(0.8).padding(8).accessibilityHidden(true) }
+                }
+        }
     }
 }

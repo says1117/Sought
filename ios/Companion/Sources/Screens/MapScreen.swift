@@ -21,6 +21,10 @@ struct MapScreen: View {
     @State private var pan: CGSize = .zero
     @GestureState private var livePan: CGSize = .zero
     @Environment(\.dynamicTypeSize) private var dts
+    // Pins: drag the map under a fixed ring, then name it.
+    @State private var placing = false
+    @State private var draftName = ""
+    @State private var draftSpot: PinSpot?
 
     enum Sort: String, CaseIterable, Identifiable { case recent = "Recent", nearest = "Nearest", name = "A to Z"; var id: String { rawValue } }
 
@@ -40,6 +44,7 @@ struct MapScreen: View {
                 if let map = robot.map {
                     roomChips(map)
                     mapCard(map).frame(height: mapHeight(map, width: outer.size.width - Space.margin * 2))
+                    legend
                     robotCard
                     counts(map)
                     itemList.id("list")
@@ -54,8 +59,20 @@ struct MapScreen: View {
         .task {   // screenshot hooks: -mapRoom Kitchen, -mapPin obj_sample0008, -mapScrolled YES
             let d = UserDefaults.standard
             if let r = d.string(forKey: "mapRoom") { room = r }
-            if let id = d.string(forKey: "mapPin") { selected = robot.objects.first { $0.id == id } }
+            if let id = d.string(forKey: "mapPin") { selected = robot.items.first { $0.id == id } }
             if d.bool(forKey: "mapScrolled") { try? await Task.sleep(nanoseconds: 2_000_000_000); proxy.scrollTo("list", anchor: .top) }
+            if d.bool(forKey: "mapPlacing") { startPlacing(named: "") }   // screenshot hooks
+            if d.bool(forKey: "mapPinEditor") { draftName = "TV remote"; draftSpot = PinSpot(x: -2, z: -2.6, place: "On the sofa", room: "Living Room") }
+            if let name = router.pinDraft { startPlacing(named: name) }
+        }
+        .onChange(of: router.pinDraft) { _, name in if let name { startPlacing(named: name) } }
+        .sheet(item: $draftSpot) { spot in
+            PinEditor(spot: spot, initialName: draftName) { pin in
+                robot.addPin(pin)
+                withAnimation(Motion.spring) { selected = pin.asItem }
+                UIAccessibility.post(notification: .announcement, argument: "Pinned \(pin.label)")
+            }
+            .presentationDetents([.large])
         }
         }
         }
@@ -76,7 +93,7 @@ struct MapScreen: View {
     private func roomChips(_ map: MapSnapshot) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: Space.s) {
-                chip("All", count: robot.objects.count, on: room == nil) { setRoom(nil) }
+                chip("All", count: robot.items.count, on: room == nil) { setRoom(nil) }
                 ForEach(map.rooms) { r in
                     chip(r.name, count: items(in: r.name).count, on: room == r.name) { setRoom(r.name) }
                 }
@@ -118,38 +135,7 @@ struct MapScreen: View {
     // MARK: Map
 
     private func mapCard(_ map: MapSnapshot) -> some View {
-        GeometryReader { geo in
-            let size = geo.size
-            let tf = MapCanvas.Transform(bounds: map.bounds, size: size, inset: 12)
-            let (baseScale, baseOffset) = focus(map, tf, size)
-            let scale = baseScale * userZoom * pinch
-            let offset = CGSize(width: baseOffset.width * userZoom * pinch + pan.width + livePan.width,
-                                height: baseOffset.height * userZoom * pinch + pan.height + livePan.height)
-            ZStack(alignment: .topTrailing) {
-                MapCanvas(map: map, robot: robot.status.pose, pins: robot.objects, highlight: selected?.id,
-                          active: robot.status.isOnline(now: robot.now) && robot.status.state != .idle,
-                          onPin: { o in withAnimation(Motion.spring) { selected = o }; Haptics.shared.tap() },
-                          layers: layers, focusRoom: room, roomCounts: roomCounts(map), markerScale: 1 / scale)
-                    .scaleEffect(scale)
-                    .offset(offset)
-                    .frame(width: size.width, height: size.height)
-                    .clipped()
-                    .gesture(MagnificationGesture()
-                        .onChanged { pinch = max(0.6, min(3, $0)) }
-                        .onEnded { _ in userZoom = max(1, min(4, userZoom * pinch)); pinch = 1 })
-                    .simultaneousGesture(DragGesture(minimumDistance: 8)
-                        .updating($livePan) { v, s, _ in if scale > 1.01 { s = v.translation } }
-                        .onEnded { v in if scale > 1.01 { pan.width += v.translation.width; pan.height += v.translation.height } })
-                controls
-                    .padding(Space.s)
-                if let o = selected {
-                    pinCard(o)
-                        .padding(Space.s)
-                        .frame(maxHeight: .infinity, alignment: .bottom)
-                        .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
-                }
-            }
-        }
+        GeometryReader { geo in cardContent(map, size: geo.size) }
         .background(p.surface.opacity(0.55))
         .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Radius.card, style: .continuous).strokeBorder(.white.opacity(0.6), lineWidth: 1))
@@ -159,6 +145,52 @@ struct MapScreen: View {
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Floor map" + (room.map { ", showing the \($0.lowercased())" } ?? "")
                             + (robot.currentRoom.map { ". Soughtbot is in the \($0.lowercased())" } ?? ""))
+    }
+
+    private func cardContent(_ map: MapSnapshot, size: CGSize) -> some View {
+        let tf = MapCanvas.Transform(bounds: map.bounds, size: size, inset: 12)
+        let base: (CGFloat, CGSize) = focus(map, tf, size)
+        let z: CGFloat = userZoom * pinch
+        let scale: CGFloat = base.0 * z
+        let offset = CGSize(width: base.1.width * z + pan.width + livePan.width,
+                            height: base.1.height * z + pan.height + livePan.height)
+        let cardTransition: AnyTransition = reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity)
+        return ZStack(alignment: .topTrailing) {
+            mapLayer(map, size: size, scale: scale, offset: offset)
+            if placing {
+                placingOverlay(map: map, tf: tf, size: size, scale: scale, offset: offset)
+            } else {
+                controls.padding(Space.s)
+            }
+            if !placing && selected == nil { pinButton }
+            if let o = selected, !placing {
+                pinCard(o)
+                    .padding(Space.s)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    .transition(cardTransition)
+            }
+        }
+    }
+
+    private func mapLayer(_ map: MapSnapshot, size: CGSize, scale: CGFloat, offset: CGSize) -> some View {
+        let canPan = scale > 1.01 || placing
+        let canvas = MapCanvas(map: map, robot: robot.status.pose, pins: robot.items, highlight: selected?.id,
+                               active: robot.status.isOnline(now: robot.now) && robot.status.state != .idle,
+                               onPin: { o in withAnimation(Motion.spring) { selected = o }; Haptics.shared.tap() },
+                               layers: layers, focusRoom: room, roomCounts: roomCounts(map), markerScale: 1 / scale)
+        let zoom = MagnificationGesture()
+            .onChanged { v in pinch = max(0.6, min(3, v)) }
+            .onEnded { _ in userZoom = max(1, min(4, userZoom * pinch)); pinch = 1 }
+        let drag = DragGesture(minimumDistance: 8)
+            .updating($livePan) { v, st, _ in if canPan { st = v.translation } }
+            .onEnded { v in if canPan { pan.width += v.translation.width; pan.height += v.translation.height } }
+        return canvas
+            .scaleEffect(scale)
+            .offset(offset)
+            .frame(width: size.width, height: size.height)
+            .clipped()
+            .gesture(zoom)
+            .simultaneousGesture(drag)
     }
 
     /// Zoom and offset that bring the focused room, or the robot when following, to the middle of the card.
@@ -181,6 +213,7 @@ struct MapScreen: View {
             }
             Menu {
                 Toggle("Items", isOn: $layers.items)
+                Toggle("Your pins", isOn: $layers.userPins)
                 Toggle("Soughtbot's path", isOn: $layers.trail)
                 Toggle("Taught spots", isOn: $layers.spots)
                 Toggle("Fade items it is unsure about", isOn: $layers.fadeByCertainty)
@@ -210,7 +243,106 @@ struct MapScreen: View {
             .soughtGlassIf(!on, .pill, in: Circle())
     }
 
+    // MARK: Pins
+
+    @ViewBuilder
+    private func placingOverlay(map: MapSnapshot, tf: MapCanvas.Transform, size: CGSize, scale: CGFloat, offset: CGSize) -> some View {
+        let center = CGPoint(x: size.width / 2, y: size.height / 2)
+        // Undo scaleEffect (around the center) and offset to find what sits under the ring.
+        let canvasPt = CGPoint(x: center.x - offset.width / scale, y: center.y - offset.height / scale)
+        let w = tf.world(canvasPt)
+        PlacementRing().position(center).allowsHitTesting(false)
+        placementPanel(map: map, x: w.x, z: w.z)
+            .padding(Space.s)
+            .frame(maxHeight: .infinity, alignment: .bottom)
+            .transition(.opacity)
+    }
+
+    private var pinButton: some View {
+        Button { startPlacing(named: "") } label: {
+            Label("Pin something", systemImage: "plus").font(SoughtFont.findIt).foregroundStyle(p.onPrimary)
+                .padding(.horizontal, Space.m).frame(minHeight: 40)
+                .background(Capsule().fill(p.call)).shadow(color: .black.opacity(0.18), radius: 4, y: 3)
+                .frame(minHeight: 44).contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(Space.s)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+        .accessibilityHint("Leave a note on the map for something Soughtbot can\u{2019}t see.")
+    }
+
+
+    private func startPlacing(named name: String) {
+        draftName = name
+        router.pinDraft = nil
+        withAnimation(Motion.spring) { placing = true; selected = nil; follow = false; userZoom = max(userZoom, 1.6) }
+        UIAccessibility.post(notification: .announcement, argument: "Move the map so the ring is where you left it, or choose a place.")
+    }
+
+    private func placementPanel(map: MapSnapshot, x: Double, z: Double) -> some View {
+        let name = PinStore.placeName(x: x, z: z, map: map)
+        return VStack(alignment: .leading, spacing: Space.s) {
+            Text("Pin it here?").font(SoughtFont.bodyMedium).foregroundStyle(p.text)
+            HStack(spacing: 6) {
+                Circle().fill(p.call).frame(width: 8, height: 8).accessibilityHidden(true)
+                Text(name.place + (name.room.map { " · \($0)" } ?? "")).font(SoughtFont.cardMeta).foregroundStyle(p.text)
+            }
+            HStack(spacing: Space.s) {
+                Button {
+                    withAnimation(Motion.spring) { placing = false }
+                    draftSpot = PinSpot(x: x, z: z, place: name.place, room: name.room)
+                } label: {
+                    Text("Pin here").font(SoughtFont.findIt).foregroundStyle(p.onPrimary)
+                        .frame(maxWidth: .infinity, minHeight: 44).background(Capsule().fill(p.primary))
+                }
+                Menu {
+                    ForEach(map.waypoints) { w in
+                        Button("On the \(w.name)") {
+                            withAnimation(Motion.spring) { placing = false }
+                            draftSpot = PinSpot(x: w.x, z: w.z, place: "On the \(w.name)", room: map.room(atX: w.x, z: w.z)?.name)
+                        }
+                    }
+                    ForEach(map.rooms) { r in
+                        Button("In the \(r.name.lowercased())") {
+                            withAnimation(Motion.spring) { placing = false }
+                            draftSpot = PinSpot(x: (r.minX + r.maxX) / 2, z: (r.minZ + r.maxZ) / 2, place: "In the \(r.name.lowercased())", room: r.name)
+                        }
+                    }
+                } label: {
+                    Text("Choose a place").font(SoughtFont.findIt).foregroundStyle(p.text)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .overlay(Capsule().strokeBorder(p.text, lineWidth: 1.2)).contentShape(Capsule())
+                }
+                Button { withAnimation(Motion.spring) { placing = false } } label: {
+                    Image(systemName: "xmark").font(.footnote.weight(.bold)).foregroundStyle(p.text)
+                        .frame(width: 44, height: 44).contentShape(Rectangle())
+                }
+                .frame(width: 44, height: 44)
+                .accessibilityLabel("Cancel pin")
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(Space.m)
+        .soughtGlass(.sheet, in: RoundedRectangle(cornerRadius: Radius.row, style: .continuous))
+        .accessibilityElement(children: .contain)
+    }
+
+    private var legend: some View {
+        HStack(spacing: Space.l) {
+            HStack(spacing: 6) {
+                Circle().fill(LinearGradient(colors: [Color(hex: 0x7A6A5A), Color(hex: 0xC9B49C)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .frame(width: 12, height: 12).overlay(Circle().stroke(p.surface, lineWidth: 2))
+                Text("Seen by Soughtbot")
+            }
+            HStack(spacing: 6) { UserPinMarker().scaleEffect(0.6).frame(width: 14, height: 18); Text("Pinned by you") }
+        }
+        .font(SoughtFont.cardMeta).foregroundStyle(p.text)
+        .accessibilityElement(children: .combine)
+    }
+
     private func pinCard(_ o: TrackedObject) -> some View {
+        if o.isPin { return AnyView(pinnedCard(o)) }
+        return AnyView(
         VStack(alignment: .leading, spacing: Space.s) {
             HStack(alignment: .top, spacing: Space.m) {
                 ShadedPhoto(photo: o.photo, shadeTo: 0, radius: Radius.thumb).frame(width: 56, height: 56)
@@ -237,6 +369,50 @@ struct MapScreen: View {
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .overlay(Capsule().strokeBorder(p.text, lineWidth: 1.2))
                         .contentShape(Capsule())
+                }
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(Space.s)
+        .soughtGlass(.sheet, in: RoundedRectangle(cornerRadius: Radius.row, style: .continuous))
+        .accessibilityElement(children: .contain)
+        )
+    }
+
+    private func pinnedCard(_ o: TrackedObject) -> some View {
+        VStack(alignment: .leading, spacing: Space.s) {
+            HStack(alignment: .top, spacing: Space.m) {
+                Group {
+                    if case .none = o.photo { UserPinMarker(selected: true).frame(width: 56, height: 56).background(RoundedRectangle(cornerRadius: Radius.thumb).fill(p.surface)) }
+                    else { ShadedPhoto(photo: o.photo, shadeTo: 0, radius: Radius.thumb).frame(width: 56, height: 56) }
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(o.label).font(SoughtFont.bodyMedium).foregroundStyle(p.text)
+                    Text(o.whereText).font(SoughtFont.cardMeta).foregroundStyle(p.text)
+                    if let n = o.pin?.note, !n.isEmpty { Text(n).font(SoughtFont.cardMeta).foregroundStyle(p.text) }
+                    ActivityPill(text: "Pinned by you · \(StatusCopy.ago(o.lastSeen, now: robot.now))")
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Button { withAnimation(Motion.spring) { selected = nil } } label: {
+                    Image(systemName: "xmark").font(.footnote.weight(.bold)).foregroundStyle(p.text)
+                        .frame(width: 44, height: 44).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close summary")
+            }
+            HStack(spacing: Space.s) {
+                Button { router.find(o) } label: {
+                    Label("Find it", systemImage: "magnifyingglass").font(SoughtFont.findIt).foregroundStyle(p.onPrimary)
+                        .frame(maxWidth: .infinity, minHeight: 44).background(Capsule().fill(p.primary))
+                }
+                Button {
+                    robot.removePin(id: o.id)
+                    withAnimation(Motion.spring) { selected = nil }
+                    UIAccessibility.post(notification: .announcement, argument: "Pin removed")
+                } label: {
+                    Text("Remove pin").font(SoughtFont.findIt).foregroundStyle(p.text)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .overlay(Capsule().strokeBorder(p.text, lineWidth: 1.2)).contentShape(Capsule())
                 }
             }
             .buttonStyle(.plain)
@@ -289,7 +465,8 @@ struct MapScreen: View {
 
     private func counts(_ map: MapSnapshot) -> some View {
         let tiles: [(String, String)] = [
-            ("\(robot.objects.count)", robot.objects.count == 1 ? "item" : "items"),
+            (robot.pins.isEmpty ? "\(robot.objects.count)" : "\(robot.objects.count) + \(robot.pins.count)",
+             robot.pins.isEmpty ? (robot.objects.count == 1 ? "item" : "items") : "items + pins"),
             ("\(map.rooms.count)", map.rooms.count == 1 ? "room" : "rooms"),
             ("\(map.waypoints.count)", "taught spots"),
             (StatusCopy.ago(map.updatedAt, now: robot.now).replacingOccurrences(of: " ago", with: ""), "map updated"),
@@ -312,7 +489,7 @@ struct MapScreen: View {
     // MARK: Item list
 
     private var itemList: some View {
-        let list = sorted(room.map(items(in:)) ?? robot.objects)
+        let list = sorted(room.map(items(in:)) ?? robot.items)
         let title = Text(room.map { "In the \($0)" } ?? "Everything").font(SoughtFont.sectionTitle).foregroundStyle(p.sectionTitle)
             .accessibilityAddTraits(.isHeader)
         let sortMenu = Menu {
@@ -351,12 +528,12 @@ struct MapScreen: View {
             Group {
                 if big {
                     VStack(alignment: .leading, spacing: Space.s) {
-                        ShadedPhoto(photo: o.photo, shadeTo: 0, radius: Radius.thumb).frame(height: 120)
+                        ItemPhoto(item: o, radius: Radius.thumb).frame(height: 120)
                         details
                     }
                 } else {
                     HStack(spacing: Space.m) {
-                        ShadedPhoto(photo: o.photo, shadeTo: 0, radius: Radius.thumb).frame(width: 56, height: 56)
+                        ItemPhoto(item: o, radius: Radius.thumb).frame(width: 56, height: 56)
                         details
                         Spacer(minLength: 0)
                     }
@@ -397,7 +574,7 @@ struct MapScreen: View {
 
     // MARK: Data
 
-    private func items(in room: String) -> [TrackedObject] { robot.objects.filter { $0.room == room } }
+    private func items(in room: String) -> [TrackedObject] { robot.items.filter { $0.room == room } }
 
     private func roomCounts(_ map: MapSnapshot) -> [String: Int] {
         Dictionary(uniqueKeysWithValues: map.rooms.map { ($0.name, items(in: $0.name).count) })
@@ -417,10 +594,11 @@ struct MapScreen: View {
     }
 
     private func certaintyColor(_ o: TrackedObject) -> Color {
+        if o.isPin { return p.call }
         switch o.persistence ?? 1 {
-        case 0.7...: p.found
-        case 0.4..<0.7: p.searching
-        default: p.alert
+        case 0.7...: return p.found
+        case 0.4..<0.7: return p.searching
+        default: return p.alert
         }
     }
 }

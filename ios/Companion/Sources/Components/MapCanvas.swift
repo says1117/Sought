@@ -8,6 +8,7 @@ struct MapLayers: Equatable {
     var items = true
     var trail = true
     var spots = true
+    var userPins = true
     var fadeByCertainty = true
 }
 
@@ -62,19 +63,25 @@ struct MapCanvas: View {
                         .accessibilityHidden(true)
                     }
                 }
-                if layers.items {
-                    ForEach(pins) { o in
+                if layers.items || layers.userPins {
+                    ForEach(pins.filter { $0.isPin ? layers.userPins : layers.items }) { o in
                         let pt = tf.point(o.x, o.z)
                         let sel = highlight == o.id
                         let certain = layers.fadeByCertainty ? (0.45 + 0.55 * (o.persistence ?? 1)) : 1
                         Button { onPin?(o) } label: {
-                            PhotoView(photo: o.photo)
-                                .frame(width: sel ? 38 : 28, height: sel ? 38 : 28)
-                                .clipShape(Circle())
-                                .overlay(Circle().stroke(sel ? p.found : p.surface, lineWidth: sel ? 3 : 2.5))
-                                .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
-                                .opacity(sel ? 1 : certain)
-                                .frame(width: 44, height: 44)
+                            Group {
+                                if o.isPin {
+                                    UserPinMarker(selected: sel).offset(y: -12)   // tip sits on the spot
+                                } else {
+                                    PhotoView(photo: o.photo)
+                                        .frame(width: sel ? 38 : 28, height: sel ? 38 : 28)
+                                        .clipShape(Circle())
+                                        .overlay(Circle().stroke(sel ? p.found : p.surface, lineWidth: sel ? 3 : 2.5))
+                                        .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
+                                        .opacity(sel ? 1 : certain)
+                                }
+                            }
+                            .frame(width: 44, height: 44)
                         }
                         .buttonStyle(.plain)
                         .scaleEffect(markerScale)
@@ -171,6 +178,11 @@ struct MapCanvas: View {
             CGPoint(x: offset.x + CGFloat(x - minX) * scale, y: offset.y + CGFloat(z - minZ) * scale)
         }
 
+        /// Screen point back to world meters (pin placement).
+        func world(_ pt: CGPoint) -> (x: Double, z: Double) {
+            (minX + Double((pt.x - offset.x) / scale), minZ + Double((pt.y - offset.y) / scale))
+        }
+
         func rect(_ x0: Double, _ z0: Double, _ x1: Double, _ z1: Double) -> CGRect {
             let a = point(x0, z0), b = point(x1, z1)
             return CGRect(x: a.x, y: a.y, width: b.x - a.x, height: b.y - a.y)
@@ -182,6 +194,39 @@ struct Triangle: Shape {
     func path(in r: CGRect) -> Path {
         var p = Path()
         p.move(to: CGPoint(x: r.midX, y: r.minY)); p.addLine(to: CGPoint(x: r.maxX, y: r.maxY)); p.addLine(to: CGPoint(x: r.minX, y: r.maxY))
+        p.closeSubpath()
+        return p
+    }
+}
+
+/// Teardrop for a pin the person left. Round photos are things Soughtbot saw; the shape alone tells them apart,
+/// and labels say "Pinned by you" too.
+struct UserPinMarker: View {
+    var selected = false
+    @Environment(\.palette) private var p
+
+    var body: some View {
+        ZStack {
+            Teardrop().fill(selected ? p.found : p.call)
+                .overlay(Teardrop().stroke(.white, lineWidth: 2))
+                .frame(width: selected ? 28 : 22, height: selected ? 34 : 27)
+                .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
+            Image(systemName: "hand.point.up.left.fill").font(.system(size: selected ? 11 : 9, weight: .bold))
+                .foregroundStyle(.white).offset(y: selected ? -4 : -3)
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+struct Teardrop: Shape {
+    func path(in r: CGRect) -> Path {
+        var p = Path()
+        let w = r.width, cx = r.midX, top = r.minY, tip = CGPoint(x: cx, y: r.maxY)
+        let radius = w / 2
+        p.addArc(center: CGPoint(x: cx, y: top + radius), radius: radius, startAngle: .degrees(150), endAngle: .degrees(30), clockwise: false)
+        p.addQuadCurve(to: tip, control: CGPoint(x: cx + radius * 0.55, y: top + radius * 1.7))
+        p.addQuadCurve(to: CGPoint(x: cx + radius * cos(.pi * 150 / 180), y: top + radius + radius * sin(.pi * 150 / 180)),
+                       control: CGPoint(x: cx - radius * 0.55, y: top + radius * 1.7))
         p.closeSubpath()
         return p
     }

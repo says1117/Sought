@@ -55,6 +55,9 @@ struct TrackedObject: Identifiable, Equatable {
     var photo: PhotoRef
     var isEssential = false
     var timesSought = 0
+    /// Set when this item is a pin the person left, not something Soughtbot saw.
+    var pin: PinInfo? = nil
+    var isPin: Bool { pin != nil }
 }
 
 /// Where a picture comes from. Asset names are the bundled SAMPLE photos from the Figma.
@@ -136,6 +139,7 @@ struct FindProgress: Equatable {
 extension TrackedObject {
     /// Plain words for persistence. Nil persistence (not reported) says nothing about certainty.
     var certaintyWord: String {
+        if isPin { return "Pinned by you" }
         guard let p = persistence else { return "Seen here" }
         switch p {
         case 0.7...: return "Usually here"

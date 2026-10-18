@@ -68,6 +68,13 @@ final class MockRobotSource: RobotSource {
         findLog = [FindRecord(query: "car keys", objectId: nil, found: false, at: ago(26 * 60)),
                    FindRecord(query: "red umbrella", objectId: "obj_sample0007", found: true, at: ago(25))]
         robotLog = [RobotLogEntry(text: "Soughtbot got stuck by the sofa", at: ago(40))]
+        // Screenshot hook: `-seedPins YES` shows two example pins (kept in memory, never saved).
+        if UserDefaults.standard.bool(forKey: "seedPins") {
+            pins = [UserPin(id: "pin_sample_remote", label: "TV remote", note: "Under the blue cushion", x: -2.0, z: -2.6,
+                            place: "On the sofa", room: "Living Room", createdAt: ago(2 * 24 * 60), photo: nil),
+                    UserPin(id: "pin_sample_keys", label: "Spare keys", note: nil, x: 4.1, z: 1.2,
+                            place: "By the front door", room: "Hallway", createdAt: ago(5 * 60), photo: nil)]
+        }
         status = RobotStatus(state: .exploring, task: nil, battery: battery, pose: Pose2D(x: route[0].0, z: route[0].1, yawDeg: 0),
                              lastHeartbeat: now)
     }

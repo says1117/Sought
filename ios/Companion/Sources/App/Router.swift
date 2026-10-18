@@ -19,17 +19,26 @@ final class Router: ObservableObject {
     @Published var heroID: String?
     /// Set by a card or search bar right before it calls find/open/search.
     var pendingHero: String?
+    /// "Pin where I left them": the Map starts placing a pin with this name.
+    @Published var pinDraft: String?
+
+    func startPin(named name: String) {
+        findRequest = nil
+        detail = nil
+        tab = .map
+        pinDraft = name
+    }
 
     /// Screenshot and UI test hooks: launch with `-tab items`, `-search "red umbrella"` `-detail obj_sample0007` or `-find obj_sample0007`.
     func applyLaunchArguments(robot: RobotSource) {
         let d = UserDefaults.standard
         if let t = d.string(forKey: "tab"), let tab = AppTab(rawValue: t) { self.tab = tab }
         if let q = d.string(forKey: "search") { search(q, in: robot) }
-        if let id = d.string(forKey: "detail"), let o = robot.objects.first(where: { $0.id == id }) { detail = o }
+        if let id = d.string(forKey: "detail"), let o = robot.items.first(where: { $0.id == id }) { detail = o }
         if let id = d.string(forKey: "find") {
             Task { @MainActor in   // server data arrives after launch: wait up to 6 s for the item
                 for _ in 0..<30 {
-                    if let o = robot.objects.first(where: { $0.id == id }) { self.find(o); return }
+                    if let o = robot.items.first(where: { $0.id == id }) { self.find(o); return }
                     try? await Task.sleep(nanoseconds: 200_000_000)
                 }
             }

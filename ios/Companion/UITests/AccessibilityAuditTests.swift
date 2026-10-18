@@ -24,6 +24,10 @@ final class AccessibilityAuditTests: XCTestCase {
         ("item detail", ["-detail", "obj_sample0001"]),
         ("map pin card", ["-tab", "map", "-mapRoom", "Kitchen", "-mapPin", "obj_sample0008"]),
         ("activity log", ["-tab", "home", "-showActivity", "YES", "-activityOpenFirst", "YES"]),
+        ("map with pins", ["-tab", "map", "-seedPins", "YES", "-mapPin", "pin_sample_remote"]),
+        ("placing a pin", ["-tab", "map", "-mapPlacing", "YES"]),
+        ("naming a pin", ["-tab", "map", "-mapPinEditor", "YES"]),
+        ("pinned find", ["-seedPins", "YES", "-find", "pin_sample_remote"]),
     ]
 
     private let gate: XCUIAccessibilityAuditType = [.hitRegion, .sufficientElementDescription, .trait]
@@ -33,7 +37,7 @@ final class AccessibilityAuditTests: XCTestCase {
         var failures = 0
         for (name, args) in screens {
             let app = XCUIApplication()
-            app.launchArguments = ["-mockLoadDelay", "0", "-mockState", "idle"] + args
+            app.launchArguments = ["-useSampleData", "YES", "-mockLoadDelay", "0", "-mockState", "idle"] + args
             app.launch()
             sleep(3)
             let bandTop = app.windows.firstMatch.frame.maxY - 110

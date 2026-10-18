@@ -32,7 +32,7 @@ struct ItemLogView: View {
                     }
                     .padding(.horizontal, Space.margin).padding(.top, Space.l)
                     .accessibilityElement().accessibilityLabel("Loading items")
-                } else if robot.objects.isEmpty {
+                } else if robot.items.isEmpty {
                     empty
                 } else if !query.trimmingCharacters(in: .whitespaces).isEmpty {
                     let hits = filtered
@@ -42,6 +42,9 @@ struct ItemLogView: View {
                     ItemRow(title: "Recent Finds", items: Array(robot.recentFinds.prefix(10)), onFind: router.find, onOpen: router.open)
                     ItemRow(title: "Essentials", items: robot.essentials, banded: true,
                             emptyText: "Pin items you need often from their detail page.", onFind: router.find, onOpen: router.open)
+                    if !robot.pins.isEmpty {
+                        ItemRow(title: "Your pins", items: robot.pinnedItems, onFind: router.find, onOpen: router.open)
+                    }
                     ItemRow(title: "Frequently Sought", items: robot.frequentlySought,
                             emptyText: "Items you search for most show up here.", onFind: router.find, onOpen: router.open)
                     ForEach(Array(robot.byRoom.enumerated()), id: \.element.room) { i, group in
@@ -81,7 +84,7 @@ struct ItemDetailView: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        if let item = robot.objects.first(where: { $0.id == itemId }) { content(item) } else {
+        if let item = robot.items.first(where: { $0.id == itemId }) { content(item) } else {
             Text("This item is no longer in Soughtbot's memory.").font(SoughtFont.body).padding()
         }
     }
@@ -98,7 +101,7 @@ struct ItemDetailView: View {
                     }
                     .accessibilityLabel("Close")
                 }
-                ShadedPhoto(photo: item.photo, shadeTo: 0.25, radius: Radius.card)
+                ItemPhoto(item: item, radius: Radius.card)
                     .aspectRatio(4 / 3, contentMode: .fit)
                     .softShadow()
                     .accessibilityLabel("Photo of \(item.label)")
@@ -106,9 +109,14 @@ struct ItemDetailView: View {
                 VStack(alignment: .leading, spacing: Space.s) {
                     fact("Where", item.whereText)
                     if let r = item.room { fact("Room", r) }
-                    fact("Last seen", StatusCopy.ago(item.lastSeen, now: robot.now))
-                    fact("First seen", StatusCopy.ago(item.firstSeen, now: robot.now))
-                    fact("Seen", "\(item.sightings) \(item.sightings == 1 ? "time" : "times")")
+                    if item.isPin {
+                        fact("Pinned", "By you, \(StatusCopy.ago(item.lastSeen, now: robot.now))")
+                        if let n = item.pin?.note { fact("Note", n) }
+                    } else {
+                        fact("Last seen", StatusCopy.ago(item.lastSeen, now: robot.now))
+                        fact("First seen", StatusCopy.ago(item.firstSeen, now: robot.now))
+                        fact("Seen", "\(item.sightings) \(item.sightings == 1 ? "time" : "times")")
+                    }
                 }
                 Button { router.find(item) } label: {
                     Label("Find it", systemImage: "magnifyingglass").font(SoughtFont.button)
@@ -116,11 +124,20 @@ struct ItemDetailView: View {
                         .background(Capsule().fill(p.primary))
                 }
                 .accessibilityHint("Soughtbot drives to the \(item.label.lowercased()).")
+                if item.isPin {
+                    Button { robot.removePin(id: item.id); dismiss() } label: {
+                        Label("Remove pin", systemImage: "mappin.slash").font(SoughtFont.button).foregroundStyle(p.text)
+                            .frame(maxWidth: .infinity, minHeight: 50)
+                            .soughtGlass(.pill, in: Capsule())
+                            .overlay(Capsule().strokeBorder(p.text, lineWidth: 1.5))
+                    }
+                } else {
                 Button { toggleEssential(item) } label: {
                     Label(item.isEssential ? "Remove from Essentials" : "Pin as Essential", systemImage: item.isEssential ? "pin.slash" : "pin")
                         .font(SoughtFont.button).foregroundStyle(p.text).frame(maxWidth: .infinity, minHeight: 50)
                         .soughtGlass(.pill, in: Capsule())
                         .overlay(Capsule().strokeBorder(p.text, lineWidth: 1.5))
+                }
                 }
                 if item.history.count > 1 {
                     Text("History").font(SoughtFont.sectionTitle).foregroundStyle(p.sectionTitle).accessibilityAddTraits(.isHeader)
