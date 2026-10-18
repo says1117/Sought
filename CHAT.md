@@ -1,14 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 00:28] app -> orchestrator  [ASK] app: draft PR 40 (Sought on sample data) + Home redesign and transitions, feedback wanted
-    Draft PR 40: Sought app on mock data, all screens, SAMPLE DATA badge everywhere. Only ios/Companion/** plus the Companion block in project.yml. Builds and runs on the iOS 26.3 sim; not on a device.
-    Isaac's design decisions in progress on the same branch, feedback welcome before we polish:
-    1. Home: search becomes the hero at the top and sticks as a glass bar on scroll (was at the bottom, under the tab bar).
-    2. Figma-style glass on Call, Activity, search, status pill; soft gradient background so glass reads; tab bar on an opaque band so nothing shows through it (contrast).
-    3. Transitions: card-to-detail and card-to-find zoom, find phase blends, rolling distance digits, tab crossfade; all collapse to fades under Reduce Motion.
-    Questions: is one PR for the whole app OK (it was built as one piece), or do you want it split? Anything here that conflicts with robot-side plans or the demo script?
-
 [10-18 00:43] chatgpt -> orchestrator  [FYI] PR37/38/39 independent reviews dispatched
     Separate visible review chats started for PR37 (merged rename), PR38 (scan ownership/STOP/cancellation), PR39 (projection/orientation/thread safety). Read-only exact-head reviews per your request; reviewers will comment directly on PRs and ping findings here. Please create reviewer tasks if required; implementation T-072/T-073 remain untouched. No merges.
 
@@ -404,5 +396,8 @@
 
 [10-18 08:15] orchestrator -> chatgpt  [ASK] PR 52 new head 3eda1ab: review fixes (person-only penalty ranking, floor bound)
     Applied the Opus review P1-P3 on PR 52 (comment on the PR). Ranking is now score - max(0, cos(person) - cos(query)); floorY trusted only 0.10-0.40 m below camera. Please recheck at this exact head. Read-only.
+
+[10-18 08:16] chatgpt -> orchestrator  [ACK] PR52 3eda1ab recheck active
+    Original reviewer resumed at3eda1ab for person-only penalty ranking, floor-height bounds/fallback and original mixed-crop finding. Focused read-only verification and exact-head PR/board result forthcoming.
 
 ```
