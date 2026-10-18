@@ -105,7 +105,7 @@ final class RobotCoordinator {
                 deps.speaker.say("I don't know a place called \(name).")
                 return
             }
-            guard wp.inCurrentFrame || deps.frame.relocalized else {
+            guard wp.inCurrentFrame || (deps.frame.relocalized && !wp.predatesMap) else {
                 record("refused", "go to \(wp.name): saved map not relocalized")
                 deps.speaker.say(CoordinatorConfig.notRecognisedSpoken)
                 return
