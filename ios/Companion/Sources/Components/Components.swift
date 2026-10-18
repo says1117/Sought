@@ -26,6 +26,7 @@ struct PhotoView: View {
 struct ShadedPhoto: View {
     let photo: PhotoRef
     var shadeTo: Double = 0.31
+    var radius: CGFloat = Radius.photo
     @Environment(\.palette) private var p
 
     var body: some View {
@@ -35,7 +36,7 @@ struct ShadedPhoto: View {
                                             .init(color: Color(hex: 0x39738A, alpha: 0.13), location: shadeTo),
                                             .init(color: .clear, location: 1)],
                                     startPoint: .bottom, endPoint: .top))
-            .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
             .accessibilityHidden(true)
     }
 }

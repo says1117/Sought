@@ -119,9 +119,15 @@ enum Space {
     static let margin: CGFloat = 24
 }
 
+/// Corner radii, always drawn as continuous (squircle) corners. Rounder than the Figma's 8 for an Apple feel
+/// (Isaac, 2026-10-17). Nested shapes stay concentric: inner radius = outer radius - padding between them.
 enum Radius {
-    static let card: CGFloat = 8       // Figma uses 8 on cards and photos
-    static let button: CGFloat = 12
+    static let card: CGFloat = 26      // big cards: map widget, Call, Activity, Live View, map card, robot card
+    static let photo: CGFloat = 20     // carousel photos, large photos inside screens
+    static let row: CGFloat = 20       // list rows, pin card
+    static let tile: CGFloat = 16      // small count tiles
+    static let thumb: CGFloat = 12     // thumbnails inside rows (row 20 - padding 8)
+    // Buttons are capsules.
 }
 
 /// One motion language for the whole app. Reduce Motion swaps these for plain fades at the call site.

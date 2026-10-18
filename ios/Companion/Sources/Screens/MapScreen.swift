@@ -150,8 +150,8 @@ struct MapScreen: View {
             }
         }
         .background(p.surface.opacity(0.55))
-        .clipShape(RoundedRectangle(cornerRadius: Radius.card * 2, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: Radius.card * 2, style: .continuous).strokeBorder(.white.opacity(0.6), lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Radius.card, style: .continuous).strokeBorder(.white.opacity(0.6), lineWidth: 1))
         .softShadow()
         .animation(reduceMotion ? Motion.fade : Motion.spring, value: room)
         .animation(reduceMotion ? Motion.fade : .easeInOut(duration: 1.2), value: follow ? robot.status.pose : nil)
@@ -210,7 +210,7 @@ struct MapScreen: View {
 
     private func pinCard(_ o: TrackedObject) -> some View {
         HStack(spacing: Space.m) {
-            ShadedPhoto(photo: o.photo, shadeTo: 0).frame(width: 64, height: 64)
+            ShadedPhoto(photo: o.photo, shadeTo: 0, radius: Radius.thumb).frame(width: 64, height: 64)
             VStack(alignment: .leading, spacing: 2) {
                 Text(o.label).font(SoughtFont.bodyMedium).foregroundStyle(p.text)
                 Text("\(o.whereText) · \(StatusCopy.ago(o.lastSeen, now: robot.now))").font(SoughtFont.cardMeta).foregroundStyle(p.text)
@@ -234,7 +234,7 @@ struct MapScreen: View {
             .accessibilityLabel("Close summary")
         }
         .padding(Space.s)
-        .soughtGlass(.sheet, in: RoundedRectangle(cornerRadius: Radius.card * 1.5, style: .continuous))
+        .soughtGlass(.sheet, in: RoundedRectangle(cornerRadius: Radius.row, style: .continuous))
         .accessibilityElement(children: .contain)
     }
 
@@ -271,7 +271,7 @@ struct MapScreen: View {
             .accessibilityLabel(s.state == .comingToUser ? "Soughtbot is coming to you" : "Call Soughtbot")
         }
         .padding(Space.m)
-        .soughtGlass(.activity, in: RoundedRectangle(cornerRadius: Radius.card * 1.5, style: .continuous))
+        .soughtGlass(.activity, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 
@@ -290,7 +290,7 @@ struct MapScreen: View {
                 }
                 .frame(maxWidth: .infinity, minHeight: 56, alignment: .topLeading)
                 .padding(Space.s)
-                .soughtGlass(.pill, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+                .soughtGlass(.pill, in: RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
                 .accessibilityElement(children: .combine)
             }
         }
@@ -324,7 +324,7 @@ struct MapScreen: View {
         HStack(spacing: Space.m) {
             Button { withAnimation(Motion.spring) { room = o.room; selected = o; follow = false } } label: {
                 HStack(spacing: Space.m) {
-                    ShadedPhoto(photo: o.photo, shadeTo: 0).frame(width: 56, height: 56)
+                    ShadedPhoto(photo: o.photo, shadeTo: 0, radius: Radius.thumb).frame(width: 56, height: 56)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(o.label).font(SoughtFont.bodyMedium).foregroundStyle(p.text)
                         Text("\(o.whereText) · \(StatusCopy.ago(o.lastSeen, now: robot.now))").font(SoughtFont.cardMeta).foregroundStyle(p.text)
@@ -349,7 +349,7 @@ struct MapScreen: View {
             .accessibilityLabel("Find \(o.label)")
         }
         .padding(Space.s)
-        .soughtGlass(.pill, in: RoundedRectangle(cornerRadius: Radius.card * 1.5, style: .continuous))
+        .soughtGlass(.pill, in: RoundedRectangle(cornerRadius: Radius.row, style: .continuous))
     }
 
     private var empty: some View {

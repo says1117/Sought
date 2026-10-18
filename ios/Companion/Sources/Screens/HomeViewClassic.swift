@@ -208,9 +208,9 @@ struct LiveViewCard: View {
         Button(action: onOpen) {
             ZStack(alignment: .bottomLeading) {
                 if let f = robot.liveFrame {
-                    ShadedPhoto(photo: .jpeg(f.jpegData(compressionQuality: 0.6) ?? Data()), shadeTo: 0.48)
+                    ShadedPhoto(photo: .jpeg(f.jpegData(compressionQuality: 0.6) ?? Data()), shadeTo: 0.48, radius: Radius.card)
                 } else {
-                    ShadedPhoto(photo: latest?.photo ?? .none, shadeTo: 0.48)
+                    ShadedPhoto(photo: latest?.photo ?? .none, shadeTo: 0.48, radius: Radius.card)
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     if robot.liveFrame == nil, let latest {
@@ -255,7 +255,7 @@ struct ActivitySheet: View {
                         let o = robot.objects.first { $0.id == a.objectId }
                         Button { if let o { dismiss(); router.open(o) } } label: {
                             HStack(spacing: Space.m) {
-                                if let o { ShadedPhoto(photo: o.photo, shadeTo: 0).frame(width: 56, height: 56) }
+                                if let o { ShadedPhoto(photo: o.photo, shadeTo: 0, radius: Radius.thumb).frame(width: 56, height: 56) }
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(a.text).font(SoughtFont.bodyMedium).foregroundStyle(p.text)
                                     Text(StatusCopy.ago(a.at, now: robot.now)).font(SoughtFont.activityMeta).foregroundStyle(p.text)
@@ -305,7 +305,7 @@ struct LiveViewScreen: View {
                 Text(robot.liveFrame != nil ? "Live from Soughtbot. Stays on your home network, never uploaded."
                                             : "No live video in this build. Showing the last snapshot.")
                     .font(SoughtFont.cardMeta).foregroundStyle(.white)
-                    .padding(Space.s).background(RoundedRectangle(cornerRadius: 6).fill(.black.opacity(0.45)))
+                    .padding(Space.s).background(RoundedRectangle(cornerRadius: Radius.thumb, style: .continuous).fill(.black.opacity(0.45)))
             }
             .padding(Space.l)
         }

@@ -86,7 +86,7 @@ struct ItemDetailView: View {
                     }
                     .accessibilityLabel("Close")
                 }
-                ShadedPhoto(photo: item.photo, shadeTo: 0.25)
+                ShadedPhoto(photo: item.photo, shadeTo: 0.25, radius: Radius.card)
                     .aspectRatio(4 / 3, contentMode: .fit)
                     .softShadow()
                     .accessibilityLabel("Photo of \(item.label)")
@@ -101,13 +101,13 @@ struct ItemDetailView: View {
                 Button { router.find(item) } label: {
                     Label("Find it", systemImage: "magnifyingglass").font(SoughtFont.button)
                         .foregroundStyle(p.onPrimary).frame(maxWidth: .infinity, minHeight: 56)
-                        .background(RoundedRectangle(cornerRadius: Radius.button, style: .continuous).fill(p.primary))
+                        .background(Capsule().fill(p.primary))
                 }
                 .accessibilityHint("Soughtbot drives to the \(item.label.lowercased()).")
                 Button { toggleEssential(item) } label: {
                     Label(item.isEssential ? "Remove from Essentials" : "Pin as Essential", systemImage: item.isEssential ? "pin.slash" : "pin")
                         .font(SoughtFont.button).foregroundStyle(p.text).frame(maxWidth: .infinity, minHeight: 50)
-                        .background(RoundedRectangle(cornerRadius: Radius.button, style: .continuous).stroke(p.text, lineWidth: 1.5))
+                        .background(Capsule().stroke(p.text, lineWidth: 1.5))
                 }
                 if item.history.count > 1 {
                     Text("History").font(SoughtFont.sectionTitle).foregroundStyle(p.sectionTitle).accessibilityAddTraits(.isHeader)

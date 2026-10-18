@@ -114,12 +114,12 @@ struct MapCanvas: View {
     private func drawRooms(_ tf: Transform, _ ctx: inout GraphicsContext) {
         let b = map.bounds
         let outer = tf.rect(b.minX, b.minZ, b.maxX, b.maxZ)
-        ctx.fill(Path(roundedRect: outer, cornerRadius: 6), with: .color(p.surface))
+        ctx.fill(Path(roundedRect: outer, cornerRadius: 14, style: .continuous), with: .color(p.surface))
         for r in map.rooms {
             let rect = tf.rect(r.minX, r.minZ, r.maxX, r.maxZ).insetBy(dx: 3, dy: 3)
             let on = focusRoom == nil || focusRoom == r.name
-            ctx.fill(Path(roundedRect: rect, cornerRadius: 3), with: .color(on && focusRoom != nil ? p.signal.opacity(0.08) : p.mapRoom.opacity(on ? 0.6 : 0.3)))
-            ctx.stroke(Path(roundedRect: rect, cornerRadius: 3), with: .color(p.mapWall.opacity(on ? 1 : 0.45)), lineWidth: 2.5 * markerScale)
+            ctx.fill(Path(roundedRect: rect, cornerRadius: 10, style: .continuous), with: .color(on && focusRoom != nil ? p.signal.opacity(0.08) : p.mapRoom.opacity(on ? 0.6 : 0.3)))
+            ctx.stroke(Path(roundedRect: rect, cornerRadius: 10, style: .continuous), with: .color(p.mapWall.opacity(on ? 1 : 0.45)), lineWidth: 2.5 * markerScale)
         }
     }
 

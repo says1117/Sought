@@ -175,7 +175,7 @@ struct FindFlowView: View {
     // MARK: Pieces
 
     private func photo(_ ph: PhotoRef) -> some View {
-        ShadedPhoto(photo: ph, shadeTo: 0.2).aspectRatio(4 / 3, contentMode: .fit).softShadow()
+        ShadedPhoto(photo: ph, shadeTo: 0.2, radius: Radius.card).aspectRatio(4 / 3, contentMode: .fit).softShadow()
     }
 
     private func title(_ s: String) -> some View {
@@ -194,7 +194,7 @@ struct FindFlowView: View {
     private func primary(_ s: String, id: String, _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(s).font(SoughtFont.button).foregroundStyle(p.onPrimary).frame(maxWidth: .infinity, minHeight: 60)
-                .background(RoundedRectangle(cornerRadius: Radius.button, style: .continuous).fill(p.primary))
+                .background(Capsule().fill(p.primary))
         }
         .buttonStyle(.plain).accessibilityIdentifier(id)
     }
@@ -202,7 +202,7 @@ struct FindFlowView: View {
     private func secondary(_ s: String, id: String, _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(s).font(SoughtFont.button).foregroundStyle(p.text).frame(maxWidth: .infinity, minHeight: 52)
-                .background(RoundedRectangle(cornerRadius: Radius.button, style: .continuous).stroke(p.text, lineWidth: 1.5))
+                .background(Capsule().stroke(p.text, lineWidth: 1.5))
         }
         .buttonStyle(.plain).accessibilityIdentifier(id)
     }
