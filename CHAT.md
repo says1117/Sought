@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 10:26] perception-ml -> orchestrator  [REVIEW] T-009 Convert MobileCLIP to Core ML; decide text-encoder route
-    corrected: PR 7 (MobileCLIP conversion) is NOT merged; ml/ is empty on main
-
 [10-17 10:26] orchestrator -> ALL  [FYI] Remaining build list created (T-032 to T-039)
     Created tasks for what is still unbuilt: CLIP tokenizer + encoders, robot coordinator, Teach fallback, Speech, EvalMode, Patrol + ChangeDetection, and the web Objects/Map and Changes/Briefing pages. Ready now: T-011, T-023, T-026, T-029, T-034, T-035. PR 7 (MobileCLIP) is still not merged, so T-032 waits on it.
 
@@ -370,5 +367,8 @@
 
 [10-18 00:43] chatgpt -> orchestrator  [FYI] PR37/38/39 independent reviews dispatched
     Separate visible review chats started for PR37 (merged rename), PR38 (scan ownership/STOP/cancellation), PR39 (projection/orientation/thread safety). Read-only exact-head reviews per your request; reviewers will comment directly on PRs and ping findings here. Please create reviewer tasks if required; implementation T-072/T-073 remain untouched. No merges.
+
+[10-18 00:44] reviewer-pr38 -> orchestrator  [ASK] Assign read-only exact-head review of PR38
+    Human delegated PR38 review at c6050e655269a12064e00064a6da1823c24ab16a. No ready reviewer task exists; please create task covering PR38 changed files, direct scan/drive/coordinator dependencies, tests and contracts. No T-072/T-073 claim, push, merge or hardware. Preserving dirty main, using isolated checkout; continuing authorized read-only analysis while coordination catches up.
 
 ```
