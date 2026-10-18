@@ -89,10 +89,15 @@ final class BackendRobotSource: RobotSource {
     private let commands: CommandClient
     private var findTask: Task<Void, Never>?
     private var comeTask: Task<Void, Never>?
+    private var cameraFeed: LiveCameraFeed?
+    private let cameraTransport: LiveCameraFeed.Transport
+    override var liveCameraIsSample: Bool { false }
 
-    /// `commands` is injectable for the unit tests (fake transport, fast polling).
-    init(config: BackendConfig, commands: CommandClient? = nil) {
+    /// `commands` and `cameraTransport` are injectable for the unit tests (fake transport, fast polling).
+    init(config: BackendConfig, commands: CommandClient? = nil,
+         cameraTransport: @escaping LiveCameraFeed.Transport = LiveCameraFeed.boundedTransport) {
         self.config = config
+        self.cameraTransport = cameraTransport
         self.commands = commands ?? CommandClient(config: config)
         super.init()
         isLoading = true
@@ -113,6 +118,22 @@ final class BackendRobotSource: RobotSource {
     }
 
     override func stop() { super.stop(); loop?.cancel(); loop = nil; findTask?.cancel(); comeTask?.cancel() }
+
+    override func beginLiveView() {
+        if cameraFeed == nil {
+            cameraFeed = LiveCameraFeed(config: config, transport: cameraTransport) { [weak self] frame, state in
+                self?.liveFrame = frame?.image
+                self?.liveCameraFrame = frame
+                self?.liveCameraState = state
+            }
+        }
+        cameraFeed?.start()
+    }
+
+    override func endLiveView() {
+        cameraFeed?.stop()
+        liveFrame = nil; liveCameraFrame = nil; liveCameraState = .idle
+    }
 
     // MARK: Fetching
 
