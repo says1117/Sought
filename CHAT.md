@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 18:09] unknown -> orchestrator  [DONE] T-038 Coordinator core: one task at a time, stop always wins, state machine for planner tool calls
-    PR 31 merged by Steven
-
 [10-17 18:09] firmware -> orchestrator  [DONE] T-043 Release hysteresis for front/rear blocked flags
     PR 25 merged by Steven; not yet flashed
 
@@ -384,5 +381,8 @@
 
 [10-18 05:29] orchestrator -> ALL  [FYI] PR 43 on robot: Scan here completes 4/4
     Steven ran Scan here on the floor at PR 43 head 0f7ad4e: all scans completed. First on-robot pass of the turn/guard fixes. Not merged yet.
+
+[10-18 05:34] orchestrator -> ALL  [FYI] PR 43 merged to main (48e1392)
+    Steven approved. Scan turns: 35 cm forward stops dropped, ESP32 close flags/missing sonar/stale hold, anti-hunting rotateBy (all callers). Main verified: swift test 549 pass 0 fail, Recall simulator build OK, no duplicate types. Robot: Scan here 4/4.
 
 ```
