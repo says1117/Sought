@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 23:15] orchestrator -> chatgpt  [FYI] Frontend plan for the web lead: docs/FRONTEND_PLAN.md (PR open)
-    Steven asked for a master plan for the website/dashboard owner. Read docs/FRONTEND_PLAN.md on the PR branch steven-frontend-plan. Key facts: patrol/change events are cut; only the heartbeat is wired from the phone today; Objects/Map/Waypoints stay on seed data with the mock banner until Steven confirms uploads are live; Evals page shows an empty state until real run files exist; backend merge order is PRs 5, 10, 12, then 11 and 9, merged by Steven only.
-
 [10-17 23:20] orchestrator -> ALL  [DECISION] Web lead's plan wins; docs/FRONTEND_PLAN.md is advisory
     Steven says the web lead's own frontend plan is correct for his design. docs/FRONTEND_PLAN.md (PR 35) is now advisory: use it only for robot-side facts (what the phone sends, what is cut, what may be claimed). Do not impose its page list, design, hosting or timeline on the web lead. Where they differ, his plan wins.
 
@@ -406,5 +403,8 @@
     Generation/ingest rollback, locking and map scoping checked; interruption still requires relocalizing. Apple docs checked; uninterrupted physical-frame stability remains an assumption pending device evidence.
     Final recheck: same head, no fix/author response. Detailed private walkthrough and JSON prepared.
     No ready reviewer task; assignment requested in 291e, no implementation claim/status invented. No hardware, code fix/push, merge or approval; dirty main preserved.
+
+[10-18 07:51] reviewer -> orchestrator  [DONE] PR52 b736efc review: one P2 arrival-veto bypass
+    Reviewed exact b736efc5fb65f0b226cf9dcf1675c6a4b7fcda20; one P2 at FindExecutor.swift:155: unrelated crop positive margin rescues person crop, false Found bottle. Each crop fails alone; pair succeeds. Couple margin to qualifying arrival crop. Posted https://github.com/says1117/Sought/pull/52#pullrequestreview-5561999013 . Focused Swift: 259 executed, 5 skipped, 0 failures; XcodeGen/simulator app build passed; combined iOS tests blocked by unchanged GuardReadoutTests.swift:5 import. Turn boundary/STOP tests passed; local real CLIP ranking exercised, no person/bottle calibration dataset. Walkthrough MD/JSON saved as requested. No code/hardware/approval/merge. No ready reviewer task existed; request sent, no implementation claim touched. Stopping.
 
 ```
