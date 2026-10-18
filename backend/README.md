@@ -85,3 +85,21 @@ Shape is docs/03_CONTRACTS.md section 2.9:
 
 Every create and status change emits an SSE `command` event with the full command.
 All endpoints need the bearer token.
+
+### Latest robot camera frame (additive API)
+
+`PUT /api/camera/frame` accepts a raw `image/jpeg` body (not multipart), at most
+512 KiB, with decoded longest side at most 640 pixels. A valid upload replaces
+the previous frame and returns 204. Oversize bodies return 413; invalid content
+type, malformed/truncated JPEGs, decompression bombs, and excessive dimensions
+return 422 without replacing the last valid frame. Reads are bounded while streaming.
+
+`GET /api/camera/frame` returns the latest JPEG with `Cache-Control: no-store`
+and `X-Frame-Age-Ms`, a nonnegative age measured using the server's monotonic
+receipt clock. It returns 404 before the first frame and 410 once the frame is
+more than 5 seconds old. Clients must treat 410 as camera unavailable, not show
+the old frame as live. Both endpoints require the configured bearer token.
+
+Frames live only in memory for this app lifespan: one latest frame, no history,
+filesystem writes, public media URL, or SSE event. They disappear on restart.
+Run a single backend worker; multiple processes would have independent frames.

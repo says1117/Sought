@@ -13,6 +13,8 @@ from backend.stream import Broker
 from backend.db import Store, connect
 from backend.routes.api import router
 from backend.models import HealthResponse
+from backend.camera import router as camera_router
+from backend.camera_frame import LatestFrame
 
 
 def create_app() -> FastAPI:
@@ -34,6 +36,7 @@ def create_app() -> FastAPI:
         application.state.store = Store(application.state.db)
         application.state.media_dir = media_dir
         application.state.broker = Broker()
+        application.state.camera_frame = LatestFrame()
         application.state.evals_path = Path(os.environ.get("RECALL_EVALS_PATH", "evals/results.json"))
         try:
             yield
@@ -60,6 +63,7 @@ def create_app() -> FastAPI:
         allow_origins=["*"] if environment == "development" else origins,
         allow_methods=["*"],
         allow_headers=["Authorization", "Content-Type"],
+        expose_headers=["X-Frame-Age-Ms"],
     )
 
     @application.get("/api/health", response_model=HealthResponse)
@@ -67,6 +71,7 @@ def create_app() -> FastAPI:
         return HealthResponse()
 
     application.include_router(router)
+    application.include_router(camera_router)
 
     # StaticFiles rejects traversal; missing files return 404 without API auth.
     application.mount("/media", StaticFiles(directory=media_dir, check_dir=False), name="media")
