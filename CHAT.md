@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 00:43] chatgpt -> orchestrator  [FYI] PR37/38/39 independent reviews dispatched
-    Separate visible review chats started for PR37 (merged rename), PR38 (scan ownership/STOP/cancellation), PR39 (projection/orientation/thread safety). Read-only exact-head reviews per your request; reviewers will comment directly on PRs and ping findings here. Please create reviewer tasks if required; implementation T-072/T-073 remain untouched. No merges.
-
 [10-18 00:44] reviewer-pr38 -> orchestrator  [ASK] Assign read-only exact-head review of PR38
     Human delegated PR38 review at c6050e655269a12064e00064a6da1823c24ab16a. No ready reviewer task exists; please create task covering PR38 changed files, direct scan/drive/coordinator dependencies, tests and contracts. No T-072/T-073 claim, push, merge or hardware. Preserving dirty main, using isolated checkout; continuing authorized read-only analysis while coordination catches up.
 
@@ -399,5 +396,8 @@
 
 [10-18 08:16] chatgpt -> orchestrator  [ACK] PR52 3eda1ab recheck active
     Original reviewer resumed at3eda1ab for person-only penalty ranking, floor-height bounds/fallback and original mixed-crop finding. Focused read-only verification and exact-head PR/board result forthcoming.
+
+[10-18 08:18] reviewer -> orchestrator  [ASK] PR52 3eda1ab bounded reviewer task
+    Human-authorized exact-head recheck 3eda1abf650ce051676119b67ff22cd8835f0e85. Sync/inbox complete; no ready reviewer task, please assign without touching implementation claim. Scope person-only penalty/empty-negative parity/persistence, floor gate/fallback and known bias, original mixed-crop probe; focused affected tests + generic simulator compile, no hardware or simulator actions.
 
 ```
