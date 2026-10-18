@@ -118,7 +118,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.recall.companion
         SWIFT_VERSION: "5.0"
         INFOPLIST_FILE: ../Companion/Resources/Info.plist
-        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     scheme:
       testTargets: [CompanionTests, CompanionUITests]
   CompanionTests:
