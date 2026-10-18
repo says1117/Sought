@@ -317,13 +317,94 @@ final class ControllerTests: XCTestCase {
 
     // MARK: failure paths
 
-    func testTimeoutAfter30Seconds() async {
+    func testDistanceBudgetIsBoundedAndFinite() {
+        XCTAssertEqual(ControllerMath.goToTimeout(distance: 0.5, stopDistance: 0.3), 30)
+        XCTAssertEqual(ControllerMath.goToTimeout(distance: 4, stopDistance: 0.3), 59.4, accuracy: 1e-9)
+        for distance in [100.0, Double.greatestFiniteMagnitude, .infinity, .nan] {
+            let budget = ControllerMath.goToTimeout(distance: distance, stopDistance: 0.3)
+            XCTAssertTrue(budget.isFinite)
+            XCTAssertGreaterThanOrEqual(budget, 30)
+            XCTAssertLessThanOrEqual(budget, 75)
+        }
+    }
+
+    func testSlowSyntheticTraversalCompletesAfterThirtySeconds() {
+        // Invented 0.1 m/s trajectory: this checks the deadline, not rover performance.
+        var session = ControlSession(goal: .goTo(x: 0, z: -4, stopDistance: 0.3))
+        for tick in 0...364 {
+            let t = Double(tick) / 10
+            let output = session.tick(TickInput(pose: Pose2D(x: 0, z: -t * 0.1, yawDeg: 0),
+                                                tracking: .normal, guardState: .clear, now: t))
+            XCTAssertEqual(output.status, .running)
+        }
+        for t in [36.6, 36.7] {
+            XCTAssertEqual(session.tick(TickInput(pose: Pose2D(x: 0, z: -3.7, yawDeg: 0),
+                                                 tracking: .normal, guardState: .clear, now: t)).status, .running)
+        }
+        let done = session.tick(TickInput(pose: Pose2D(x: 0, z: -3.7, yawDeg: 0),
+                                         tracking: .normal, guardState: .clear, now: 36.8))
+        XCTAssertEqual(done.status, .done)
+        XCTAssertEqual(done.command, .zero)
+    }
+
+    func testBudgetUsesFirstValidPoseAndNeverRenews() {
+        var session = ControlSession(goal: .goTo(x: 0, z: -4, stopDistance: 0.3))
+        func tick(_ time: Double, _ z: Double?, _ tracking: TrackingKind = .normal) -> TickOutput {
+            session.tick(TickInput(pose: z.map { Pose2D(x: 0, z: $0, yawDeg: 0) },
+                                   tracking: tracking, guardState: .stop, now: time))
+        }
+        XCTAssertEqual(tick(0, nil, .limited).command, .zero)
+        XCTAssertEqual(tick(0.5, 0).status, .running) // budget 59.4 s, clock still starts at 0
+        XCTAssertEqual(tick(30, -3).status, .running) // progress cannot shrink the budget
+        XCTAssertEqual(tick(58.8, nil, .limited).command, .zero)
+        XCTAssertEqual(tick(59.3, 10).status, .running) // recovery / greater distance cannot renew it
+        let failed = tick(59.5, 10)
+        XCTAssertEqual(failed.status, .failed(.timeout))
+        XCTAssertEqual(failed.command, .zero)
+    }
+
+    func testNonfinitePoseWaitsForValidPoseWithoutDriving() {
+        var session = ControlSession(goal: .goTo(x: 0, z: -4, stopDistance: 0.3))
+        let invalid = session.tick(TickInput(pose: Pose2D(x: .nan, z: 0, yawDeg: 0),
+                                            tracking: .normal, guardState: .clear, now: 0))
+        XCTAssertEqual(invalid.command, .zero)
+        XCTAssertEqual(invalid.status, .running)
+        XCTAssertEqual(session.tick(TickInput(pose: Pose2D(x: 0, z: 0, yawDeg: 0),
+                                              tracking: .normal, guardState: .stop, now: 0.5)).status, .running)
+        XCTAssertEqual(session.tick(TickInput(pose: Pose2D(x: 0, z: 0, yawDeg: 0),
+                                              tracking: .normal, guardState: .stop, now: 40)).status, .running)
+    }
+
+    func testGuardHeldLongJourneyStillTimesOutAtHardCap() {
+        var session = ControlSession(goal: .goTo(x: 0, z: -100, stopDistance: 0.3))
+        for t in [0.0, 30, 74.9] {
+            let output = session.tick(TickInput(pose: Pose2D(x: 0, z: 0, yawDeg: 0),
+                                                tracking: .normal, guardState: .stop, now: t))
+            XCTAssertEqual(output.status, .running)
+            XCTAssertEqual(output.command, .zero)
+        }
+        XCTAssertEqual(session.tick(TickInput(pose: Pose2D(x: 0, z: 0, yawDeg: 0),
+                                              tracking: .normal, guardState: .stop, now: 75.1)).status, .failed(.timeout))
+    }
+
+    func testRotationRetainsFifteenSecondTimeout() async {
+        let sim = SimRover(x: 0, z: 0, yawDeg: 0)
+        sim.frozen = true
+        let status = await sim.controller().rotateBy(90)
+        XCTAssertEqual(status, .failed(.timeout))
+        XCTAssertGreaterThan(sim.time, ControllerTuning.rotateTimeout)
+        XCTAssertLessThan(sim.time, ControllerTuning.rotateTimeout + 0.5)
+        XCTAssertTrue(sim.lastEventWasStop)
+    }
+
+    func testStuckJourneyTimesOutAtFixedDistanceBudget() async {
         let sim = SimRover(x: 0, z: 0, yawDeg: 0)
         sim.frozen = true
         let status = await sim.controller().goTo(x: 0, z: -3, stopDistance: 0.3)
         XCTAssertEqual(status, .failed(.timeout))
-        XCTAssertGreaterThan(sim.time, ControllerTuning.timeout)
-        XCTAssertLessThan(sim.time, ControllerTuning.timeout + 0.5)
+        let budget = ControllerMath.goToTimeout(distance: 3, stopDistance: 0.3)
+        XCTAssertGreaterThan(sim.time, budget)
+        XCTAssertLessThan(sim.time, budget + 0.5)
         XCTAssertTrue(sim.lastEventWasStop)
     }
 

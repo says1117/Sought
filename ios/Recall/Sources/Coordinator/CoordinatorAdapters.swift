@@ -73,13 +73,14 @@ final class StoreWaypointsAdapter: CoordinatorWaypoints {
 }
 
 enum ControllerResultMapper {
-    static func result(_ s: ControlStatus) -> CoordinatorTaskResult {
+    static func result(_ s: ControlStatus, stats: ControlRunStats? = nil) -> CoordinatorTaskResult {
+        let diagnostics = stats.map { " (" + $0.summary + ")" } ?? ""
         switch s {
         case .done: return .completed(summary: "arrived")
         case .running: return .blocked(reason: "The controller did not finish")
         case .failed(.cancelled): return .cancelled
-        case .failed(.timeout): return .blocked(reason: "I couldn't get there in time")
-        case .failed(.trackingLost): return .blocked(reason: CoordinatorConfig.rescanReason)
+        case .failed(.timeout): return .blocked(reason: "I couldn't get there in time" + diagnostics)
+        case .failed(.trackingLost): return .blocked(reason: CoordinatorConfig.rescanReason + diagnostics)
         }
     }
 }
@@ -94,7 +95,7 @@ final class ControllerNavigator: CoordinatorNavigating {
         let epoch = controller.stopEpoch   // a cancel() from here on cancels this run even if it lands before the loop starts
         try Task.checkCancellation()
         let status = await controller.goTo(x: waypoint.x, z: waypoint.z, stopDistance: stopDistance, since: epoch)
-        return ControllerResultMapper.result(status)
+        return ControllerResultMapper.result(status, stats: controller.lastRun)
     }
     func cancel() { controller.stop() }
 }
