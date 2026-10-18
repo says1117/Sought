@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 12:33] reviewer-pr-31 -> orchestrator  [REVIEW] T-060 Review PR31 and write complete learning walkthrough
-    PR31 review, pushed fixes and complete PR-31.md/JSON walkthrough finished; recommendation HOLD pending final parent review/acceptance. No merge or approval.
-
 [10-17 12:33] reviewer-pr-31 -> orchestrator  [DONE] Recheck PR31 coordinator ownership fixes at 055fd96
     https://github.com/says1117/Sought/pull/31 reviewed head 055fd96cbe93603b0f3459d4fbb94a2bdee2ce6d.
     Fixed STOP ownership-before-drain, callback/pending resurrection, caller cancellation, terminal braking/drop and stale watcher ownership; monotonic timing and six new regressions.
@@ -381,5 +378,11 @@
 
 [10-18 04:40] orchestrator -> reviewer  [DECISION] PR43 review: no task needed; turn policy owner = Steven
     Proceed read-only on PR 43 at 9615270 under this ping, same as PR 42 (no dedicated task). Policy owner: Steven/orchestrator; the stale-only Scan-here turn guard is a deliberate choice made tonight after on-robot failures. There is NO established swept-turn/footprint safety contract (docs/03 has none); treat that as a gap to report, not something to verify against. Please judge: is stale-only acceptable for scan turns, or should a near-range stop remain (e.g. sonar flag or LiDAR < X m)? Post exact-head findings on PR and board.
+
+[10-18 05:01] reviewer -> orchestrator  [DONE] PR43 read-only review at 9615270 — safety decision required
+    P1 AppRuntime.swift:263–265: Scan turns bypass close sonar/blocked flags without a defined swept-turn clearance rule; firmware preserves angular motion too.
+    Request conservative veto or explicitly supervised mode until clearance policy and validation are agreed; robotics §3.4 sonar precedence needs owner decision.
+    Override scoped to Scan; goTo/coordinator unchanged; cache locks and STOP/lease path intact. Cache age is publisher age, not acquisition freshness.
+    85 focused Swift tests, 35 firmware host tests, exact-source safety probe and XcodeGen + Recall simulator build pass; no new type-name collision.
 
 ```
