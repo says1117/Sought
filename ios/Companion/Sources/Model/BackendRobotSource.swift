@@ -68,7 +68,7 @@ final class BackendRobotSource: RobotSource {
     private lazy var sample = MockRobotSource(seedOnly: true)
 
     override var isSample: Bool { serverIsMock || itemsAreSample }
-    override var sampleLabel: String { itemsAreSample && !serverIsMock ? "SAMPLE ITEMS" : "SAMPLE DATA" }
+    override var sampleLabel: String { itemsAreSample && !serverIsMock ? "Sample items" : "Sample" }
     override var sampleSpoken: String {
         itemsAreSample && !serverIsMock ? "Items are sample data. Soughtbot\u{2019}s status is live." : super.sampleSpoken
     }

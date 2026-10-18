@@ -31,7 +31,7 @@ class RobotSource: ObservableObject {
     /// True when anything shown is sample data. Drives the SAMPLE DATA banner.
     var isSample: Bool { true }
     /// Badge words. "SAMPLE ITEMS" when the status is live but the catalog is still sample data.
-    var sampleLabel: String { "SAMPLE DATA" }
+    var sampleLabel: String { "Sample" }
     var sampleSpoken: String { "Sample data. This is not from the robot." }
     var sourceName: String { "Sample data" }
     /// Whether Call Soughtbot can reach the robot in this build.

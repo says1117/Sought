@@ -292,13 +292,12 @@ struct SampleBanner: View {
 
     var body: some View {
         if robot.isSample {
-            HStack(spacing: 4) {
-                Image(systemName: "flask").font(SoughtFont.badge)
-                Text(robot.sampleLabel).font(SoughtFont.badge).tracking(0.6)
-            }
-            .foregroundStyle(p.onPrimary)
-            .padding(.horizontal, 8).padding(.vertical, 4)
-            .background(Capsule().fill(p.searching))
+            // Quiet on purpose (Isaac): a small glass tag in the UI's own text color. Still visible in every
+            // screenshot and recording; VoiceOver reads the full explanation.
+            Text(robot.sampleLabel).font(SoughtFont.badge).tracking(0.3)
+                .foregroundStyle(p.text)
+                .padding(.horizontal, 8).padding(.vertical, 3)
+                .soughtGlass(.pill, in: Capsule())
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(robot.sampleSpoken)
             .accessibilityIdentifier("sampleBanner")
