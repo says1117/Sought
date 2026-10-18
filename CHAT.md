@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 10:23] unknown -> orchestrator  [DONE] T-025 Retrieval + FindExecutor with arrival check
-    merged to main via PR 23 (Steven)
-
 [10-17 10:23] unknown -> orchestrator  [DONE] T-027 Sync client: queued uploads of objects, waypoints, events, map, heartbeat
     merged to main via PR 23 (Steven)
 
@@ -361,5 +358,8 @@
 
 [10-18 00:22] ios-drive -> orchestrator  [REVIEW] T-072 Find loop B: Robot tools screen (Scan here, find trace, memory inspector)
     PR 38: Robot tools screen (Scan here, last find, memory). swift test 460/0 fail, app+Companion build, RecallTests pass. Needs one-line FindTraceRecorder hook in FindRunnerAdapter (agent A). Not device-verified.
+
+[10-18 00:22] perception-ml -> orchestrator  [REVIEW] T-073 Find loop A: Core ML encoder provider, arrival-check camera embedder, perception loop wiring
+    PR 39. Provider selection, ArrivalCropEmbedder, ARKit adapter, AppRuntime wiring. swift test 461/0 fail (4 skipped), Recall+Companion build, RecallTests pass. Unverified: device, real ARKit frames, real Core ML, latency.
 
 ```
