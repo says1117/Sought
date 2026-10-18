@@ -22,6 +22,9 @@ final class PoseTracker: NSObject, ObservableObject, ARSessionDelegate {
     private var lastStamp: Double?
     private var hzEMA = 0.0
 
+    /// Called on every (re)start with whether a saved map was loaded: a new ARKit run is a new coordinate frame.
+    var onSessionStart: ((_ loadedSavedMap: Bool) -> Void)?
+
     override init() {
         super.init()
         session.delegate = self
@@ -41,6 +44,7 @@ final class PoseTracker: NSObject, ObservableObject, ARSessionDelegate {
         floorY = nil
         let options: ARSession.RunOptions = resetTracking || initialWorldMap != nil
             ? [.resetTracking, .removeExistingAnchors] : []
+        onSessionStart?(initialWorldMap != nil)
         session.run(config, options: options)
     }
 

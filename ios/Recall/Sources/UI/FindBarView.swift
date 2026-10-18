@@ -3,6 +3,8 @@ import SwiftUI
 /// Root screen: a speak-or-type find bar. Large controls, VoiceOver labels, Dynamic Type friendly.
 struct FindBarView: View {
     @ObservedObject var model: FindBarViewModel
+    /// What the robot is doing now (coordinator state and task). nil in previews.
+    var robotStatus: String? = nil
     @FocusState private var fieldFocused: Bool
 
     var body: some View {
@@ -53,6 +55,13 @@ struct FindBarView: View {
                     .foregroundStyle(isError ? Color.red : Color.primary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityLabel("Status: \(model.statusLine)")
+                if let robotStatus {
+                    Text(robotStatus)
+                        .font(.body.monospaced())
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityLabel(robotStatus)
+                }
                 if let last = model.lastToolCall {
                     Text("Last action: \(last)")
                         .font(.body)

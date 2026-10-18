@@ -74,13 +74,16 @@ final class CoordTestSpeaker: CoordinatorSpeaking {
     private let lock = NSLock()
     private var words: [String] = []
     var said: [String] { lock.lock(); defer { lock.unlock() }; return words }
-    func say(_ text: String) { lock.lock(); words.append(text); lock.unlock() }
+    /// Runs after the text is recorded, on the speaking thread (may be inside the coordinator's lock).
+    var onSay: ((String) -> Void)?
+    func say(_ text: String) { lock.lock(); words.append(text); lock.unlock(); onSay?(text) }
 }
 
 final class CoordTestWaypoints: CoordinatorWaypoints {
     var known: [String: CoordinatorWaypoint] = ["kitchen": CoordinatorWaypoint(name: "kitchen", x: 1, z: 2)]
     var marked: [String] = []
     var markError: Error?
+    var isPersistent = true
     func lookup(_ name: String) -> CoordinatorWaypoint? { known[name.lowercased()] }
     func markHere(name: String) throws -> CoordinatorWaypoint {
         if let markError { throw markError }
@@ -142,10 +145,12 @@ struct CoordRig {
         func append(_ status: CoordinatorStatus) { lock.lock(); statuses.append(status); lock.unlock() }
     }
 
-    init() {
+    init(frame: CoordinatorFrameValidity = TrustedFrame()) {
         let e = explorer, f = finder, c = comer, n = navigator, w = waypoints, d = drive, s = speaker, k = clock, p = pose
         coordinator = RobotCoordinator(dependencies: CoordinatorDependencies(
-            explorer: e, finder: f, comer: c, navigator: n, waypoints: w, drive: d, speaker: s, clock: k, pose: p))
+            explorer: e, finder: f, comer: c, navigator: n, waypoints: w, drive: d, speaker: s, clock: k, pose: p, frame: frame),
+            // These tests exercise sequencing for every task type, so all features are on here.
+            config: CoordinatorConfig(features: RecallFeatureFlags(exploreEnabled: true, comeToMeEnabled: true)))
         let log = StateLog()
         states = log
         coordinator.onChange = { log.append($0) }

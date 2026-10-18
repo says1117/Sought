@@ -22,7 +22,12 @@ final class Controller {
     private let guardState: () -> GuardState
     private let clock: () -> Double
     private let sleep: (Double) async -> Void
-    private var stopRequested = false
+    private let stopLock = NSLock()
+    private var stopGeneration: UInt64 = 0
+
+    /// Monotonic count of stop() calls. Thread-safe. A run ends as soon as this differs from the value it saw
+    /// when it started, so a stop that lands at any point after a run was entered always wins and nothing resets it.
+    var stopEpoch: UInt64 { stopLock.lock(); defer { stopLock.unlock() }; return stopGeneration }
 
     /// `clock` returns seconds (monotonic); `sleep` waits that many seconds. Both are injectable for tests.
     init(poses: PoseSource, sink: DriveSink,
@@ -34,24 +39,26 @@ final class Controller {
 
     /// Ends the current goTo/rotateBy at the next tick (also on task cancellation). Sends STOP immediately.
     func stop() {
-        stopRequested = true
+        stopLock.lock(); stopGeneration &+= 1; stopLock.unlock()
         sink.stop()
     }
 
-    func goTo(x: Double, z: Double, stopDistance: Double) async -> ControlStatus {
-        await run(ControlSession(goal: .goTo(x: x, z: z, stopDistance: stopDistance)))
+    /// `since`: the `stopEpoch` the caller read before it could have been told to stop; a stop issued after that
+    /// (even before this call begins) cancels the run. Defaults to the epoch at entry.
+    func goTo(x: Double, z: Double, stopDistance: Double, since: UInt64? = nil) async -> ControlStatus {
+        await run(ControlSession(goal: .goTo(x: x, z: z, stopDistance: stopDistance)), since: since)
     }
 
-    func rotateBy(_ deg: Double) async -> ControlStatus {
-        await run(ControlSession(goal: .rotateBy(deg: deg)))
+    func rotateBy(_ deg: Double, since: UInt64? = nil) async -> ControlStatus {
+        await run(ControlSession(goal: .rotateBy(deg: deg)), since: since)
     }
 
-    private func run(_ initial: ControlSession) async -> ControlStatus {
+    private func run(_ initial: ControlSession, since: UInt64?) async -> ControlStatus {
         var session = initial
-        stopRequested = false
+        let startEpoch = since ?? stopEpoch
         defer { sink.stop() }                       // every exit path leaves the rover stopped
         while true {
-            if stopRequested || Task.isCancelled { return .failed(.cancelled) }
+            if stopEpoch != startEpoch || Task.isCancelled { return .failed(.cancelled) }
             let s = poses.latest()
             let out = session.tick(TickInput(pose: s.pose, tracking: s.tracking, guardState: guardState(), now: clock()))
             if out.status != .running { return out.status }

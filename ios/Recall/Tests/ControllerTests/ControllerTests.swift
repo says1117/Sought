@@ -220,4 +220,53 @@ final class ControllerTests: XCTestCase {
         XCTAssertEqual(status, .failed(.cancelled))
         XCTAssertTrue(sim.lastEventWasStop)
     }
+
+    // PR 33 re-review finding 2: the stop flag was a plain Bool, written by stop() on one thread while run()
+    // reset and read it on another, and run() cleared a stop that arrived just before it began.
+    func testStopRequestedAfterEpochReadButBeforeRunBeginsWins() async {
+        let rover = SimRover(x: 0, z: 0, yawDeg: 0)
+        let c = rover.controller()
+        let epoch = c.stopEpoch
+        c.stop()                                              // lands before run() starts
+        let status = await c.goTo(x: 0, z: -3, stopDistance: 0.1, since: epoch)
+        XCTAssertEqual(status, .failed(.cancelled))
+        XCTAssertEqual(rover.drives, 0, "never drove")
+    }
+
+    func testStopEpochIsMonotonicAndLaterRunsStillWork() async {
+        let rover = SimRover(x: 0, z: 0, yawDeg: 0)
+        let c = rover.controller()
+        let e0 = c.stopEpoch
+        c.stop(); c.stop()
+        XCTAssertEqual(c.stopEpoch, e0 + 2)
+        let status = await c.goTo(x: 0, z: -0.5, stopDistance: 0.1)   // fresh run after an old stop is not poisoned
+        XCTAssertEqual(status, .done)
+    }
+
+    /// Run under `swift test --sanitize=thread`: stop() from many threads while runs start and finish.
+    func testConcurrentStopAndRunHaveNoDataRace() async {
+        let ticks = ControllerRaceClock()
+        let c = Controller(poses: ControllerRaceBox(), sink: ControllerRaceBox(),
+                           clock: { ticks.next() }, sleep: { _ in await Task.yield() })
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<4 {
+                group.addTask { for _ in 0..<200 { c.stop(); _ = c.stopEpoch } }
+                group.addTask { for _ in 0..<50 { _ = await c.rotateBy(10) } }
+            }
+        }
+    }
+}
+
+/// Pose that never moves and a sink that discards commands: only the stop flag is exercised.
+final class ControllerRaceBox: PoseSource, DriveSink {
+    func latest() -> (pose: Pose2D?, tracking: TrackingKind) { (Pose2D(x: 0, z: 0, yawDeg: 0), .normal) }
+    func drive(left: Int, right: Int) {}
+    func stop() {}
+}
+
+/// Monotonic fake clock that moves on every read so runs always time out.
+final class ControllerRaceClock {
+    private let lock = NSLock()
+    private var t = 0.0
+    func next() -> Double { lock.lock(); defer { lock.unlock() }; t += 0.1; return t }
 }
