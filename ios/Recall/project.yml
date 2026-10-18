@@ -116,7 +116,20 @@ targets:
         INFOPLIST_FILE: ../Companion/Resources/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: ""
     scheme:
-      testTargets: [CompanionUITests]
+      testTargets: [CompanionTests, CompanionUITests]
+  CompanionTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: ../Companion/Tests
+    dependencies:
+      - target: Companion
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.recall.companion.tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Companion.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Companion
+        BUNDLE_LOADER: $(TEST_HOST)
   CompanionUITests:
     type: bundle.ui-testing
     platform: iOS

@@ -126,6 +126,7 @@ struct MapWidget: View {
 
 struct CallCard: View {
     @EnvironmentObject private var robot: RobotSource
+    @EnvironmentObject private var router: Router
     @Environment(\.palette) private var p
     @State private var notice: String?
 
@@ -133,12 +134,10 @@ struct CallCard: View {
         let coming = robot.status.state == .comingToUser
         Button {
             Haptics.shared.tap()
-            if coming { return }
-            if robot.canComeToMe && robot.status.isOnline(now: robot.now) {
-                robot.comeToMe()
-                Speaker.shared.say("Soughtbot is coming to you.")
+            if coming || (robot.canComeToMe && robot.status.isOnline(now: robot.now)) {
+                router.showComeToMe = true
             } else {
-                notice = robot.status.isOnline(now: robot.now) ? "Not available in this build" : "Soughtbot is offline"
+                notice = robot.status.isOnline(now: robot.now) ? "Not connected yet" : "Soughtbot is offline"
                 UIAccessibility.post(notification: .announcement, argument: notice)
             }
         } label: {
@@ -167,7 +166,7 @@ struct CallCard: View {
             }
         }
         .accessibilityLabel(coming ? "Soughtbot is coming to you" : "Call Soughtbot")
-        .accessibilityHint(coming ? "" : "Asks Soughtbot to drive to you.")
+        .accessibilityHint(coming ? "Double tap to see where it is." : "Choose where you are, and Soughtbot drives there.")
         .accessibilityIdentifier("callButton")
     }
 }

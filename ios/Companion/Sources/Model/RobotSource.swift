@@ -13,6 +13,7 @@ class RobotSource: ObservableObject {
     @Published var objects: [TrackedObject] = []
     @Published var map: MapSnapshot?
     @Published var liveFrame: UIImage?          // nil when no live frames (fallback: latest thumbnail)
+    @Published var come: ComeProgress?
     @Published var find: FindProgress? {
         didSet { logFindResult(from: oldValue, to: find) }
     }
@@ -48,7 +49,8 @@ class RobotSource: ObservableObject {
     func startFind(_ query: String, match: TrackedObject?) {}
     func cancelFind() { if var f = find { f.phase = .cancelled; find = f } }
     func clearFind() { find = nil }
-    func comeToMe() {}
+    func comeToMe(to target: ComeTarget) {}
+    func cancelComeToMe() { if var c = come { c.phase = .cancelled; come = c } }
 
     // MARK: Derived
 

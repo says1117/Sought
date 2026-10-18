@@ -442,7 +442,7 @@ struct MapScreen: View {
         .accessibilityHidden(true)
         let call = Button {
             Haptics.shared.tap()
-            if robot.canComeToMe && online { robot.comeToMe() }
+            if robot.canComeToMe && online { router.showComeToMe = true }
         } label: {
             Text(s.state == .comingToUser ? "Coming" : "Call").font(SoughtFont.findIt).foregroundStyle(p.onPrimary)
                 .padding(.horizontal, Space.l).frame(minHeight: 44)

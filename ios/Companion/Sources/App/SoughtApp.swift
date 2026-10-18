@@ -113,6 +113,10 @@ struct RootView: View {
         .sheet(item: $router.detail) { o in
             ItemDetailView(itemId: o.id).heroDestination(router.heroID).background(SoughtBackground()).environment(\.palette, palette).environment(\.backgroundMood, mood).environment(\.heroNamespace, hero).presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: $router.showComeToMe) {
+            ComeToMeSheet().background(SoughtBackground()).environment(\.palette, palette).environment(\.backgroundMood, mood)
+                .presentationDetents([.large]).presentationDragIndicator(.visible)
+        }
         .fullScreenCover(item: $router.findRequest) { r in
             FindFlowView(request: r).heroDestination(router.heroID).background(SoughtBackground()).environment(\.palette, palette).environment(\.backgroundMood, mood).environment(\.heroNamespace, hero)
         }

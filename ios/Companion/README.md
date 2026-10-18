@@ -12,6 +12,15 @@ open Recall.xcodeproj   # scheme: Companion, any iOS 17+ simulator
 
 Screenshot hooks (launch arguments): `-tab items|map|settings`, `-search "red umbrella"`, `-detail obj_sample0007`, `-find obj_sample0007`.
 
+## Tests
+
+```bash
+cd ios/Recall && xcodebuild test -project Recall.xcodeproj -scheme Companion -destination 'platform=iOS Simulator,name=<iPhone>'
+```
+
+`Tests/SoughtLogicTests.swift` (12 unit tests): status copy and offline rule, activity events, search matching, pins
+never counting as finds, pin place names, backend date and config parsing. `UITests/` runs the accessibility audit.
+
 ## Accessibility audit
 
 ```bash
@@ -50,5 +59,5 @@ Peer-link messages (`robot_status`, `objects_digest`, `find`) are a documented f
 ## Not done or not verified
 
 - Not run on a physical iPhone. Speech input and haptics are untested on device.
-- Come to me v2 (T-068) button is mocked; real wiring waits for the first real find.
+- Come to me (T-068) is the waypoint version on sample data: pick where you are, Soughtbot drives there and stops about 1 m short. Real wiring needs the command route (T-067, T-070) and waits for the first real find.
 - `ComeToMeTestView` (Settings > For testing) is the original T-028 UWB screen, unchanged in behavior.

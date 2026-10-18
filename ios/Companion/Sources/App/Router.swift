@@ -21,6 +21,8 @@ final class Router: ObservableObject {
     var pendingHero: String?
     /// "Pin where I left them": the Map starts placing a pin with this name.
     @Published var pinDraft: String?
+    /// Come to me sheet (place picker, then progress).
+    @Published var showComeToMe = false
 
     func startPin(named name: String) {
         findRequest = nil
@@ -42,6 +44,12 @@ final class Router: ObservableObject {
                     try? await Task.sleep(nanoseconds: 200_000_000)
                 }
             }
+        }
+        // `-showComeToMe YES` opens the place picker; `-comeTo wpt_x` also starts going there.
+        if d.bool(forKey: "showComeToMe") { showComeToMe = true }
+        if let id = d.string(forKey: "comeTo"), let w = robot.map?.waypoints.first(where: { $0.id == id }) {
+            robot.comeToMe(to: ComeTarget(waypointId: w.id, name: "the \(w.name)", x: w.x, z: w.z))
+            showComeToMe = true
         }
         // `-demoOpen obj_x` / `-demoFind obj_x`: after Home settles, open or find from its Recent Finds card (zoom demo).
         for (key, open) in [("demoOpen", true), ("demoFind", false)] {

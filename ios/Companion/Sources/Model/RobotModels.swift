@@ -148,3 +148,25 @@ extension TrackedObject {
         }
     }
 }
+
+// MARK: - Come to me (T-068, waypoint version of docs/COME_TO_ME_PLAN.md)
+
+/// Where the person says they are. The waypoint id is what the command will carry (target {waypoint_id}).
+struct ComeTarget: Equatable, Codable {
+    var waypointId: String?
+    var name: String          // "the kitchen table", "the kitchen"
+    var x: Double
+    var z: Double
+}
+
+enum ComePhase: Equatable {
+    case going(distanceM: Double?)
+    case arrived
+    case failed(reason: String)
+    case cancelled
+}
+
+struct ComeProgress: Equatable {
+    var target: ComeTarget
+    var phase: ComePhase
+}

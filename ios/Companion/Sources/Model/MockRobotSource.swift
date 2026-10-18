@@ -165,13 +165,37 @@ final class MockRobotSource: RobotSource {
         status.task = nil
     }
 
-    override func comeToMe() {
+    /// Drives the sample robot toward the spot and stops about 1 m short, as the plan describes.
+    override func comeToMe(to target: ComeTarget) {
         comeTask?.cancel()
         status.state = .comingToUser
+        status.task = "come to me: \(target.name)"
+        come = ComeProgress(target: target, phase: .going(distanceM: nil))
         comeTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 8_000_000_000)
-            guard let self, !Task.isCancelled else { return }
-            if self.status.state == .comingToUser { self.status.state = .idle }
+            guard let self else { return }
+            var p = self.status.pose ?? Pose2D(x: 0, z: 0, yawDeg: 0)
+            try? await Task.sleep(nanoseconds: 800_000_000)
+            while !Task.isCancelled {
+                let dx = target.x - p.x, dz = target.z - p.z
+                let d = hypot(dx, dz)
+                self.come?.phase = .going(distanceM: (max(0, d - 1) * 10).rounded() / 10)
+                if d <= 1.05 { break }
+                let step = min(0.35, d - 1)
+                p = Pose2D(x: p.x + dx / d * step, z: p.z + dz / d * step, yawDeg: atan2(-dx, -dz) * 180 / .pi)
+                self.status.pose = p
+                try? await Task.sleep(nanoseconds: 600_000_000)
+            }
+            guard !Task.isCancelled else { return }
+            self.come?.phase = .arrived
+            self.status.state = .idle
+            self.status.task = nil
         }
+    }
+
+    override func cancelComeToMe() {
+        comeTask?.cancel()
+        super.cancelComeToMe()
+        status.state = .idle
+        status.task = nil
     }
 }
