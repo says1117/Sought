@@ -39,7 +39,7 @@ final class AccessibilityAuditTests: XCTestCase {
         var failures = 0
         for (name, args) in screens {
             let app = XCUIApplication()
-            app.launchArguments = ["-useSampleData", "YES", "-mockLoadDelay", "0", "-mockState", "idle"] + args
+            app.launchArguments = ["-noSplash", "YES", "-useSampleData", "YES", "-mockLoadDelay", "0", "-mockState", "idle"] + args
             app.launch()
             sleep(3)
             let bandTop = app.windows.firstMatch.frame.maxY - 110

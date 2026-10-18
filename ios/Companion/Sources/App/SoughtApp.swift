@@ -92,6 +92,8 @@ struct RootView: View {
     @EnvironmentObject private var router: Router
     @EnvironmentObject private var settings: AppSettings
     @State private var lastSpokenState: RobotState?
+    /// Opening splash on cold launch. `-noSplash YES` skips it (screenshots, UI tests).
+    @State private var showSplash = !UserDefaults.standard.bool(forKey: "noSplash")
     @Namespace private var hero
 
     private var palette: Palette { settings.highContrast ? .highContrast : .standard }
@@ -105,6 +107,7 @@ struct RootView: View {
             .background(SoughtBackground())
             .safeAreaInset(edge: .bottom, spacing: 0) { SoughtTabBar(selection: $router.tab) }
             .overlay(alignment: .top) { StatusBarScrim() }
+            .overlay { if showSplash { SplashView { showSplash = false }.transition(.identity) } }
         .environment(\.palette, palette)
         .environment(\.backgroundMood, mood)
         .environment(\.heroNamespace, hero)

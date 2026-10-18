@@ -46,10 +46,17 @@ struct SoughtTabBar: View {
         // Opaque band: content never shows through behind the bar (contrast). Starts at the background's bottom
         // color so the seam is invisible, then deepens to the Figma teal.
         .background {
-            LinearGradient(stops: [.init(color: p.isHighContrast ? p.background : Color(hex: 0xCDE1E7), location: 0),
-                                   .init(color: p.tabGradientBottom, location: 0.58)],
-                           startPoint: .top, endPoint: .bottom)
-                .ignoresSafeArea(edges: .bottom)
+            // Fades in over the top 28 pt so content dissolves into it, then solid behind the pill (contrast).
+            VStack(spacing: 0) {
+                LinearGradient(colors: [p.tabGradientBottom.opacity(0), p.tabGradientBottom.opacity(0.55)],
+                               startPoint: .top, endPoint: .bottom)
+                    .frame(height: 28)
+                LinearGradient(colors: [p.tabGradientBottom.opacity(0.55), p.tabGradientBottom], startPoint: .top, endPoint: .bottom)
+                    .frame(height: 30)
+                p.tabGradientBottom
+            }
+            .padding(.top, -28)
+            .ignoresSafeArea(edges: .bottom)
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Tab bar")
