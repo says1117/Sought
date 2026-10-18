@@ -234,6 +234,8 @@ struct CoordinatorWiring {
     /// Builds the explore task on the coordinator's Controller (ExploreRuntime.makeExplorer). nil = UnwiredExplorer.
     /// The coordinator still refuses explore unless `features.exploreEnabled`.
     var makeExplorer: ((Controller) -> CoordinatorExploring)? = nil
+    /// Builds Remote Teach (move / turn / scan here / save map) on the coordinator's Controller. nil = UnwiredRemoteTeach.
+    var makeRemoteTeach: ((Controller) -> CoordinatorRemoteTeaching)? = nil
 
     /// `drive` must be a serialized sink (see `SerialDriveSink`) and `poses` a snapshot reader
     /// (see `PoseSnapshotBox`): the coordinator and Controller run off the main thread.
@@ -253,7 +255,8 @@ struct CoordinatorWiring {
                 drive: DriveStopAdapter(sink: drive), speaker: speaker, clock: clock,
                 pose: ControllerPoseAdapter(source: poses), lease: lease, frame: frame,
                 taught: StoreTaughtPlacesAdapter(store: waypointStore, frame: frame),
-                legs: ControllerLegDriver(controller: controller, poses: poses)),
+                legs: ControllerLegDriver(controller: controller, poses: poses),
+                teach: makeRemoteTeach?(controller) ?? UnwiredRemoteTeach()),
             config: cfg)
     }
 

@@ -40,14 +40,20 @@ final class RemoteCommandRunner: CommandRunning {
     /// `generation` was read before the command was claimed: any stop since then (during the claim, the context
     /// lookup, planning, or between calls) refuses every call this command would dispatch.
     func run(_ text: String, claimedAt generation: UInt64) async -> CommandOutcome {
-        if (try? KeywordPlanner.parse(text, context: context()))?.contains(.stop) == true { return stop() }
+        let keyword = try? KeywordPlanner.parse(text, context: context())
+        if keyword?.contains(.stop) == true { return stop() }
         guard coordinator.stopGeneration == generation else { return .failed(CommandPoller.stopped) }
         guard claim() else { return .failed(CommandPoller.busy) }
         defer { release() }
 
         let calls: [ToolCall]
-        do { calls = try await plan(text) } catch {
-            return .failed("I did not understand that. Try: find my keys, go to the kitchen, or stop.")
+        // Remote Teach commands have an exact text spec shared with Sought: the keyword grammar decides them, never the model.
+        if let keyword, keyword.count == 1, Self.isTeachCall(keyword[0]) {
+            calls = keyword
+        } else {
+            do { calls = try await plan(text) } catch {
+                return .failed("I did not understand that. Try: find my keys, go to the kitchen, or stop.")
+            }
         }
         if calls.contains(.stop) { return stop() }
 
@@ -64,6 +70,13 @@ final class RemoteCommandRunner: CommandRunning {
             }
         }
         return .done(results.joined(separator: "; "))
+    }
+
+    static func isTeachCall(_ call: ToolCall) -> Bool {
+        switch call {
+        case .move, .turn, .scanHere, .saveMap, .markWaypoint: return true
+        default: return false
+        }
     }
 
     private func stop() -> CommandOutcome {

@@ -110,7 +110,8 @@ final class ToolCallParsingTests: XCTestCase {
     func testDeclarationsMatchEveryTool() throws {
         let names = GeminiPlanner.functionDeclarations().compactMap { $0["name"] as? String }
         XCTAssertEqual(names, ["find_object", "go_to_waypoint", "mark_waypoint", "check_route", "start_patrol",
-                               "what_changed", "stop", "say", "explore", "come_to_me", "come_to_waypoint"])
+                               "what_changed", "stop", "say", "explore", "come_to_me", "come_to_waypoint",
+                               "move", "turn", "scan_here", "save_map"])
         // Every declared tool parses with its minimal valid args.
         for n in names { XCTAssertEqual(PlannerTools.spec(named: n)?.name, n) }
     }
