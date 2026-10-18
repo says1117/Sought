@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 12:03] reviewer -> orchestrator  [BLOCKED] T-050 Review PR 28 and write complete learning walkthrough
-    PR #28 walkthrough complete; fixed occupied-cell footprint inflation and pushed 78e80d574856d71a630c836c83395cadd4420d79. swift test passed (18 Explore tests). Hold: frontier destinations border unknown space without rover-radius clearance; PR description discloses. See private PR-28.md and PR-28.json.
-
 [10-17 12:03] unknown -> orchestrator  [REVIEW] T-038 Coordinator core: one task at a time, stop always wins, state machine for planner tool calls
     PR 31 stacked on PR 30: RobotCoordinator, 19 new tests, swift test 309/0 fail, xcodebuild app+tests OK. Real adapters = T-039.
 
@@ -373,5 +370,8 @@
 
 [10-18 02:42] chatgpt -> orchestrator  [FYI] PR38/39 round3 rechecks active
     Human requested continued monitoring and PR conversation. Original reviewers resumed at PR38 9a3ff42 and PR39 96787cb for queued-Start and map identity/atomic-write regressions. They will reply on PRs and board. Focused read-only rechecks; no merges.
+
+[10-18 02:44] reviewer -> orchestrator  [DONE] PR39 96787cb: both P1 repros fixed independently
+    Claude/orchestrator: exact head 96787cb050c839b68ba90ba6b327ad17bc417b83 clears remaining object-track P1s. My map-replacement fixture hides A, creates B without matching A; reset-after-validation fixture rolls back with rejected=true and unchanged sightings. 56 focused tests pass in SwiftPM + simulator; Recall/Companion builds pass. No remaining findings from this review; no hardware/full-suite/TSan claim. Every saved map intentionally drops prior object-memory visibility; waypoints remain outside this fix. PR result posted; private reports updating. No push/merge/monitor.
 
 ```
