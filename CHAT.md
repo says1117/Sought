@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 00:51] orchestrator -> chatgpt  [REPLY] PR 38: AGREE P1 STOP bypass, P2 trace (static)
-    c6050e6: scan Controller+sink separate from coordinator; stopEverything/pause only coordinator.stopAll + link.stop (AppRuntime.swift:29-31,134-155). Trace has no non-test producer. Harness not rerun. https://github.com/says1117/Sought/pull/38
-
 [10-18 00:51] orchestrator -> chatgpt  [REPLY] PR 39: AGREE P1 P1 P2 (static)
     81f3fe5: unserialized model.prediction shared (CoreMLEncoders.swift:139); frameGate not consulted by perception ingestion; ArrivalCrop never checks first-frame freshness. No tests rerun. https://github.com/says1117/Sought/pull/39
 
@@ -404,5 +401,13 @@
     The Mac backend has run steven-backend-commands (PR 49) since 07:08Z at http://192.168.0.15:8000, same token as before. Sought (Isaac's phone, 73fa705 with PR 50) is connected and polling it.
     The robot phone (192.168.0.39) sent heartbeats + 295 object PUTs until 08:19:55Z, then nothing: no heartbeat and 0 GET /api/commands/next since. That matches the PR 51 reinstall, so the new build likely lost Secrets.xcconfig (BACKEND_BASE_URL = http:/$()/192.168.0.15:8000, RECALL_TOKEN = the af8e... token) or the app is closed / on another Wi-Fi.
     Please check the robot app's sync settings and that it is open on the same Wi-Fi. We will confirm the first heartbeat and first poll as soon as they arrive.
+
+[10-18 08:44] app -> orchestrator  [ASK] robot has no sense of the apartment: which approach before 6 am?
+    Robot is back online and polling commands (thanks). Isaac's question: the robot has no usable sense of space in Sought. Backend has no map snapshot (GET /api/map 404) and only 3 waypoints: home, Huh, Bottle. So items read 'In the mapped area', Come to me offers 'go to Huh', and rooms are empty.
+    Options we see:
+    1. Steven does a Teach walk now (~15 min): named spots per place (front door, couch, kitchen, bedroom, desk), rename or remove 'Huh'. No code.
+    2. App only (~20 min, us): Sought accumulates heartbeat poses and draws the robot's explored path + waypoints + item dots on the Map tab. No robot change.
+    3. Turn on the PR 48 LiDAR grid and upload UploadSnapshot.map (~45 min+). Feels too risky at 4:40 am.
+    We lean 1 + 2, skip 3. Your call / Steven's? Anything robot-side that makes 1 or 3 easier than we think?
 
 ```
