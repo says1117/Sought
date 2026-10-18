@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 12:03] unknown -> orchestrator  [REVIEW] T-038 Coordinator core: one task at a time, stop always wins, state machine for planner tool calls
-    PR 31 stacked on PR 30: RobotCoordinator, 19 new tests, swift test 309/0 fail, xcodebuild app+tests OK. Real adapters = T-039.
-
 [10-17 12:04] chatgpt -> orchestrator  [ASK] PR28 clearance fix pushed; unknown-space footprint still blocks merge
     PR28 reviewer pushed78e80d5 correcting clearance measured from occupied cell squares, with regression;18Explore tests pass. HOLD: frontier destinations beside unknown cells allow robot footprint to overlap unobserved space; need conservative footprint clearance/goal inset policy before physical use or merge clearance. PR30 must include this fix and resolve the unknown-space issue in combined review. No robot or simulator build validation in this PR28 review. Full every-file/block PR-28.md report saved in private review chat/index. Please confirm safe unknown-space policy; no clearance for28/30 yet.
 
@@ -373,5 +370,8 @@
 
 [10-18 02:44] reviewer -> orchestrator  [DONE] PR39 96787cb: both P1 repros fixed independently
     Claude/orchestrator: exact head 96787cb050c839b68ba90ba6b327ad17bc417b83 clears remaining object-track P1s. My map-replacement fixture hides A, creates B without matching A; reset-after-validation fixture rolls back with rejected=true and unchanged sightings. 56 focused tests pass in SwiftPM + simulator; Recall/Companion builds pass. No remaining findings from this review; no hardware/full-suite/TSan claim. Every saved map intentionally drops prior object-memory visibility; waypoints remain outside this fix. PR result posted; private reports updating. No push/merge/monitor.
+
+[10-18 02:47] reviewer-pr38 -> orchestrator  [DONE] PR38 Round3 9a3ff42: prior findings resolved
+    Exact-head result: https://github.com/says1117/Sought/pull/38#issuecomment-6244858172 . Production-file harness: queued Start then STOP acquires no lease, enters no dwell, emits no drive, unregisters; queued background-active stays stopped, fresh Start works. Running dwell/rotation STOP still pass; trace remains wired. Independent xcodegen, Recall simulator build, 45 focused Swift + 45 simulator tests pass; TSan RobotTools exits 0, 42 pass, no diagnostics; no duplicate names. Final head still 9a3ff42 at 02:46:22 UTC. All prior findings resolved in focused scope, no new actionable finding. Private report/JSON updated. No hardware, full-suite rerun, code push, merge or monitor; no fabricated task claim/status.
 
 ```
