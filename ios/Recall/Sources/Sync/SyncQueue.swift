@@ -79,6 +79,12 @@ public final class SyncQueue {
         return try query("SELECT id, method, path, body, media_path, attempts, next_try FROM sync_queue WHERE next_try <= ? ORDER BY id LIMIT 1",
                          [.real(now)]).first
     }
+    /// Every due row, oldest first: one drain pass works through this list, so it sends each row at most once.
+    public func allDue(now: Double) throws -> [QueueItem] {
+        lock.lock(); defer { lock.unlock() }
+        return try query("SELECT id, method, path, body, media_path, attempts, next_try FROM sync_queue WHERE next_try <= ? ORDER BY id",
+                         [.real(now)])
+    }
     public func all() throws -> [QueueItem] {
         lock.lock(); defer { lock.unlock() }
         return try query("SELECT id, method, path, body, media_path, attempts, next_try FROM sync_queue ORDER BY id", [])

@@ -9,6 +9,10 @@ import SQLite3
 /// to. Only rows of the map id passed in are returned; rows of other maps and rows with an unknown map never upload.
 /// Rows the backend would reject (non-finite numbers, unparseable timestamps) are skipped here instead of
 /// being sent and dropped as 422.
+///
+/// HEIGHT SANITY: `height_above_floor` is the lifted point's world y minus the floor estimate, so a row far below the
+/// floor (or far above any ceiling) has a wrong position too: its keyframe was lifted with a bad pose or bad depth.
+/// Such rows are skipped (`plausibleHeight`); a few centimetres under the floor is depth noise and reads as 0.
 public final class LocalStoreReader {
     private var db: OpaquePointer?
     private let lock = NSLock()
@@ -42,16 +46,19 @@ public final class LocalStoreReader {
             let first = Self.text(s, 8).flatMap(Self.validTime) ?? last
             let x = sqlite3_column_double(s, 4), y = sqlite3_column_double(s, 5), z = sqlite3_column_double(s, 6)
             let h = sqlite3_column_double(s, 7), p = sqlite3_column_double(s, 11)
-            guard x.isFinite, y.isFinite, z.isFinite, h.isFinite else { return nil }
+            guard x.isFinite, y.isFinite, z.isFinite, Self.plausibleHeight.contains(h) else { return nil }
             let source = Self.text(s, 2).flatMap(WireLabelSource.init(rawValue:)) ?? .none
             return WireObjectTrack(id: id, label: Self.text(s, 1) ?? "", labelSource: source,
                                    description: Self.text(s, 3) ?? "", position: WirePosition(x: x, y: y, z: z),
-                                   heightAboveFloorM: h, firstSeen: first, lastSeen: last,
+                                   heightAboveFloorM: max(0, h), firstSeen: first, lastSeen: last,
                                    sightings: max(0, Int(sqlite3_column_int(s, 10))),
                                    persistence: p.isFinite ? min(1, max(0, p)) : 0,
                                    mediaId: Self.text(s, 12).flatMap(Self.validMediaId), history: [])
         }
     }
+
+    /// Heights (metres above the floor) a remembered object can really have. Outside this the row is not sent.
+    static let plausibleHeight = -0.3...3.5
 
     // MARK: helpers
 

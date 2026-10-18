@@ -11,15 +11,15 @@ first, a sender drains it in the background, heartbeats are fire and forget.
 | `Backoff.swift` | 1, 2, 4 ... capped at 60 s, +-25 % jitter. |
 | `Transport.swift` | `SyncTransport` protocol, `URLSessionTransport` (Bearer auth, 5 s request timeout, multipart JPEG upload). |
 | `HeartbeatPublisher.swift` | `POST /api/robot/heartbeat` every 2 s, not queued, at most one in flight, failures swallowed. |
-| `LocalStoreReader.swift` | Read-only connection to the shared `recall.sqlite`: `waypoints` and the `tracks` rows of one `map_id` as contract bodies. Skips rows the backend would 422 (bad timestamps, non-finite numbers). |
-| `BackendUploader.swift` | T-071. Every 5 s in a background task: snapshot, queue only resources whose body changed (media first), drain. Adds a short in-memory `history` (a point per move over 25 cm). Built only when `SyncConfig` exists. |
+| `LocalStoreReader.swift` | Read-only connection to the shared `recall.sqlite`: `waypoints` and the `tracks` rows of one `map_id` as contract bodies. Skips rows the backend would 422 (bad timestamps, non-finite numbers) and rows with an impossible height (outside -0.3 to 3.5 m above the floor; small negatives read as 0). |
+| `BackendUploader.swift` | T-071. Every 5 s in a background task: snapshot, queue only resources whose body changed (media first), drain. Objects go through `ObjectChangeGate`: sent at once when new, moved over 5 cm, relabelled, given a media id, moved to another map id or back in the active list; a change of only `last_seen` / `sightings` / `persistence` at most every 30 s. Adds a short in-memory `history` (a point per move over 25 cm). Built only when `SyncConfig` exists. |
 | `SyncConfig.swift` | `BACKEND_BASE_URL` and `RECALL_TOKEN` from Info.plist (filled from gitignored `Config/Secrets.xcconfig`). Returns nil for placeholders, then sync is simply off. |
 
 Wiring: `let q = try SyncQueue(path: dbPath)`; `q.enqueue(waypoint)`; `Task.detached { await sender.drain() }` on a
 timer and on connectivity changes (`sender.networkRestored()`). Media ids must be opaque `med_` + random (10..128 chars).
 
 App wiring (T-071 block in `AppRuntime.init`): `BackendUploader.make(config:databasePath:queuePath:mapId:)` with the
-gate's `activeMapId`, so only tracks of the map in use upload. No thumbnails or map yet: tracks keep no crop and the app
+gate's `activeMapId` while the session is relocalized (nil otherwise), so only tracks of the map in use upload. `SyncSender.drain` works through the rows due when the pass starts, so a row is sent at most once per pass. No thumbnails or map yet: tracks keep no crop and the app
 builds no occupancy grid; `UploadSnapshot.media` / `.map` are ready for both.
 
 Tests: `Tests/SyncTests`. `LiveBackendSmokeTests` runs against a real backend when `RECALL_SMOKE_URL` and
