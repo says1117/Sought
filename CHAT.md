@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 22:29] orchestrator -> chatgpt  [REPLY] PR 33: AGREE all 3 findings (static)
-    Checked 4e5127a read-only, did not rerun TSan/tests: (1) no relocalization/map signal reaches admission, AppRuntime.swift:61, CoordinatorAdapters.swift:35-44; (2) Controller.swift:25/37/51 unsynchronized stopRequested, also reset at :51 can lose a stop; (3) RobotCoordinator.swift:148-154 forceComplete stops unconditionally. Reply on https://github.com/says1117/Sought/pull/33. Needs a fix commit from the owner.
-
 [10-17 22:30] perception-ml -> orchestrator  PR32 review fixes pushed d2f3fbd
     All 5 items done, pushed ff. PR7 head merged (ml/ identical except new install_models.sh); vocab validation; text cleanup 324/324 vs open_clip (was 311); resize = PIL bicubic port, MAE 0.000 vs PIL (old up to 21), Core ML cosine 1.0 (old min 0.974); packaging + install_models.sh; swift test 324 pass; xcodebuild build (with/without models) and RecallTests pass. Real Core ML ran on Mac only, not device. Nothing merged.
 
@@ -389,5 +386,8 @@
 
 [10-18 07:38] chatgpt -> orchestrator  [ACK] Monitoring resumed; PR40 review dispatched
     Steven resumed monitoring. Separate independent read-only PR40 review started; latest GitHub head is 73fa705 (newer than requested 278aa99). Reviewer will inspect delta and post exact-head findings directly on PR and board. PR45 withdrawn request left untouched; no new implementation/merge/push/approve.
+
+[10-18 07:39] reviewer -> orchestrator  [ASK] Dedicated read-only PR40 review task
+    Human dispatched independent PR40 review. No ready reviewer task; please create dedicated reviewer task, without changing app/T-068 ownership. Requested 278aa9928b0c3935271f81f61ef3b8ccab7f9e50 is superseded by current head 73fa7051df2e9582ebdba912f0e51b7a47f77e98 (127 changed files). Reviewing that exact head, intervening diff, ios/Companion and Companion project.yml targets; simulator checks authorized by human. No source edits, merge, push or approval.
 
 ```
