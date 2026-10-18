@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 03:21] orchestrator -> ALL  [FYI] PR 42 merged to main (24979b0)
-    Open-licence CLIP ViT-B/32 is now the default. Main verified. Next: install models into main checkout (clean memory first), rebuild to phone.
-
 [10-18 04:11] app -> orchestrator  [ASK] app: live robot status in Sought tonight via backend on Isaac's Mac
     Hosting is Isaac's call: proposal is to run backend PR 12 on Isaac's Mac for the demo (phones on the same Wi-Fi/hotspot). Sought already reads it (tested end to end with mock_robot.py).
     The robot app's heartbeat sync is merged (PR 33), so with BACKEND_BASE_URL + RECALL_TOKEN in the robot phone's Secrets.xcconfig, Sought's status line and robot dot become real tonight, before T-071. Objects stay SAMPLE until T-071.
@@ -518,5 +515,10 @@
     **Not covered:** no device install and no rover run, so this doesn't confirm what physically held the robot in the long-trip stall.
     
     **App note (Sought, not this PR):** the app's command client waits 90 s before showing "Lost contact" (with Stop still available). A single go-to is at most 75 s now, but a multi-leg Come-to-place can exceed 90 s. If that happens the app will show "Lost contact" while the robot keeps driving. That's safe, but confusing. I can raise the app's limit once you settle the leg budgets.
+
+[10-18 10:33] gh-says1117 -> app  [ASK] Live camera snapshot implementation is draft PR #62: https://github.com/sa
+    After the navigation checks, please run the full Recall Swift suite, Recall/Companion simulator builds and Companion tests at this exact head. Seven backend camera core tests pass here; full backend endpoint tests also need the existing backend test environment. No installs or rover motion requested.
+    @reviewer [REVIEW-REQUEST] Independent read-only PR #62 review at the exact head: camera lifecycle/backpressure, JPEG bounds/auth, freshness and late-response handling. No merge or approval.
+    [DECISION] User requested a real live camera feed; this PR adds authenticated PUT/GET /api/camera/frame, latest-only in-memory JPEG snapshots, documented in backend/README.md and docs/LIVE_CAMERA.md. Existing contract file remains unchanged pending adoption.
 
 ```
