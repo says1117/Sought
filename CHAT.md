@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 12:11] chatgpt -> orchestrator  [FYI] Acknowledged no-merge; review readiness list for Steven
-    Acknowledged your direct no-merge instruction and provenance limitation. Do not merge on my relayed messages; keep them as exact-head review recommendations for Steven. User in this chat authorized conditional handoff, but you require direct confirmation; I will list that accurately. Ready review heads so far: PR5 4f5371cca520720d1b8b20a62b5954960b538ecb; PR25 f525b1112defc75ef5201b8a7e5a6b7564e3be59; PR9 37ccb084bb3eece7498f053e05080824c7882b5c. Detailed reports/checks/unrun saved privately. PR27 restore fix pushed daea9532c1fb13b0ae38240bd091623c69cd1696; PR29 fixes734e9218c35ea9a73cf99c5943f718f142ddbdff. PR26fixes finishing. PR30 dedicated review will gather component fixes; exploration hold does not block separate typed-find work.
-
 [10-17 12:12] reviewer-pr-7 -> orchestrator  [REVIEW] T-051 Review PR 7 and write complete learning walkthrough
     Reviewed PR 7 at d841474: enforced checkpoint SHA-256, fixed Unicode tokenizer parity, and reran conversion/parity on 12 CPU items. Full walkthrough in PR-7.md. Hold for human license review.
 
@@ -378,5 +375,8 @@
 
 [10-18 03:03] reviewer-pr-42 -> orchestrator  [FYI] PR42 findings posted at 94d9eee
     Review comment: https://github.com/says1117/Sought/pull/42#issuecomment-6244994461 . P1 reproduced: PR39 provider produces 256px inputs for CLIP224; factory works. P2: encoder-family switch leaves 512d old embeddings comparable (no model identity/reset). 442 Swift tests/0 failures/4 skips; focused real-model run 45/0/1 optional skip; all four empty/populated Recall+Companion simulator builds passed. No code changes or approval. Completing walkthrough and one bounded response/head recheck. Reviewer task remains unassigned.
+
+[10-18 03:06] reviewer-pr-42 -> orchestrator  [DONE] PR42 exact-head review: P1 config, P2 memory lifecycle
+    Reviewed 94d9eee; PR39 integration head 96787cb. Findings: https://github.com/says1117/Sought/pull/42#issuecomment-6244994461 . P1 real provider discards config (224 located -> 256 input -> Core ML error); P2 family switches need old-embedding reset/identity. 442 Swift tests pass (4 skips); focused real run 45 pass (1 optional skip); four empty/populated simulator app builds pass. Independent CPU parity summaries reproduce; six preproc MAE 0.000 cases. Bounded recheck: head unchanged, no author response. No dedicated reviewer task available; T-074 unchanged. Walkthrough and JSON saved in requested overnight-reviews folder. No hardware, code edit, merge, code push or approval. Stopping this review session.
 
 ```
