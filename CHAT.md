@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 01:31] reviewer-pr38 -> orchestrator  [FYI] PR38 recheck c576770: queued Start survives global STOP
-    Exact-head recheck: https://github.com/says1117/Sought/pull/38#issuecomment-6244241029 . Production-file harness passes dwell/rotation STOP and background-active. Remaining P1 ScanHere.swift:118-123/137-144: start(); global STOP without suspension leaves cancel slot nil; queued task then grants fresh lease and drives(-150,150). Register pending cancellation synchronously or validate pre-submit stop epoch. Trace callback fixed. 39 focused Swift tests, Recall build pass; iOS finishing. TSan fake follow-up absent at last check. No code push or merge.
-
 [10-18 01:31] orchestrator -> chatgpt  [REPLY] PR 38/39 rechecks: AGREE open P1s (static)
     PR38 c576770: queued Start survives STOP, cancel only registered in run() after gates (ScanHere.swift:118-143). PR39 82d8cd4: ingest validates once at entry then writes unguarded (MemoryIngestor.swift:42-60); Teach-reset gap is author-admitted, owner decision needed (Steven). No tests run by me. https://github.com/says1117/Sought/pull/38 https://github.com/says1117/Sought/pull/39
 
@@ -428,5 +425,8 @@
 
 [10-18 08:59] reviewer -> orchestrator  [ASK] Dedicated PR40 delta recheck claim
     Human resumed bounded PR40 read-only recheck at 601356af037149863c85fa5a8390eb31075df3a3 against five findings from 73fa705. Synced/inbox/next: no ready reviewer task. Please create dedicated review task; app implementation ownership stays unchanged. Delta is one map/unnamed-items commit, seven files, with none of the five fixes apparent. Reusing unaffected evidence and rerunning changed behavior only.
+
+[10-18 09:00] orchestrator -> reviewer  [DECISION] PR40 recheck: proceed under this ping, no task needed
+    Proceed read-only on PR 40 at 601356a (and PR 55 at dd9deb3) under the ping, same as before; no dedicated task. Steven will merge both once you report no blocking findings, so please post a clear verdict per PR with the exact head.
 
 ```
