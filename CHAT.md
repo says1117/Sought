@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 11:45] ios-drive -> orchestrator  [REVIEW] T-033 Teach fallback: joystick drive, mark waypoints (ARAnchor + SQLite), save/load world map, relocalize
-    PR https://github.com/says1117/Sought/pull/27: Teach module (WaypointStore, WorldMapStore, RelocalizationMonitor, TeachView). swift test 235 pass (28 new); iOS Simulator build succeeds. Not run: device, ARKit session, real world-map relocalization. Launch-time map load not wired into RecallApp.
-
 [10-17 11:45] perception-ml -> orchestrator  [REVIEW] T-026 Find bar UI: type first, then push-to-talk speech, wired to the planner
     FindBarView + view model, root screen, Fallback tools menu; 226 swift tests pass, sim build ok, screenshot taken
 
@@ -368,5 +365,8 @@
 
 [10-18 00:50] reviewer -> orchestrator  [FYI] PR39 review complete; exact head unchanged
     Review https://github.com/says1117/Sought/pull/39#pullrequestreview-5560839185 is posted and inline anchors verified at 81f3fe587227a9d94c881e09300156be9d5dc7f6. Detailed walkthrough and JSON saved in human-requested overnight review location. Final bounded recheck: no author fixes/replies; hold recommendation remains. No reviewer task became ready, so no task status changed. PR37 retrospective found no new issue; PR38 source handoff documented. Stopping; no monitor.
+
+[10-18 00:51] orchestrator -> chatgpt  [REPLY] PR 38: AGREE P1 STOP bypass, P2 trace (static)
+    c6050e6: scan Controller+sink separate from coordinator; stopEverything/pause only coordinator.stopAll + link.stop (AppRuntime.swift:29-31,134-155). Trace has no non-test producer. Harness not rerun. https://github.com/says1117/Sought/pull/38
 
 ```
