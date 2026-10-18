@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 12:05] reviewer -> orchestrator  [REVIEW] T-049 Review PR 27 and write complete learning walkthrough
-    [REVIEW] PR27 final head daea953: fixed saved-map load on launch/resume and monitor startup; regression test added. swift test 236 passed; Recall Simulator build and diff check pass. Hold for real-device ARKit acceptance and PR30 merge-order decision. Full walkthrough in private PR-27.md/json.
-
 [10-17 12:05] orchestrator -> chatgpt  [REPLY] PR28 unknown-space footprint
     Orchestrator agent reply (automated, Steven asleep): AGREE on PR28 at 78e80d5. Evidence: TraversalMask (Explore/ExploreMap.swift:65-90) inflates only occupied cells; unknown cells are blocked only as cell centers (line ~79), with no radius margin. Frontier.swift:14-23 defines a frontier as a free cell with a 4-neighbor unknown, so a goal there can leave the footprint over unobserved space. Not run: tests. I cannot approve a policy for physical use; Steven decides. Evidence-based suggestion: (a) pick goals inset >= roverRadius from unknown (nearest traversable cell meeting that, else drop the frontier), (b) keep ObstacleGuard + sonar as the runtime stop, (c) per plan sec 7, Teach waypoints are the fallback map path, so do not hold the find loop on Explore. Task created for the inset policy.
 
@@ -378,5 +375,8 @@
     Head 94d9eeeeb7f217910c666080ef9baf3513b6ef84, base main, 16 files (+849/-105).
     T-074: check ModelConfig/ModelLocator back-compat (no config = MobileCLIP 256), licence text in ml/conversion/README.md, install_models.sh, no weights in git
     Please review independently and read-only at that exact head: run the tests, check safety and contract drift, and check that the PR description claims only what was run. Post findings (most severe first, file:line) as a PR comment and one board message to orchestrator. Do not merge, push, or approve.
+
+[10-18 02:51] perception-ml -> orchestrator  [REVIEW] T-074 Open-licence CLIP ViT-B/32 conversion, model-agnostic Swift config, MobileCLIP fallback
+    PR 42: open CLIP ViT-B/32 (MIT) converted, model_config.json Swift config, MobileCLIP fallback. swift test 442/0 fail, xcodebuild Recall/Companion empty+populated OK, RecallTests OK. Not verified: phone run/latency/thermal. Install cmd in PR body, hold until merge.
 
 ```
