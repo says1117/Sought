@@ -61,32 +61,23 @@ struct ExploreMap {
     static let neighbors8: [(Int, Int)] = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)]
 }
 
-/// Traversable cells = free cells farther than the rover radius from any occupied cell.
+/// Traversable cells = free cells farther than the rover radius from any occupied cell, and (T-059) from any
+/// unknown cell or the grid edge when `unknownRadiusM` > 0: unseen space may hide an obstacle.
 struct TraversalMask {
     let map: ExploreMap
     private var blocked: [Bool]   // true = the rover center may not be here
+    private var nearOccupied: [Bool]   // occupied, or within the rover radius of an occupied cell
 
-    init(map: ExploreMap, roverRadiusM: Float) {
+    init(map: ExploreMap, roverRadiusM: Float, unknownRadiusM: Float = 0) {
         self.map = map
-        blocked = [Bool](repeating: false, count: map.width * map.height)
+        nearOccupied = map.cells.map { $0 == .occupiedLow || $0 == .occupiedHigh }
         // Occupied cells represent squares, not points. Measure clearance from each cell's
         // footprint so a rover center cannot pass within roverRadiusM of an occupied square.
-        let rc = max(0, Int((roverRadiusM / map.resolution + 0.5).rounded(.up)))
-        for row in 0..<map.height {
-            for col in 0..<map.width {
-                let cell = GridCell(col: col, row: row)
-                if map.state(cell) != .free { blocked[row * map.width + col] = true }
-                guard map.isOccupied(cell) else { continue }
-                for dr in -rc...rc {
-                    for dc in -rc...rc {
-                        let dx = max(0, (Float(abs(dc)) - 0.5) * map.resolution)
-                        let dz = max(0, (Float(abs(dr)) - 0.5) * map.resolution)
-                        guard dx * dx + dz * dz <= roverRadiusM * roverRadiusM else { continue }
-                        let n = GridCell(col: col + dc, row: row + dr)
-                        if map.contains(n) { blocked[n.row * map.width + n.col] = true }
-                    }
-                }
-            }
+        ClearanceInflation.inflate(map: map, radiusM: roverRadiusM, from: { map.isOccupied($0) }, into: &nearOccupied)
+        blocked = zip(map.cells, nearOccupied).map { $0 != .free || $1 }
+        if unknownRadiusM > 0 {
+            ClearanceInflation.inflate(map: map, radiusM: unknownRadiusM, from: { map.state($0) == .unknown }, into: &blocked)
+            ClearanceInflation.inflateEdges(map: map, radiusM: unknownRadiusM, into: &blocked)
         }
     }
 
@@ -94,13 +85,21 @@ struct TraversalMask {
 
     /// BFS over 4-connected traversable cells. `start` is always expanded even if the rover sits inside an
     /// inflated margin, and cells within `escapeRadiusM` of start are allowed so it can leave that margin.
-    func reach(from start: GridCell, escapeRadiusM: Float = 0.3) -> Reach {
+    /// Unknown cells within `blindRadiusM` of start, and free cells there that only fail the unknown clearance, are
+    /// allowed too (never within the rover radius of an obstacle): the mounted camera never sees the floor right around the rover, so without this a parked rover is
+    /// boxed in by its own blind spot. The forward obstacle guard still covers those first centimetres.
+    func reach(from start: GridCell, escapeRadiusM: Float = 0.3, blindRadiusM: Float = 0) -> Reach {
         var dist = [Int32](repeating: -1, count: map.width * map.height)
         var parent = [Int32](repeating: -1, count: map.width * map.height)
         guard map.contains(start) else { return Reach(map: map, dist: dist, parent: parent) }
         let esc = Int((escapeRadiusM / map.resolution).rounded(.up))
+        let blindSq = blindRadiusM * blindRadiusM
         func allowed(_ c: GridCell) -> Bool {
             if isTraversable(c) { return true }
+            if !nearOccupied[c.row * map.width + c.col] {     // unseen, or seen but too close to unseen
+                let dx = Float(c.col - start.col) * map.resolution, dz = Float(c.row - start.row) * map.resolution
+                if dx * dx + dz * dz <= blindSq { return true }
+            }
             // Escape corridor: not occupied/unknown-looking-blocked ground near start only.
             guard map.state(c) == .free, !map.isOccupied(c) else { return false }
             return abs(c.col - start.col) <= esc && abs(c.row - start.row) <= esc
@@ -164,5 +163,62 @@ struct Reach {
             i = Int(parent[i])
         }
         return out.reversed()
+    }
+}
+
+/// Cells where a goal may be placed (T-059): free, and at least `clearanceM` from every occupied cell, unknown
+/// cell and the grid edge. With clearance = rover radius + margin, the parked rover's footprint never overlaps
+/// space it has not seen.
+struct ClearanceMask {
+    let map: ExploreMap
+    let clearanceM: Float
+    private var blocked: [Bool]
+
+    init(map: ExploreMap, clearanceM: Float) {
+        self.map = map
+        self.clearanceM = clearanceM
+        blocked = map.cells.map { $0 != .free }
+        ClearanceInflation.inflate(map: map, radiusM: clearanceM, from: { map.state($0) != .free }, into: &blocked)
+        ClearanceInflation.inflateEdges(map: map, radiusM: clearanceM, into: &blocked)
+    }
+
+    func isSafe(_ c: GridCell) -> Bool { map.contains(c) && !blocked[c.row * map.width + c.col] }
+}
+
+enum ClearanceInflation {
+    /// Blocks every cell whose center is within `radiusM` of the square footprint of a source cell. Only sources
+    /// with a free 8-neighbour are expanded: the nearest non-free cell to any free cell always has one.
+    static func inflate(map: ExploreMap, radiusM: Float, from isSource: (GridCell) -> Bool, into blocked: inout [Bool]) {
+        guard radiusM > 0 else { return }
+        let rc = max(0, Int((radiusM / map.resolution + 0.5).rounded(.up)))
+        for row in 0..<map.height {
+            for col in 0..<map.width {
+                let cell = GridCell(col: col, row: row)
+                guard isSource(cell) else { continue }
+                guard ExploreMap.neighbors8.contains(where: { map.state(GridCell(col: col + $0.0, row: row + $0.1)) == .free })
+                else { continue }
+                for dr in -rc...rc {
+                    for dc in -rc...rc {
+                        let dx = max(0, (Float(abs(dc)) - 0.5) * map.resolution)
+                        let dz = max(0, (Float(abs(dr)) - 0.5) * map.resolution)
+                        guard dx * dx + dz * dz <= radiusM * radiusM else { continue }
+                        let n = GridCell(col: col + dc, row: row + dr)
+                        if map.contains(n) { blocked[n.row * map.width + n.col] = true }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Space outside the grid is unknown: block cells within `radiusM` of the edge.
+    static func inflateEdges(map: ExploreMap, radiusM: Float, into blocked: inout [Bool]) {
+        guard radiusM > 0 else { return }
+        for row in 0..<map.height {
+            for col in 0..<map.width {
+                // Distance from this cell's center to the nearest outside cell's square.
+                let edgeCells = min(col, map.width - 1 - col, row, map.height - 1 - row)
+                if (Float(edgeCells) + 0.5) * map.resolution <= radiusM { blocked[row * map.width + col] = true }
+            }
+        }
     }
 }

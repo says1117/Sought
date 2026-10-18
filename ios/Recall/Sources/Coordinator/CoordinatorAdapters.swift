@@ -228,6 +228,9 @@ struct CoordinatorWiring {
     var onFindTrace: ((FindTrace) -> Void)? = nil
     /// The drive lease the coordinator and any other motion producer (Scan here) share. Defaults to a fresh one.
     var lease = DriveLease()
+    /// Builds the explore task on the coordinator's Controller (ExploreRuntime.makeExplorer). nil = UnwiredExplorer.
+    /// The coordinator still refuses explore unless `features.exploreEnabled`.
+    var makeExplorer: ((Controller) -> CoordinatorExploring)? = nil
 
     /// `drive` must be a serialized sink (see `SerialDriveSink`) and `poses` a snapshot reader
     /// (see `PoseSnapshotBox`): the coordinator and Controller run off the main thread.
@@ -241,7 +244,7 @@ struct CoordinatorWiring {
         cfg.features = features
         return RobotCoordinator(
             dependencies: CoordinatorDependencies(
-                explorer: UnwiredExplorer(), finder: finder, comer: UnwiredComeToMe(),
+                explorer: makeExplorer?(controller) ?? UnwiredExplorer(), finder: finder, comer: UnwiredComeToMe(),
                 navigator: ControllerNavigator(controller: controller),
                 waypoints: StoreWaypointsAdapter(store: waypointStore, poses: poses, isPersistent: waypointsPersistent, frame: frame),
                 drive: DriveStopAdapter(sink: drive), speaker: speaker, clock: clock,

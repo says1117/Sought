@@ -26,6 +26,8 @@ final class AppRuntime: ObservableObject {
     let coordinator: RobotCoordinator
     // Robot tools accessors (find-loop B): the stored tracks, a Controller on the same drive path, the pose reader.
     let trackProvider: TrackProviding
+    /// Explore (flag-gated): live LiDAR grid + the coordinator's explore task. See the EXPLORE block in init.
+    let explore: ExploreRuntime
     var scanPoses: ExplorePoseSource { poseBox }
     /// Scan here drives only through the coordinator's drive lease and its serialized sink, so global STOP,
     /// pause and backgrounding revoke it exactly like a coordinator task. Its turns in place skip the 35 cm
@@ -111,6 +113,12 @@ final class AppRuntime: ObservableObject {
             waypointsPersistent: waypointsPersistent, frame: frameGate)
         wiring.lease = lease
         wiring.onFindTrace = { FindTraceRecorder.shared.record($0) }   // Robot tools 'Last find'
+        // EXPLORE (explore-wire branch) BEGIN: grid fed from LiDAR only when the flag is on; runs as a coordinator task.
+        let explore = ExploreRuntime(enabled: features.exploreEnabled, pose: pose, poses: poseBox,
+                                     speaker: SpeakerAdapter(speaker: speaker))
+        self.explore = explore
+        wiring.makeExplorer = explore.makeExplorer
+        // EXPLORE END
         let coordinator = wiring.makeCoordinator()
         self.coordinator = coordinator
         self.storageWarning = warning

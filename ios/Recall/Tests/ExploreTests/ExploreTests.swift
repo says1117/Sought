@@ -89,7 +89,9 @@ final class ExploreSimWorld: ExploreDrive, ScanHook, ExploreClock, ExplorePoseSo
     // ExplorePoseSource
     func latest() -> (pose: Pose2D?, tracking: TrackingKind) { (tracking == .normal ? pose : nil, tracking) }
     // ExploreGridSource
+    var notReady: String?
     func currentMap() -> ExploreMap { known }
+    func readiness() -> String? { notReady }
     // WaypointSink
     func addWaypoint(name: String, x: Double, z: Double, yawDeg: Double) { added.append((name, x, z)) }
 }
@@ -204,7 +206,8 @@ final class ExploreTests: XCTestCase {
     func testOpenRoomFullyExploredEndsDone() async {
         let w = ExploreSimWorld(truth: makeRoom(w: 100, h: 80), start: (2.5, 2.0))    // 5 m x 4 m
         var states: [ExploreProgress] = []
-        let rep = await session(w, progress: { states.append($0) }).run()
+        var cfg = ExploreConfig(); cfg.maxDistanceM = .infinity     // full coverage; the distance cap is tested on its own
+        let rep = await session(w, config: cfg, progress: { states.append($0) }).run()
         XCTAssertEqual(rep.end, .noReachableFrontier)
         XCTAssertGreaterThan(rep.scanStops, 1)
         XCTAssertEqual(states.last, .done)
