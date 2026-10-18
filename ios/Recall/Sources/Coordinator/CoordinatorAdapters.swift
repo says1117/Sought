@@ -60,7 +60,8 @@ final class StoreWaypointsAdapter: CoordinatorWaypoints {
     func lookup(_ name: String) -> CoordinatorWaypoint? {
         guard let w = try? store.waypoint(named: name) else { return nil }
         return CoordinatorWaypoint(name: w.name, x: w.x, z: w.z, yawDeg: w.yawDeg,
-                                   inCurrentFrame: frame.isInCurrentFrame(createdAt: w.createdAt))
+                                   inCurrentFrame: frame.isInCurrentFrame(createdAt: w.createdAt),
+                                   predatesMap: frame.predatesActiveMap(createdAt: w.createdAt))
     }
 
     func markHere(name: String) throws -> CoordinatorWaypoint {

@@ -6,6 +6,10 @@ import ARKit
 final class ARWorldMapAdapter: TeachMapSaving {
     private let store: WorldMapStore
     private let tracker: PoseTracker
+    /// Frame generation, read before asking ARKit for the map (see `onSaved`).
+    var currentGeneration: (() -> Int)?
+    /// Called on the main queue after a successful save with the new map id and the generation read before the save.
+    var onSaved: ((_ mapId: String, _ generation: Int?) -> Void)?
 
     init(store: WorldMapStore = WorldMapStore(url: WorldMapStore.defaultURL()), tracker: PoseTracker) {
         self.store = store
@@ -26,12 +30,15 @@ final class ARWorldMapAdapter: TeachMapSaving {
         guard WorldMapSavePolicy.canSave(tracking: tracker.tracking, mapping: tracker.mapping) else {
             completion(.failure(TeachError.notReadyToSave)); return
         }
+        let generation = currentGeneration?()
+        let onSaved = onSaved   // still adopt if Teach closes while ARKit builds the map
         tracker.currentWorldMap { [store] map in
             DispatchQueue.main.async {
                 guard let map else { completion(.failure(TeachError.noWorldMap)); return }
                 do {
                     let data = try NSKeyedArchiver.archivedData(withRootObject: map, requiringSecureCoding: true)
-                    try store.save(data)
+                    let id = try store.save(data)
+                    onSaved?(id, generation)
                     completion(.success(()))
                 } catch { completion(.failure(error)) }
             }

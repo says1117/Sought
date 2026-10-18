@@ -173,6 +173,22 @@ final class TrackStore: TrackProviding {
         return Int(sqlite3_changes(db))
     }
 
+    /// Moves every track of map `oldId` to map `newId` (a map saved from a session relocalized against `oldId` shares
+    /// its frame). Returns how many rows moved.
+    @discardableResult
+    func retagMap(from oldId: String, to newId: String) throws -> Int {
+        lock.lock(); defer { lock.unlock() }
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "UPDATE tracks SET map_id = ?1 WHERE map_id = ?2", -1, &stmt, nil) == SQLITE_OK else {
+            throw TrackStoreError.sqlite(msg())
+        }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, newId, -1, Self.transient)
+        sqlite3_bind_text(stmt, 2, oldId, -1, Self.transient)
+        guard sqlite3_step(stmt) == SQLITE_DONE else { throw TrackStoreError.sqlite(msg()) }
+        return Int(sqlite3_changes(db))
+    }
+
     /// Runs `body` in one SQLite transaction. Just before COMMIT, `commitIf` is asked whether the writes are still
     /// valid (the frame / map did not change meanwhile); if not, everything is rolled back and nil returned.
     /// A throwing body also rolls back. The store lock is held throughout, so other store calls wait.

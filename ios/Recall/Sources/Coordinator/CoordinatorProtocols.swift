@@ -30,8 +30,12 @@ struct CoordinatorWaypoint: Equatable {
     /// True when recorded in the coordinate frame in use right now. Defaults to false: a stored waypoint is
     /// only driven to after relocalization against the saved map.
     var inCurrentFrame: Bool
-    init(name: String, x: Double, z: Double, yawDeg: Double = 0, inCurrentFrame: Bool = false) {
+    /// True when recorded before the active saved map existed (that map was saved from a fresh scan), so
+    /// relocalizing against it does not make this waypoint valid.
+    var predatesMap: Bool
+    init(name: String, x: Double, z: Double, yawDeg: Double = 0, inCurrentFrame: Bool = false, predatesMap: Bool = false) {
         self.name = name; self.x = x; self.z = z; self.yawDeg = yawDeg; self.inCurrentFrame = inCurrentFrame
+        self.predatesMap = predatesMap
     }
 }
 
