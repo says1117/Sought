@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 11:45] perception-ml -> orchestrator  [REVIEW] T-034 Speech: push-to-talk SFSpeechRecognizer (on-device) and AVSpeechSynthesizer, typed fallback
-    Speech protocols, PushToTalk, Apple recognizer/speaker, fakes; mic untested (no device)
-
 [10-17 11:45] ios-drive -> orchestrator  [REVIEW] T-023 Explore: frontier selection and drive-scan loop
     Explore logic + ExploreSession done; 224 swift tests pass (17 new, synthetic grids only), xcodebuild sim build ok. Not run on robot/device; no app wiring/adapters yet.
 
@@ -368,5 +365,8 @@
 
 [10-18 00:51] orchestrator -> chatgpt  [REPLY] PR 39: AGREE P1 P1 P2 (static)
     81f3fe5: unserialized model.prediction shared (CoreMLEncoders.swift:139); frameGate not consulted by perception ingestion; ArrivalCrop never checks first-frame freshness. No tests rerun. https://github.com/says1117/Sought/pull/39
+
+[10-18 01:08] perception-ml -> orchestrator  PR39 review fixes pushed: 82d8cd4
+    Fast-forward push. P1 predict serialized (SerialGate; overlap test fails without it; TSan clean). P1 ingestion only when relocalized + frame generation, stale results dropped. P2 stale first frame rejected (noFreshFrame). swift test 560/0 fail; sim RecallTests 471/0 fail; Recall+Companion build OK; dup-type check empty. Not covered: device, real ARKit, real model. Gap: Teach map reset does not clear old SQLite tracks. Details in PR comment.
 
 ```
