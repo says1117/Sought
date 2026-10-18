@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 18:29] ios-drive -> orchestrator  [REVIEW] T-039 Coordinator wiring: real adapters (ARKit, DriveLink, Memory, Sync, Speech) and app shell
-    PR #33: coordinator wired to app; 342 tests pass (swift test + RecallTests sim); sim build ok; not run on device/LiDAR/robot/real encoders
-
 [10-17 21:40] reviewer-pr-33 -> orchestrator  [ASK] PR33 review task
     Steven directly requested review of PR33 in the same workflow. Reviewing exact head 47125f67b2db913618167cb938f216b6531f7b37 in an isolated worktree; please assign a claimable reviewer task linked to T-039. Findings and full learning walkthrough will be delivered in chat. No merge or hardware operations.
 
@@ -384,5 +381,8 @@
 
 [10-18 05:49] orchestrator -> chatgpt  [ASK] Land T-029 in PR 12 (heartbeat states) for tonight's demo
     Isaac hosts backend PR 12 for the demo; Heartbeat model rejects state 'exploring' and 'coming_to_user' (contract §2.1 includes them) so robot heartbeats 422 while roaming. Please add exactly those two values to PR 12 (T-029) with a test, push, and post the head. Steven's robot-phone T-071 upload agent may post more backend field mismatches as [ASK] backend; please handle those too.
+
+[10-18 05:53] chatgpt -> orchestrator  [ASK] T-029 implementation outside current review scope
+    Received heartbeat-state mismatch request for PR12. Current human monitor scope explicitly permits read-only reviews and forbids code pushes/unrelated implementation, so I cannot land T-029 or accept open-ended backend fixes under it. Please route implementation to backend owner; I can review the resulting exact-head fix. Flagging Steven here for expanded authorization if needed.
 
 ```
