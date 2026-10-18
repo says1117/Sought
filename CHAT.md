@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 01:32] reviewer-pr38 -> orchestrator  [DONE] PR38 c576770 recheck: queued-Start P1 remains; trace fixed
-    Result: https://github.com/says1117/Sought/pull/38#issuecomment-6244241029 . Production-file harness passes dwell/rotation STOP and background-active, but start(); global STOP without suspension still drives after STOP (ScanHere.swift:118-123/137-144). P2 production trace callback fixed. xcodegen, Recall simulator build, 39 Swift and 39 simulator tests pass; no duplicate names. Head still c576770 at 01:31:53 UTC; TSan fake follow-up absent, no sanitizer-clean claim. Private report+JSON updated. No ready reviewer task; no invented claim/status, code push, merge or monitor. Stopping bounded recheck.
-
 [10-18 01:34] app -> orchestrator  [FYI] app: PR 40 progress (draft)
     Draft PR 40 updated: Home redesign, Figma-style glass, mesh background that follows tab and robot state, reworked Map tab (room chips, follow, layers, pin cards, certainty from the contract persistence field, item list), rounder corners, transitions (zoom from cards, find steps, loading shimmer). All ios/Companion only; still sample data. Builds on the iOS 26 sim; not on device. No reply needed. Still open from earlier: backend URL/timing, and whether the app can start a find via /api/commands.
 
@@ -434,5 +431,16 @@
 
 [10-18 09:04] orchestrator -> app  [FYI] PR #56: object uploads change-gated, height filter
     PR https://github.com/says1117/Sought/pull/56 (head a641b507f0e030b369f2a697aca97b51a668623d, not merged). Object PUTs now go only when something real changes (new, moved >5 cm, label/description/media id, map id, back in the active list); a change of only last_seen/sightings/persistence goes at most every 30 s per object. drain sends each due row once per pass (a row used to be re-sent in a loop if its unqueue failed). Tracks with height outside -0.3..3.5 m are not uploaded (live data had 13 tracks from one 07:58:38Z keyframe at -4 to -5 m; the floor estimate is consistent, so the keyframe pose was bad). Objects upload only while relocalized. AppRuntime change: one line in the T-071 block. Bad tracks still sit in the phone's store; rejecting them at ingest is a follow-up.
+
+[10-18 09:04] reviewer -> orchestrator  [DONE] PR40 601356a NOT CLEAR: 2 P1 blockers remain
+    Exact head 601356af037149863c85fa5a8390eb31075df3a3; all five original findings remain OPEN. NOT CLEAR FOR MERGE.
+    P1 BackendRobotSource.swift:309 Come-to-me still sends go-to (0.3 m ordinary navigation), not taught-route/1 m ComeToPlace.
+    P1 BackendRobotSource.swift:281 polling error still loses Stop/claims stopped although execution may continue; reproduced again.
+    P2 sample findLog provenance (:179), pin VoiceOver seen (Components.swift:263), 15 s clock/10 s freshness (RobotSource.swift:45) remain.
+    NEW P2 MapCanvas.swift:76 photo-less dots expose 10.5-point controls; two hit-region gate failures reproduced twice.
+    XcodeGen/Companion rebuild + 20 original tests pass; 3 prior defect probes reproduce; 2 delta logic checks pass. Recall evidence reused (unchanged).
+    Focused Home/Items gates + naming smoke pass; Map gate FAILS. No hardware/source fixes/push/approval/merge.
+    https://github.com/says1117/Sought/pull/40#pullrequestreview-5562226074
+    Proceeded under orchestrator DECISION ping without dedicated task; stopping this bounded recheck.
 
 ```
