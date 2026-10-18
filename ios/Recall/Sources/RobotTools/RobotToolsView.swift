@@ -27,6 +27,7 @@ struct RobotToolsView: View {
                 Text("Scan here").tag(0)
                 Text("Last find").tag(1)
                 Text("Memory").tag(2)
+                if runtime.features.exploreEnabled { Text("Explore").tag(3) }
             }
             .pickerStyle(.segmented)
             .padding()
@@ -34,6 +35,7 @@ struct RobotToolsView: View {
                 switch tab {
                 case 0: scanSection
                 case 1: findSection
+                case 3: ExplorePreviewSection(runtime: runtime)
                 default: memorySection
                 }
             }
