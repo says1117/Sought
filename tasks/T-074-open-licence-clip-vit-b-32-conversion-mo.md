@@ -7,7 +7,7 @@ owner: perception-ml
 depends: 
 read: ml/conversion/README.md, ios/Recall/Sources/MLEncoders
 created: 2026-10-18T02:38:38Z
-doing: checking licence of laion CLIP ViT-B/32 before download
-doing_at: 2026-10-18T02:38:45Z
+doing: BLOCKED on licence ambiguity, reporting to orchestrator
+doing_at: 2026-10-18T02:39:01Z
 ---
 see PR
