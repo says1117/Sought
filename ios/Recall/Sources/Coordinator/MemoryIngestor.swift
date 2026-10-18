@@ -5,6 +5,9 @@ import Memory
 #if canImport(PerceptionCore)
 import PerceptionCore
 #endif
+#if canImport(PoseCore)
+import PoseCore
+#endif
 
 /// Feeds perception output into the track store with the Memory association rules (plan 4.5).
 /// Pure logic plus the store; the camera side lives in the app's PerceptionLoop.
@@ -14,12 +17,29 @@ import PerceptionCore
 /// A fresh map (first run, Teach reset, unrecognised map) writes nothing, so old and new coordinates are never mixed
 /// and nothing associates across frames. The caller reads `generation` when it grabs the camera frame and passes it
 /// back to `ingest`; if the frame changed meanwhile (new session, tracking lost) the result is dropped.
+///
+/// LIFT SANITY (live data 2026-10-18): keyframes taken while the camera pose was off lifted whole sets of objects
+/// 4-5 m below a floor estimate that was right everywhere else. The loop only captures keyframes with normal
+/// tracking (`admitsKeyframe`), and `write` drops objects whose height above the floor is impossible, or the whole
+/// keyframe when most of its objects are under the floor (the pose, not the objects, is wrong).
 final class MemoryIngestor {
     struct Summary: Equatable {
         var matched = 0, created = 0
         /// True when nothing was written because the frame is not valid for the persistent store.
         var rejected = false
+        /// Objects not written because their lifted height was impossible (all of them when `badPose`).
+        var implausible = 0
+        /// True when the whole keyframe was dropped: most of its objects were below the floor.
+        var badPose = false
     }
+
+    /// Heights above the floor an object can really have. A few centimetres under the floor is depth noise; the
+    /// same range as the uploader's `LocalStoreReader.plausibleHeight`.
+    static let plausibleHeight: ClosedRange<Float> = -0.3...3.5
+
+    /// Only a keyframe whose camera tracking is normal is lifted into the world: with limited tracking the pose
+    /// (and so every lifted position) can be metres off.
+    static func admitsKeyframe(tracking: TrackingKind) -> Bool { tracking == .normal }
 
     private let store: TrackStore
     private let now: () -> Date
@@ -58,9 +78,16 @@ final class MemoryIngestor {
     }
 
     private func write(_ objects: [PerceivedObject], mapId: String) throws -> Summary {
-        var tracks = try store.allTracks(mapId: mapId)
         var summary = Summary()
-        for o in objects {
+        let belowFloor = objects.filter { $0.heightAboveFloor < Self.plausibleHeight.lowerBound }.count
+        if belowFloor * 2 > objects.count {
+            summary.implausible = objects.count; summary.badPose = true
+            return summary
+        }
+        let plausible = objects.filter { Self.plausibleHeight.contains($0.heightAboveFloor) }
+        summary.implausible = objects.count - plausible.count
+        var tracks = try store.allTracks(mapId: mapId)
+        for o in plausible {
             let assoc = associate(o.observation, tracks: tracks)
             switch assoc.result {
             case .matched(let id, let sim, let dist):
