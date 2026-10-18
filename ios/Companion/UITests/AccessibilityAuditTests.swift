@@ -30,6 +30,7 @@ final class AccessibilityAuditTests: XCTestCase {
         ("pinned find", ["-seedPins", "YES", "-find", "pin_sample_remote"]),
         ("come to me: where are you", ["-showComeToMe", "YES"]),
         ("come to me: on the way", ["-comeTo", "wpt_sample_door"]),
+        ("map with unnamed dots", ["-tab", "map", "-mockUnnamed", "YES"]),
     ]
 
     private let gate: XCUIAccessibilityAuditType = [.hitRegion, .sufficientElementDescription, .trait]

@@ -88,6 +88,9 @@ struct MapCanvas: View {
                                 }
                             }
                             .frame(width: 44, height: 44)
+                            // The whole 44 pt square takes taps and VoiceOver focus, even around a 9 pt dot (review F6).
+                            .contentShape(Rectangle())
+                            .contentShape(.accessibility, Rectangle())
                         }
                         .buttonStyle(.plain)
                         .scaleEffect(markerScale)

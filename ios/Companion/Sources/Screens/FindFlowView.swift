@@ -66,13 +66,14 @@ struct FindFlowView: View {
         case .reported: return "reported"
         case .notFound: return "notFound"
         case .failed: return "failed"
+        case .lostContact: return "lostContact"
         case .cancelled: return "cancelled"
         }
     }
 
     private var isActive: Bool {
         guard started, let ph = robot.find?.phase else { return false }
-        switch ph { case .queued, .searching, .driving: return true; default: return false }
+        switch ph { case .queued, .searching, .driving, .lostContact: return true; default: return false }
     }
 
     /// Robot labels read naturally in lowercase ("your red umbrella"); pin names keep the person's own capitals.
@@ -186,6 +187,13 @@ struct FindFlowView: View {
             title("Soughtbot stopped")
             body(reason)
             primary("Try again", id: "tryAgain") { start() }
+            secondary("Close", id: "findDone") { close() }
+        case let .lostContact(reason):
+            // The command may still be running on the robot, so Stop stays the main action (review F2).
+            icon("wifi.exclamationmark", color: p.alert)
+            title("Lost contact with Soughtbot")
+            body("\(reason) It may still be moving.")
+            primary("Stop Soughtbot", id: "cancelFind") { cancel() }
             secondary("Close", id: "findDone") { close() }
         case .cancelled:
             title("Find cancelled")

@@ -40,6 +40,7 @@ struct ComeToMeSheet: View {
         case .going: return "going"
         case .arrived: return "arrived"
         case .failed: return "failed"
+        case .lostContact: return "lostContact"
         case .cancelled: return "cancelled"
         }
     }
@@ -139,6 +140,13 @@ struct ComeToMeSheet: View {
             Text("Soughtbot stopped").font(SoughtFont.largeTitle).foregroundStyle(p.text).accessibilityAddTraits(.isHeader)
             Text(reason).font(SoughtFont.body).foregroundStyle(p.text)
             wideButton("Close", primary: true) { closeSheet() }
+        case let .lostContact(reason):
+            // The robot may still be driving, so Stop stays first (review F2).
+            Image(systemName: "wifi.exclamationmark").font(.system(size: 56)).foregroundStyle(p.alert).accessibilityHidden(true)
+            Text("Lost contact with Soughtbot").font(SoughtFont.largeTitle).foregroundStyle(p.text).accessibilityAddTraits(.isHeader)
+            Text("\(reason) It may still be moving.").font(SoughtFont.body).foregroundStyle(p.text)
+            wideButton("Stop Soughtbot", primary: true) { robot.cancelComeToMe() }
+            wideButton("Close", primary: false) { closeSheet() }
         case .cancelled:
             Text("Stopped").font(SoughtFont.largeTitle).foregroundStyle(p.text)
             wideButton("Close", primary: true) { closeSheet() }
@@ -158,7 +166,10 @@ struct ComeToMeSheet: View {
     }
 
     private func closeSheet() {
-        if case .going = robot.come?.phase { /* keep driving; the Call card shows it */ } else { robot.come = nil }
+        switch robot.come?.phase {
+        case .going?, .lostContact?: break   // keep it; the Call card still offers Stop
+        default: robot.come = nil
+        }
         dismiss()
     }
 
@@ -169,6 +180,7 @@ struct ComeToMeSheet: View {
         case "going": Speaker.shared.say("Soughtbot is coming to \(c.target.name).")
         case "arrived": Haptics.shared.success(); Speaker.shared.say("Soughtbot is here.")
         case "failed": Haptics.shared.warning(); Speaker.shared.say("Soughtbot stopped.")
+        case "lostContact": Haptics.shared.warning(); Speaker.shared.say("Lost contact with Soughtbot. It may still be moving.")
         default: break
         }
     }

@@ -138,6 +138,8 @@ enum FindPhase: Equatable {
     case reported(result: String)
     case notFound
     case failed(reason: String)
+    /// The app lost track of a command that may still be running (network error or timeout): keep a Stop.
+    case lostContact(reason: String)
     case cancelled
 }
 
@@ -175,6 +177,8 @@ enum ComePhase: Equatable {
     case going(distanceM: Double?)
     case arrived
     case failed(reason: String)
+    /// Same as FindPhase.lostContact: the robot may still be moving, so the sheet keeps Stop.
+    case lostContact(reason: String)
     case cancelled
 }
 

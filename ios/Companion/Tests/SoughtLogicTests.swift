@@ -139,4 +139,23 @@ final class SoughtLogicTests: XCTestCase {
         XCTAssertNil(BackendConfig.clean("$(BACKEND_BASE_URL)"))
         XCTAssertNotNil(BackendConfig.clean("http://127.0.0.1:8765"))
     }
+
+    // MARK: PR 40 review fixes
+
+    func testComeToMeSendsComeToPlaceNotPlainGoTo() {
+        let wps = [Waypoint(id: "w1", name: "kitchen table", x: 1, z: 1)]
+        XCTAssertEqual(BackendRobotSource.comeCommand(ComeTarget(waypointId: "w1", name: "the kitchen table", x: 1, z: 1), waypoints: wps),
+                       "come to the kitchen table")
+        XCTAssertEqual(BackendRobotSource.comeCommand(ComeTarget(waypointId: nil, name: "the sofa", x: 0, z: 0), waypoints: wps),
+                       "come to the sofa")
+    }
+
+    func testTransportErrorsKeepStopButRobotAnswersDoNot() {
+        XCTAssertTrue(BackendRobotSource.isTransportProblem(.network))
+        XCTAssertTrue(BackendRobotSource.isTransportProblem(.timeout))
+        XCTAssertTrue(BackendRobotSource.isTransportProblem(.http(502)))
+        XCTAssertFalse(BackendRobotSource.isTransportProblem(.failed("blocked")))
+        XCTAssertFalse(BackendRobotSource.isTransportProblem(.busy))
+        XCTAssertFalse(BackendRobotSource.isTransportProblem(.unauthorized))
+    }
 }

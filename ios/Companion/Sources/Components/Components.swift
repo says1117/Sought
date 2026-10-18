@@ -260,7 +260,9 @@ struct ItemCard: View {
         }
         .frame(width: width, alignment: .leading)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(item.label), \(item.whereText.lowercased()), seen \(StatusCopy.agoSpoken(item.lastSeen, now: robot.now)).")
+        .accessibilityLabel(item.isPin
+            ? "\(item.label), pinned by you \(item.whereText.lowercased()), \(StatusCopy.agoSpoken(item.lastSeen, now: robot.now))."
+            : "\(item.label), \(item.whereText.lowercased()), seen \(StatusCopy.agoSpoken(item.lastSeen, now: robot.now)).")
         .accessibilityHint("Double tap to find. Swipe up or down for more.")
         .accessibilityAction { onFind(item) }
         .accessibilityAction(named: "Find it") { onFind(item) }

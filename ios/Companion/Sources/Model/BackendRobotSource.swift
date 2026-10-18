@@ -66,6 +66,7 @@ final class BackendRobotSource: RobotSource {
     /// The server has no items yet (robot uploads, T-071): show the sample catalog, clearly labeled, with live status.
     @Published private(set) var itemsAreSample = false
     private lazy var sample = MockRobotSource(seedOnly: true)
+    private var borrowedFinds: [FindRecord] = []
 
     override var isSample: Bool { serverIsMock || itemsAreSample }
     override var sampleLabel: String { itemsAreSample && !serverIsMock ? "Sample items" : "Sample" }
@@ -178,7 +179,8 @@ final class BackendRobotSource: RobotSource {
                 if !itemsAreSample {
                     itemsAreSample = true
                     objects = sample.objects
-                    findLog = sample.findLog
+                    borrowedFinds = sample.findLog
+                    findLog = borrowedFinds + findLog
                 }
                 if snapshot.grid == nil {
                     var plan = sample.map ?? snapshot
@@ -189,6 +191,11 @@ final class BackendRobotSource: RobotSource {
                 isLoading = false
                 if connectionProblem?.hasPrefix("Connected") != true { connectionProblem = nil }
                 return
+            }
+            if itemsAreSample {
+                // Real items arrived: drop the borrowed sample history so it can't pass as a robot report (F3).
+                findLog.removeAll { borrowedFinds.contains($0) }
+                borrowedFinds = []
             }
             itemsAreSample = false
             let previous = Dictionary(uniqueKeysWithValues: objects.map { ($0.id, $0) })
@@ -280,9 +287,15 @@ final class BackendRobotSource: RobotSource {
                 self.find?.phase = match == nil ? .notFound : .remembered
             } catch let e as CommandError {
                 guard !Task.isCancelled else { return }
-                self.find?.phase = .failed(reason: e.message)
+                // A transport problem says nothing about the robot: it may still be driving, so keep Stop.
+                self.find?.phase = Self.isTransportProblem(e) ? .lostContact(reason: e.message) : .failed(reason: e.message)
             } catch {}   // cancelled
         }
+    }
+
+    /// Network, timeout and server errors leave the command's real state unknown; failed/busy come from the robot.
+    static func isTransportProblem(_ e: CommandError) -> Bool {
+        switch e { case .network, .timeout, .http: return true; default: return false }
     }
 
     /// "find red umbrella" for a known item; the person's own words when they already start with find / where.
@@ -295,18 +308,19 @@ final class BackendRobotSource: RobotSource {
 
     override func cancelFind() {
         let wasRunning: Bool = {
-            switch find?.phase { case .queued?, .searching?, .driving?: return true; default: return false }
+            switch find?.phase { case .queued?, .searching?, .driving?, .lostContact?: return true; default: return false }
         }()
         findTask?.cancel(); findTask = nil
         super.cancelFind()
         if wasRunning { sendStop() }
     }
 
-    /// Sends "go to <taught spot name>" (the planner resolves waypoint names) and follows it to done or failed.
+    /// Sends "come to <taught spot>", which the planner maps to Come-to-place (taught routes, stops about 1 m short).
+    /// "go to" would be plain go-to-waypoint navigation that stops 0.3 m away (review F1).
     override func comeToMe(to target: ComeTarget) {
         comeTask?.cancel()
         come = ComeProgress(target: target, phase: .going(distanceM: nil))
-        let text = "go to \(Self.placeName(target, waypoints: waypoints))"
+        let text = Self.comeCommand(target, waypoints: waypoints)
         comeTask = Task { [weak self] in
             guard let self else { return }
             do {
@@ -317,9 +331,13 @@ final class BackendRobotSource: RobotSource {
                 self.come?.phase = .arrived
             } catch let e as CommandError {
                 guard !Task.isCancelled, self.come?.phase != .cancelled else { return }
-                self.come?.phase = .failed(reason: e.message)
+                self.come?.phase = Self.isTransportProblem(e) ? .lostContact(reason: e.message) : .failed(reason: e.message)
             } catch {}   // cancelled
         }
+    }
+
+    static func comeCommand(_ target: ComeTarget, waypoints: [Waypoint]) -> String {
+        "come to the \(placeName(target, waypoints: waypoints))"
     }
 
     /// The taught name the robot knows ("kitchen table"), not the sheet's spoken form ("the kitchen table").
@@ -330,7 +348,9 @@ final class BackendRobotSource: RobotSource {
     }
 
     override func cancelComeToMe() {
-        let wasGoing: Bool = { if case .going = come?.phase { return true }; return false }()
+        let wasGoing: Bool = {
+            switch come?.phase { case .going?, .lostContact?: return true; default: return false }
+        }()
         comeTask?.cancel(); comeTask = nil
         super.cancelComeToMe()
         if wasGoing { sendStop() }

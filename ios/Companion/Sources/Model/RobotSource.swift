@@ -8,7 +8,10 @@ import SwiftUI
 @MainActor
 class RobotSource: ObservableObject {
     @Published var status = RobotStatus(state: .idle, task: nil, battery: nil, pose: nil, lastHeartbeat: nil) {
-        didSet { logStatusChange(from: oldValue, to: status) }
+        didSet {
+            logStatusChange(from: oldValue, to: status)
+            if oldValue.lastHeartbeat != status.lastHeartbeat { scheduleFreshnessTick() }
+        }
     }
     @Published var objects: [TrackedObject] = []
     @Published var map: MapSnapshot?
@@ -40,6 +43,19 @@ class RobotSource: ObservableObject {
     var canComeToMe: Bool { false }
 
     private var clock: Timer?
+    private var freshness: Timer?
+
+    /// The 15 s clock alone can leave "online" showing up to 25 s after the last check-in. Tick once more right
+    /// when the heartbeat goes stale so the offline state shows at 10 s (review F5).
+    private func scheduleFreshnessTick() {
+        freshness?.invalidate()
+        guard let t = status.lastHeartbeat else { return }
+        let due = t.addingTimeInterval(RobotStatus.offlineAfter + 0.1).timeIntervalSinceNow
+        guard due > 0 else { return }
+        freshness = Timer.scheduledTimer(withTimeInterval: due, repeats: false) { [weak self] _ in
+            Task { @MainActor in self?.now = Date() }
+        }
+    }
 
     init() {
         clock = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in
@@ -52,7 +68,7 @@ class RobotSource: ObservableObject {
     // Commands. Subclasses override.
     func start() {}
     /// Stop timers and network loops (called when Settings switches the data source).
-    func stop() { clock?.invalidate() }
+    func stop() { clock?.invalidate(); freshness?.invalidate() }
     func startFind(_ query: String, match: TrackedObject?) {}
     func cancelFind() { if var f = find { f.phase = .cancelled; find = f } }
     func clearFind() { find = nil }

@@ -134,7 +134,8 @@ struct ItemDetailView: View {
                         .foregroundStyle(p.onPrimary).frame(maxWidth: .infinity, minHeight: 56)
                         .background(Capsule().fill(p.primary))
                 }
-                .accessibilityHint("Soughtbot drives to the \(item.label.lowercased()).")
+                .accessibilityHint(item.isPin ? "Soughtbot drives to where you pinned the \(item.label.lowercased())."
+                                                : "Soughtbot drives to the \(item.label.lowercased()).")
                 if item.isPin {
                     Button { robot.removePin(id: item.id); dismiss() } label: {
                         Label("Remove pin", systemImage: "mappin.slash").font(SoughtFont.button).foregroundStyle(p.text)
