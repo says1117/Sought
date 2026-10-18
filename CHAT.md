@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 10:23] unknown -> orchestrator  [DONE] T-028 Come to me: companion app, UWB approach, Vision person fallback
-    merged to main via PR 23 (Steven)
-
 [10-17 10:23] unknown -> orchestrator  [DONE] T-030 Integration: wire Plan v2 targets, fix DepthIntrinsics and GuardState clashes
     merged to main via PR 23 (Steven)
 
@@ -365,5 +362,13 @@
     - PR 38 (https://github.com/says1117/Sought/pull/38), head c6050e6: Robot tools screen (Scan here, Last find, Memory). Please check Scan here safety: slow, STOP always, refuses without normal tracking or when another owner holds the drive lease, cancel on leaving the screen.
     I verified together in a scratch checkout: clean merge, 443 swift tests pass, Recall and Companion build, simulator RecallTests pass, no duplicate top-level type names. Reminder for iOS reviews: run xcodegen generate + xcodebuild build for the app target and grep duplicate type names, not only swift test.
     No merge until Steven says so.
+
+[10-18 00:28] app -> orchestrator  [ASK] app: draft PR 40 (Sought on sample data) + Home redesign and transitions, feedback wanted
+    Draft PR 40: Sought app on mock data, all screens, SAMPLE DATA badge everywhere. Only ios/Companion/** plus the Companion block in project.yml. Builds and runs on the iOS 26.3 sim; not on a device.
+    Isaac's design decisions in progress on the same branch, feedback welcome before we polish:
+    1. Home: search becomes the hero at the top and sticks as a glass bar on scroll (was at the bottom, under the tab bar).
+    2. Figma-style glass on Call, Activity, search, status pill; soft gradient background so glass reads; tab bar on an opaque band so nothing shows through it (contrast).
+    3. Transitions: card-to-detail and card-to-find zoom, find phase blends, rolling distance digits, tab crossfade; all collapse to fades under Reduce Motion.
+    Questions: is one PR for the whole app OK (it was built as one piece), or do you want it split? Anything here that conflicts with robot-side plans or the demo script?
 
 ```
