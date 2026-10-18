@@ -69,34 +69,3 @@ extension View {
 extension Palette {
     var isHighContrast: Bool { background == Palette.highContrast.background }
 }
-
-/// App background: a soft glacier-to-mist wash with three blurred color pools, so glass has something to frost.
-/// Kept light enough that every text token still passes contrast on its darkest spot. Flat when transparency is reduced.
-struct SoughtBackground: View {
-    @Environment(\.palette) private var p
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-
-    var body: some View {
-        if reduceTransparency || p.isHighContrast {
-            p.background.ignoresSafeArea()
-        } else {
-            GeometryReader { g in
-                ZStack {
-                    LinearGradient(colors: [Color(hex: 0xDFEEF1), Color(hex: 0xD3E6EB), Color(hex: 0xCDE1E7)],
-                                   startPoint: .top, endPoint: .bottom)
-                    Circle().fill(Color(hex: 0x9DBDC6, alpha: 0.30))
-                        .frame(width: g.size.width * 0.9).blur(radius: 70)
-                        .position(x: g.size.width * 0.95, y: g.size.height * 0.12)
-                    Circle().fill(Color(red: 150 / 255, green: 226 / 255, blue: 238 / 255, opacity: 0.45))
-                        .frame(width: g.size.width * 0.8).blur(radius: 80)
-                        .position(x: g.size.width * 0.05, y: g.size.height * 0.48)
-                    Circle().fill(Color(hex: 0xB4D0D8, alpha: 0.45))
-                        .frame(width: g.size.width).blur(radius: 90)
-                        .position(x: g.size.width * 0.85, y: g.size.height * 0.85)
-                }
-            }
-            .ignoresSafeArea()
-            .accessibilityHidden(true)
-        }
-    }
-}

@@ -57,6 +57,9 @@ struct RootView: View {
     @State private var lastSpokenState: RobotState?
 
     private var palette: Palette { settings.highContrast ? .highContrast : .standard }
+    private var mood: BackgroundMood {
+        BackgroundMood(tab: router.tab, state: robot.status.state, online: robot.status.isOnline(now: robot.now))
+    }
 
     var body: some View {
         TabContainer(selection: router.tab)
@@ -64,13 +67,14 @@ struct RootView: View {
             .background(SoughtBackground())
             .safeAreaInset(edge: .bottom, spacing: 0) { SoughtTabBar(selection: $router.tab) }
         .environment(\.palette, palette)
+        .environment(\.backgroundMood, mood)
         .preferredColorScheme(settings.highContrast ? .dark : .light)
         .tint(palette.text)
         .sheet(item: $router.detail) { o in
-            ItemDetailView(itemId: o.id).background(SoughtBackground()).environment(\.palette, palette).presentationDragIndicator(.visible)
+            ItemDetailView(itemId: o.id).background(SoughtBackground()).environment(\.palette, palette).environment(\.backgroundMood, mood).presentationDragIndicator(.visible)
         }
         .fullScreenCover(item: $router.findRequest) { r in
-            FindFlowView(request: r).background(SoughtBackground()).environment(\.palette, palette)
+            FindFlowView(request: r).background(SoughtBackground()).environment(\.palette, palette).environment(\.backgroundMood, mood)
         }
         .onChange(of: robot.status.state) { _, s in announce(s) }
         .onChange(of: settings.haptics) { _, v in Haptics.shared.enabled = v }

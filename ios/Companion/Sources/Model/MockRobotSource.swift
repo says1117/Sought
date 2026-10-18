@@ -85,6 +85,8 @@ final class MockRobotSource: RobotSource {
             s.state = (stateClock % 20) < 15 ? .exploring : .idle
             if s.state == .exploring { advance(&s) }
         }
+        // Screenshot hook: `-mockState blocked` pins the sample robot to one state.
+        if let forced = UserDefaults.standard.string(forKey: "mockState"), let st = RobotState(rawValue: forced) { s.state = st }
         status = s
     }
 

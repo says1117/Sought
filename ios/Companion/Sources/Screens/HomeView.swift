@@ -58,10 +58,16 @@ struct HomeView: View {
 
     private var greeting: some View {
         VStack(alignment: .leading, spacing: Space.m) {
-            HStack(alignment: .center) {
-                SampleBanner()
-                Spacer()
-                StatusPill()
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .center) {
+                    SampleBanner().fixedSize()
+                    Spacer(minLength: Space.s)
+                    StatusPill()
+                }
+                VStack(alignment: .leading, spacing: Space.s) {
+                    SampleBanner().fixedSize()
+                    StatusPill(singleLine: false)
+                }
             }
             Text("Welcome \(settings.userName)").font(SoughtFont.screenTitle).foregroundStyle(p.title)
                 .accessibilityAddTraits(.isHeader)
@@ -128,9 +134,10 @@ struct HomeView: View {
 
 /// Status line as a small glass pill (top right of Home).
 struct StatusPill: View {
+    var singleLine = true
     @EnvironmentObject private var robot: RobotSource
     var body: some View {
-        StatusLine(singleLine: true)
+        StatusLine(singleLine: singleLine)
             .padding(.horizontal, Space.m)
             .padding(.vertical, 6)
             .soughtGlass(.pill, in: Capsule())
