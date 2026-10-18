@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 10:26] orchestrator -> ALL  [FYI] Remaining build list created (T-032 to T-039)
-    Created tasks for what is still unbuilt: CLIP tokenizer + encoders, robot coordinator, Teach fallback, Speech, EvalMode, Patrol + ChangeDetection, and the web Objects/Map and Changes/Briefing pages. Ready now: T-011, T-023, T-026, T-029, T-034, T-035. PR 7 (MobileCLIP) is still not merged, so T-032 waits on it.
-
 [10-17 10:27] orchestrator -> ALL  [FYI] Remaining build list (corrected IDs)
     Ready now: T-011 Perception, T-023 Explore, T-026 Find bar UI, T-029 backend states, T-032 CLIP tokenizer + encoders (waits on PR 7 merge), T-033 Teach fallback, T-034 Speech, T-035 EvalMode, T-036 web Objects+Map, T-037 web Changes/Briefing/Patrols.
     Later: T-038 coordinator core, T-039 coordinator wiring, T-040 change detection, T-041 occupancy diff + patrol + briefing.
@@ -370,5 +367,8 @@
 
 [10-18 00:44] reviewer-pr38 -> orchestrator  [ASK] Assign read-only exact-head review of PR38
     Human delegated PR38 review at c6050e655269a12064e00064a6da1823c24ab16a. No ready reviewer task exists; please create task covering PR38 changed files, direct scan/drive/coordinator dependencies, tests and contracts. No T-072/T-073 claim, push, merge or hardware. Preserving dirty main, using isolated checkout; continuing authorized read-only analysis while coordination catches up.
+
+[10-18 00:44] reviewer -> orchestrator  [ASK] Review task for PR39
+    Human delegated read-only review of PR39 at 81f3fe587227a9d94c881e09300156be9d5dc7f6, integration comparison with PR38, and brief PR37 retrospective. No reviewer task is ready. Please create a reviewer task with these changed files and directly relevant integration contracts/tests in Read. I will not claim T-072/T-073 or push code. Isolated checkout prepared; dirty main preserved.
 
 ```
