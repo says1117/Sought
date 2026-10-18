@@ -28,6 +28,15 @@ enum ControllerTuning {
     static let nearGoalM = 0.4                  // PLACEHOLDER
     // Inside this much travel left with the target beside or behind (> 60 deg), the rover drove past it: arrived.
     static let passedGoalSlackM = 0.15          // PLACEHOLDER
+    // Detours (plan 3.4; ObstacleGuard has the same numbers but nothing drove them). A go-to held still by the
+    // forward guard for this long, with the turn guard clear (sonar present, fresh, no close-range flag), turns in
+    // place and drives out a little instead of freezing until the deadline.
+    static let detourAfterHoldS = 2.0           // PLACEHOLDER
+    static let detourMarginDeg = 20.0           // PLACEHOLDER keep turning this far past the first clear heading
+    static let detourMaxTurnDeg = 120.0         // PLACEHOLDER no clear heading within this: try the other side next
+    static let detourDriveM = 0.6               // PLACEHOLDER straight run on the detour heading before re-aiming
+    static let maxDetours = 3                   // PLACEHOLDER without progress; then hold as before
+    static let detourProgressM = 0.3            // PLACEHOLDER this much closer to the goal refills the detour budget
     static let kpTurn = 2.0                     // PLACEHOLDER wheel units per deg while turning in place
     static let minTurn = 90.0                   // PLACEHOLDER smallest command that rotates the rover (find by test)
     static let maxTurn = 150.0                  // PLACEHOLDER
@@ -147,6 +156,19 @@ struct ControlSession {
     private var spinning = false            // go-to: currently turning in place
     private var spinStartSign: Double?
     private var hasDriven = false           // go-to: has driven forward this run (raises the spin threshold)
+    private var guardStopSince: Double?     // go-to: forward guard has held the wheels since
+    private(set) var detoursUsed = 0           // total this run (diagnostics)
+    private var detoursWithoutProgress = 0
+    private var detourSide: Double?           // +1 left / -1 right; kept while it works
+    private var distAtLastDetour: Double?
+    private var detour: Detour?
+    private struct Detour {
+        var sign: Double
+        var startYaw: Double
+        var clearAtTurnedDeg: Double?         // how far it had turned when the forward guard first cleared
+        var driving = false
+        var startX = 0.0, startZ = 0.0
+    }
     private var rotateTargetYaw: Double?
     private var rotateStartSign: Double?
     private(set) var status: ControlStatus = .running
@@ -195,7 +217,15 @@ struct ControlSession {
             // Drove past it: close, with the target beside or behind. Turning around to chase a few cm is the
             // micro-adjusting seen on the rover; this is arrived.
             if remaining < ControllerTuning.passedGoalSlackM && abs(err) > 60 { return finish(.done) }
+            if let d0 = distAtLastDetour, d0 - dist >= ControllerTuning.detourProgressM {
+                detoursWithoutProgress = 0; distAtLastDetour = nil      // real progress: refill the budget
+            }
+            if let out = detourStep(pose: pose, input: input) { return out }
             let turning = decideSpin(err: err, remaining: remaining)
+            if !turning, input.guardState == .stop, let out = maybeStartDetour(pose: pose, err: err, dist: dist, input: input) {
+                return out
+            }
+            if turning || input.guardState != .stop { guardStopSince = nil }
             // Above the turn-in-place threshold goToStep sends no forward motion, so obey the turn guard (when set),
             // as rotateBy does. Otherwise an obstacle ahead held the wheels at zero and the find timed out without
             // ever facing the target (seen on the rover). Driving forward still obeys the full forward guard.
@@ -222,6 +252,53 @@ struct ControlSession {
             return TickOutput(command: ControllerMath.wheels(linear: 0, angular: ControllerMath.turnCommand(errDeg: err)),
                               status: .running)
         }
+    }
+
+    /// Runs an active detour: turn in place (obeying the turn guard) toward one side until the forward guard reads
+    /// clear, plus a margin; then drive straight out on that heading (obeying the forward guard) for detourDriveM.
+    /// nil = no detour active (any more); continue the normal go-to, which re-aims at the goal.
+    private mutating func detourStep(pose: Pose2D, input: TickInput) -> TickOutput? {
+        guard var d = detour else { return nil }
+        if !d.driving {
+            if (input.turnGuardState ?? input.guardState) == .stop { return TickOutput(command: .zero, status: .running) }
+            let turned = abs(PoseMath.shortestDelta(from: d.startYaw, to: pose.yawDeg))
+            if d.clearAtTurnedDeg == nil, input.guardState != .stop { d.clearAtTurnedDeg = turned }
+            if d.clearAtTurnedDeg != nil, input.guardState == .stop { d.clearAtTurnedDeg = nil }   // only a gap; keep turning
+            if let c = d.clearAtTurnedDeg, turned >= c + ControllerTuning.detourMarginDeg {
+                d.driving = true; d.startX = pose.x; d.startZ = pose.z; detour = d
+                detourSide = d.sign                                                // this side worked: keep it
+            } else if turned >= ControllerTuning.detourMaxTurnDeg {
+                detour = nil; detourSide = -d.sign; guardStopSince = nil           // nothing clear this way
+                return TickOutput(command: .zero, status: .running)
+            } else {
+                detour = d
+                return TickOutput(command: ControllerMath.wheels(linear: 0, angular: TURN_SIGN * d.sign * ControllerTuning.minTurn),
+                                  status: .running)
+            }
+        }
+        let moved = ((pose.x - d.startX) * (pose.x - d.startX) + (pose.z - d.startZ) * (pose.z - d.startZ)).squareRoot()
+        // Done driving out, or blocked again: back to the normal go-to (which may start the next detour).
+        if moved >= ControllerTuning.detourDriveM || input.guardState == .stop {
+            detour = nil; spinning = false; spinStartSign = nil; guardStopSince = nil
+            if moved > 0.05 { hasDriven = true }
+            return nil
+        }
+        return TickOutput(command: ControllerMath.wheels(linear: ControllerTuning.slowLinear, angular: 0), status: .running)
+    }
+
+    /// Forward guard holding a go-to: after detourAfterHoldS start a detour if the turn guard is wired and clear
+    /// and fewer than maxDetours ran without progress. First side: toward the goal. nil = keep holding.
+    private mutating func maybeStartDetour(pose: Pose2D, err: Double, dist: Double, input: TickInput) -> TickOutput? {
+        if guardStopSince == nil { guardStopSince = input.now }
+        guard input.now - guardStopSince! >= ControllerTuning.detourAfterHoldS,
+              detoursWithoutProgress < ControllerTuning.maxDetours,
+              let turnGuard = input.turnGuardState, turnGuard == .clear else { return nil }
+        let sign = detourSide ?? (err < 0 ? -1 : 1)
+        detoursUsed += 1; detoursWithoutProgress += 1
+        if distAtLastDetour == nil { distAtLastDetour = dist }
+        detour = Detour(sign: sign, startYaw: pose.yawDeg)
+        guardStopSince = nil
+        return TickOutput(command: .zero, status: .running)
     }
 
     /// Turn-in-place decision with hysteresis. Start above 20 deg from rest (40 once driving; 90 near the goal);
