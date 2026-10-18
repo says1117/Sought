@@ -211,7 +211,8 @@ struct CoordinatorWiring {
     var drive: DriveSink
     var guardState: () -> GuardState
     /// Guard for the coordinator's turns in place (find's final facing turn). nil = turns obey `guardState`.
-    /// The app passes Scan here's turn guard (SensorCache.turnGuardState); goTo always obeys `guardState`.
+    /// The app passes Scan here's turn guard (SensorCache.turnGuardState). goTo also uses it while turning in place
+    /// toward its target (|heading error| > 20 deg, no forward motion); driving forward always obeys `guardState`.
     var turnGuard: (() -> GuardState)? = nil
     var waypointStore: WaypointStore
     var trackStore: TrackProviding
@@ -256,7 +257,8 @@ struct CoordinatorWiring {
             config: cfg)
     }
 
-    /// The coordinator's Controller: drives under the shared lease; goTo obeys `guardState`, rotateBy `turnGuard`.
+    /// The coordinator's Controller: drives under the shared lease; forward motion obeys `guardState`, turns in place
+    /// (rotateBy and goTo's turn-toward phase) obey `turnGuard`.
     func makeController() -> Controller {
         Controller(poses: poses, sink: LeasedDriveSink(base: drive, lease: lease), guardState: guardState,
                    turnGuard: turnGuard, clock: controllerClock, sleep: controllerSleep)

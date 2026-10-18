@@ -104,9 +104,10 @@ final class RetrievalNegativesTests: XCTestCase {
         let r = try Retriever(encoder: enc, negatives: ["a person", "a wall"], arrivalNegatives: ["a person"])
             .retrieve(phrase: "bottle", tracks: [person, weak, bottleish])
         XCTAssertEqual(r.ranked.map(\.trackID), ["bottle", "weak", "person"], "person sinks but is not removed")
+        XCTAssertEqual(r.ranked[2].rankScore, r.ranked[2].score + r.ranked[2].margin, accuracy: 1e-5, "penalised by how much more it looks like a person")
+        XCTAssertEqual(r.ranked[0].rankScore, r.ranked[0].score, accuracy: 1e-6, "no penalty when the query wins")
         XCTAssertEqual(r.log.rejectedByNegatives, ["person"])
         XCTAssertEqual(r.negatives.count, 1, "arrival negatives only")
-        XCTAssertGreaterThan(r.ranked[0].margin, r.ranked[1].margin)
     }
 
     func testNegativeSharingAWordWithTheQueryIsDropped() throws {
@@ -117,6 +118,15 @@ final class RetrievalNegativesTests: XCTestCase {
         XCTAssertEqual(r.ranked.map(\.trackID), ["chair"])
         XCTAssertTrue(r.log.rejectedByNegatives.isEmpty, "the chair negative was dropped for a chair query")
         XCTAssertEqual(r.negatives.count, 1)
+    }
+
+    func testFurnitureLikeTargetIsNotSunkByPenaltyOnlyRanking() throws {
+        // Review P1: a remote on a couch looks a bit like "couch". With person-only negatives and penalty-only
+        // ranking, a higher query score still wins over a lower one.
+        let onCouch = track("remote", [0.8, 0.0, 0.6])          // query 0.8, wall 0.6
+        let lamp = track("lamp", [0.6, 0.0, 0.8])               // query 0.6, wall 0.8
+        let r = try Retriever(encoder: enc, negatives: ["a person"]).retrieve(phrase: "bottle", tracks: [lamp, onCouch])
+        XCTAssertEqual(r.ranked.map(\.trackID), ["remote", "lamp"])
     }
 
     func testNoNegativesKeepsPlainRanking() throws {

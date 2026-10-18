@@ -56,7 +56,14 @@ public enum DepthAdapter {
         let intr = DepthIntrinsics(fx: k[0][0] * sx, fy: k[1][1] * sy, cx: k[2][0] * sx, cy: k[2][1] * sy)
 
         let m = frame.camera.transform
-        let floor = floorY.map(Float.init) ?? (m.columns.3.y - mount.heightM)
+        // Trust the detected floor only when it is plausibly under the lens (0.10-0.40 m below the camera); a raised
+        // surface taken for the floor, or a plane left from before a relocalization jump, would otherwise lift the
+        // "floor" and hide real obstacles under the clearance. Otherwise use the mount-height fallback.
+        let fallback = m.columns.3.y - mount.heightM
+        let floor: Float = floorY.map(Float.init).flatMap { f in
+            let drop = m.columns.3.y - f
+            return drop >= 0.10 && drop <= 0.40 ? f : nil
+        } ?? fallback
         return CorridorSampler.sampleWorld(depth: buf, width: w, height: h, intrinsics: intr,
                                            cameraToWorld: m, floorY: floor, corridor: corridor, stride: stride)
     }

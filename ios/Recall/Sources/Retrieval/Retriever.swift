@@ -9,12 +9,12 @@ public enum RetrievalConfig {
     public static let topK = 5
     public static let persistenceFloor: Float = 0.8
     public static let persistenceWeight: Float = 0.2
-    /// Contrastive negatives for the app's finder. Raw text-image cosines are nearly flat (~0.23-0.25) on real memory,
-    /// so a plain ranking picked a person as "bottle" on the rover. Retrieval ranks by margin = cos(query) - best
-    /// cos(negative), so people, walls and floor sink, but nothing is rejected (a real object crop is mostly
-    /// background, so a hard cut could drop the object itself). Negatives sharing a word with the query are dropped.
-    public static let negatives = ["a person", "a wall", "the floor", "a chair", "a table", "a door",
-                                   "a couch", "a window", "the ceiling", "a bed"]
+    /// Negatives for the app's finder. Raw text-image cosines are nearly flat (~0.23-0.25) on real memory, and a plain
+    /// ranking picked a person as "bottle" on the rover. A region is penalised by how much MORE it looks like a
+    /// negative than like the query (penalty-only; the normal score otherwise decides). Only "a person": furniture and
+    /// surfaces were dropped after review, because objects sit on them (a remote on a couch reads as "couch") and
+    /// synonyms ("sofa", "desk") would sink the target itself. Nothing is ever removed.
+    public static let negatives = ["a person"]
     /// The arrival check only vetoes these: an accepted crop must look more like the query than like any of them.
     /// Background prompts are deliberately absent (the object's crop contains floor/table around it).
     public static let arrivalNegatives = ["a person"]
@@ -31,6 +31,8 @@ public struct RankedTrack: Equatable {
     public var embedding: [Float]
     /// cosine to the query minus the best cosine to any negative (0 when retrieval ran without negatives).
     public var margin: Float = 0
+    /// What ranking uses: score minus max(0, -margin), i.e. only regions closer to a negative than to the query lose.
+    public var rankScore: Float = 0
 }
 
 /// Per-query candidate log (4.6): every track that was scored, in rank order, for evals and failure analysis.
@@ -42,7 +44,7 @@ public struct QueryLog: Equatable {
     public var skippedIncomparable: [String]
     /// True when no confirmed track was scorable, so unconfirmed tracks were ranked instead.
     public var usedUnconfirmed: Bool
-    /// Tracks a negative prompt matched at least as well as the query (ranked last, not removed).
+    /// Tracks a negative prompt matched at least as well as the query (penalised in ranking, not removed).
     public var rejectedByNegatives: [String] = []
 }
 
@@ -86,7 +88,7 @@ public struct Retriever {
     }
 
     /// Pure ranking step. Unconfirmed tracks are used only if no confirmed track could be scored.
-    /// With `negatives`, tracks rank by margin (cosine to the query minus the best cosine to a negative).
+    /// With `negatives`, a track closer to a negative than to the query is penalised by the difference (penalty-only).
     public static func rank(query q: [Float], phrase: String, tracks: [Track], topK: Int = RetrievalConfig.topK,
                             negatives: [[Float]] = []) -> RetrievalResult {
         var scored: [RankedTrack] = []
@@ -103,11 +105,11 @@ public struct Retriever {
             let s = c * (RetrievalConfig.persistenceFloor + RetrievalConfig.persistenceWeight * t.persistence)
             scored.append(RankedTrack(trackID: t.id, score: s, cosine: c, persistence: t.persistence,
                                       confirmed: t.isConfirmed, position: t.position, embedding: t.embedding,
-                                      margin: margin))
+                                      margin: margin, rankScore: s - max(0, -margin)))
         }
-        // Deterministic: best margin (with negatives) then best score first, ties by id.
+        // Deterministic: best penalised score (equals score without negatives), then score, ties by id.
         scored.sort {
-            if $0.margin != $1.margin { return $0.margin > $1.margin }
+            if $0.rankScore != $1.rankScore { return $0.rankScore > $1.rankScore }
             return $0.score != $1.score ? $0.score > $1.score : $0.trackID < $1.trackID
         }
         let confirmed = scored.filter { $0.confirmed }

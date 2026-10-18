@@ -94,7 +94,7 @@ public struct FindExecutor {
         }
         if retrieval.log.usedUnconfirmed { notes.append("only unconfirmed tracks were available") }
         if !retrieval.log.rejectedByNegatives.isEmpty {
-            notes.append("\(retrieval.log.rejectedByNegatives.count) of \(retrieval.log.scored.count) regions matched a person/wall/floor/furniture better (ranked last)")
+            notes.append("\(retrieval.log.rejectedByNegatives.count) of \(retrieval.log.scored.count) regions looked more like a person than the query (penalised)")
         }
         if retrieval.ranked.contains(where: { $0.margin != 0 }) {
             notes.append("margins: " + retrieval.ranked.prefix(config.maxCandidates)
