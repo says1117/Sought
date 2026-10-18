@@ -8,6 +8,7 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validato
 Id = Annotated[str, Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")]
 Probability = Annotated[float, Field(ge=0, le=1)]
 Severity = Literal["info", "warning", "hazard"]
+CommandStatus = Literal["queued", "running", "done", "failed"]
 EventType = Literal["appeared", "disappeared", "moved", "new_obstacle", "path_blocked", "door_changed"]
 
 
@@ -34,7 +35,7 @@ class Position(ContractModel):
 
 class Heartbeat(ContractModel):
     t: AwareDatetime
-    state: Literal["idle", "teaching", "finding", "patrolling", "checking_route", "blocked", "error"]
+    state: Literal["idle", "teaching", "finding", "patrolling", "checking_route", "blocked", "error", "exploring", "coming_to_user"]
     task: str
     tracking: Literal["normal", "limited", "not_available"]
     mapping_status: Literal["mapped", "limited", "extending", "not_available"]
@@ -150,3 +151,22 @@ class MapSnapshot(ContractModel):
         if len(cells) != self.width * self.height or any(cell > 3 for cell in cells):
             raise ValueError("Map cells must match width*height and use values 0..3")
         return self
+
+
+class CommandCreate(ContractModel):
+    """Client may supply its own id (idempotent retries); the server fills the rest."""
+    id: Id | None = None
+    text: Annotated[str, Field(min_length=1, max_length=200)]
+
+
+class Command(ContractModel):
+    id: Id
+    text: str
+    created_at: AwareDatetime
+    status: CommandStatus
+    result: str | None
+
+
+class CommandAck(ContractModel):
+    status: Literal["running", "done", "failed"]
+    result: Annotated[str, Field(max_length=500)] | None = None

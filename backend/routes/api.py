@@ -3,18 +3,19 @@ import io
 import json
 import os
 import re
+import secrets
 import tempfile
 import time
 import warnings
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile
 from PIL import Image, UnidentifiedImageError
 from pydantic import AwareDatetime
 
-from backend.models import ChangeEvent, EventType, Heartbeat, MapSnapshot, ObjectTrack, Patrol, Route, Severity, Waypoint
+from backend.models import ChangeEvent, Command, CommandAck, CommandCreate, EventType, Heartbeat, MapSnapshot, ObjectTrack, Patrol, Route, Severity, Waypoint
 
 router = APIRouter(prefix="/api")
 MAX_MEDIA_BYTES = 500 * 1024
@@ -181,3 +182,69 @@ def evals(request: Request):
 @router.get("/metadata")
 def metadata(request: Request):
     return {"mock": store(request).get("metadata", "mock") is not None}
+
+
+# Remote commands (docs/03_CONTRACTS.md section 2.9). Sought posts free text; the robot
+# polls `next` (which claims the oldest queued command as `running`) and acks the result.
+# Empty `next` is 204 No Content. Every create and status change is an SSE `command` event.
+def publish_command(request: Request, body: dict):
+    request.app.state.broker.publish("command", body)
+    return body
+
+
+@router.post("/commands", response_model=Command)
+def create_command(payload: CommandCreate, request: Request):
+    commands = store(request)
+    id = payload.id or f"cmd_{secrets.token_hex(6)}"
+    with commands.lock:
+        existing = commands.get("commands", id)
+        if existing is not None:
+            # A retried create with the same id and text is idempotent; anything else conflicts.
+            if existing[0]["text"] != payload.text:
+                raise HTTPException(409, "Command id already exists")
+            return existing[0]
+        command = Command(id=id, text=payload.text, created_at=datetime.now(timezone.utc), status="queued", result=None)
+        body = commands.put("commands", id, command.model_dump(mode="json"), time.time())
+    return publish_command(request, body)
+
+
+@router.get("/commands/next", response_model=Command, responses={204: {"description": "No queued command"}})
+def next_command(request: Request):
+    commands = store(request)
+    with commands.lock:
+        queued = next((item for item in commands.by_insertion("commands") if item["status"] == "queued"), None)
+        if queued is None:
+            return Response(status_code=204)
+        body = commands.put("commands", queued["id"], {**queued, "status": "running"}, time.time())
+    return publish_command(request, body)
+
+
+@router.post("/commands/{id}/ack", response_model=Command)
+def ack_command(id: str, payload: CommandAck, request: Request):
+    commands = store(request)
+    with commands.lock:
+        record = commands.get("commands", id)
+        if record is None:
+            raise HTTPException(404, "Unknown command")
+        current = record[0]
+        updated = {**current, "status": payload.status, "result": payload.result}
+        if current["status"] in ("done", "failed"):
+            # Retried final acks are idempotent; a finished command never changes.
+            if updated == current:
+                return current
+            raise HTTPException(409, "Command already finished")
+        body = commands.put("commands", id, updated, time.time())
+    return publish_command(request, body)
+
+
+@router.get("/commands/{id}", response_model=Command)
+def get_command(id: str, request: Request):
+    record = store(request).get("commands", id)
+    if record is None:
+        raise HTTPException(404, "Unknown command")
+    return record[0]
+
+
+@router.get("/commands", response_model=list[Command])
+def commands(request: Request, limit: Annotated[int, Query(ge=1, le=200)] = 20):
+    return store(request).by_insertion("commands")[::-1][:limit]
