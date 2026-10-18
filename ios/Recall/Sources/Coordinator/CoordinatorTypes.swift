@@ -23,6 +23,15 @@ enum CoordinatorTaskKind: String, Equatable {
 }
 
 /// One recorded decision. `t` is clock time at the decision.
+/// How one tool call ended, for a caller that reports results (remote commands). `done` only on a real
+/// success; `busy` when remote admission refused it (task running or stopping, manual tool open);
+/// every refusal, block, cancellation or missing result is `failed` with "event: detail".
+enum CoordinatorCallOutcome: Equatable {
+    case done(String)
+    case busy(String)
+    case failed(String)
+}
+
 struct CoordinatorTraceEntry: Equatable {
     var t: TimeInterval
     var event: String

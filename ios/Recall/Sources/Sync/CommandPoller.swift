@@ -57,14 +57,19 @@ public protocol CommandRunning: AnyObject {
     func run(_ text: String) async -> CommandOutcome
 }
 
-/// Polls `GET /api/commands/next` every 2 s while started. Each claimed command is acked `running`, handed to
-/// the runner, then acked `done` with the result or `failed` with the reason. Polling continues while a
-/// command runs so a remote "stop" still gets through; the runner refuses anything else as busy.
+/// Polls `GET /api/commands/next` every 2 s while started. Each claimed command goes to the runner at once
+/// (the claim already marked it `running` on the server, so a remote "stop" brakes without another round
+/// trip); the `running` ack and then the final `done`/`failed` ack are sent alongside and never gate motion.
+/// Polling continues while a command runs so a remote "stop" still gets through; the runner refuses anything
+/// else as busy. `stop()` (runtime pause) cancels every claimed command, including a claim still in flight,
+/// so nothing claimed before a pause reaches the robot after it.
 /// Network errors and non-2xx answers back off quietly (2, 4, 8 ... 30 s) and never reach the robot loop.
 public final class CommandPoller {
     public static let interval: TimeInterval = 2
     public static let busy = "busy"
     public static let maxResultLength = 500
+    /// Final ack result for a command the runtime paused before or while it ran.
+    public static let cancelled = "cancelled: robot paused"
     private let transport: CommandTransport
     private let runner: CommandRunning
     private let backoff: Backoff
@@ -72,6 +77,9 @@ public final class CommandPoller {
     private let lock = NSLock()
     private var loop: Task<Void, Never>?
     private var failures = 0
+    /// Bumped by `stop()`: a claim that started under an older generation is never run.
+    private var generation: UInt64 = 0
+    private var claimed: [UUID: Task<Void, Never>] = [:]
     public private(set) var acksFailed = 0
 
     public init(transport: CommandTransport, runner: CommandRunning,
@@ -99,15 +107,22 @@ public final class CommandPoller {
         }
     }
 
-    /// Stops polling. A command already running keeps going and still sends its final ack.
+    /// Stops polling and cancels every claimed command (the coordinator refuses or cancels its work), and a
+    /// claim still in flight is dropped when it lands. Their final acks are still sent, best effort.
     public func stop() {
-        lock.lock(); let l = loop; loop = nil; lock.unlock()
+        lock.lock()
+        let l = loop; loop = nil
+        generation &+= 1
+        let work = Array(claimed.values); claimed = [:]
+        lock.unlock()
         l?.cancel()
+        work.forEach { $0.cancel() }
     }
 
     /// One poll. Returns the delay before the next poll and the task handling a claimed command (tests await it).
     @discardableResult
     public func pollOnce() async -> (delay: TimeInterval, work: Task<Void, Never>?) {
+        let claimGeneration = currentGeneration()
         let response: (status: Int, body: Data)
         do {
             response = try await transport.exchange(SyncRequest(method: "GET", path: "/api/commands/next", body: nil, media: nil))
@@ -119,17 +134,48 @@ public final class CommandPoller {
             return (failed(), nil)
         }
         let delay = succeeded()
-        let work = Task.detached(priority: .userInitiated) { [self] in await handle(command) }
+        guard let work = launch(command, claimedIn: claimGeneration) else {
+            // Paused while this claim was in flight: never run it, just close it out on the server.
+            return (delay, Task.detached { [self] in await ack(command.id, status: "failed", result: Self.cancelled) })
+        }
         return (delay, work)
     }
 
-    private func handle(_ command: WireCommand) async {
-        await ack(command.id, status: "running", result: nil)
-        let outcome = await runner.run(command.text)
-        switch outcome {
-        case .done(let text): await ack(command.id, status: "done", result: text)
-        case .failed(let text): await ack(command.id, status: "failed", result: text)
+    private func currentGeneration() -> UInt64 { lock.lock(); defer { lock.unlock() }; return generation }
+
+    /// Start handling a claim unless `stop()` ran since it began. Registered under the same lock as that
+    /// check, so `stop()` always sees (and cancels) it.
+    private func launch(_ command: WireCommand, claimedIn claimGeneration: UInt64) -> Task<Void, Never>? {
+        lock.lock(); defer { lock.unlock() }
+        guard generation == claimGeneration else { return nil }
+        let key = UUID()
+        let work = Task.detached(priority: .userInitiated) { [self] in
+            await handle(command)
+            forget(key)
         }
+        claimed[key] = work
+        return work
+    }
+
+    private func forget(_ key: UUID) { lock.lock(); claimed[key] = nil; lock.unlock() }
+
+    private func handle(_ command: WireCommand) async {
+        // Acks are their own tasks: a stalled ack never delays the runner, and a pause cannot cancel them.
+        let running = Task.detached { [self] in await ack(command.id, status: "running", result: nil) }
+        var outcome = CommandOutcome.failed(Self.cancelled)
+        if !Task.isCancelled { outcome = await runner.run(command.text) }
+        if Task.isCancelled, case .failed = outcome { outcome = .failed(Self.cancelled) }
+        let (status, result): (String, String) = {
+            switch outcome {
+            case .done(let text): return ("done", text)
+            case .failed(let text): return ("failed", text)
+            }
+        }()
+        // After the running ack, so the server sees them in order.
+        await Task.detached { [self] in
+            await running.value
+            await ack(command.id, status: status, result: result)
+        }.value
     }
 
     /// Up to three tries. 2xx and 409 (already finished, e.g. a retried final ack) count as delivered.

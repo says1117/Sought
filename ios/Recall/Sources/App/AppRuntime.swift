@@ -265,9 +265,10 @@ final class AppRuntime: ObservableObject {
     func mapSaved(mapId: String, generation: Int?) { adoptSavedMap?(mapId, generation) }
 
     func pause() {
+        // Remote commands first, so nothing claimed before the pause can start after the brake below.
+        commandPoller?.stop()
         stopEverything()
         heartbeat?.stop()
-        commandPoller?.stop()
         sensorTimer?.invalidate()
         sensorTimer = nil
     }
