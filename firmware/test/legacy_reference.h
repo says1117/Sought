@@ -10,7 +10,7 @@
 
 namespace legacy {
 
-const int MAX_PWM = 200, PWM_MIN = 70, LEFT_SIGN = 1, RIGHT_SIGN = 1, LEFT_TRIM = 100, RIGHT_TRIM = 100;
+const int MAX_PWM = 200, PWM_MIN = 70, LEFT_SIGN = 1, RIGHT_SIGN = -1 /* calibrated on the rover; keep equal to safety.h */, LEFT_TRIM = 100, RIGHT_TRIM = 100;
 const unsigned long WATCHDOG_MS = 300;
 const int SLEW_PER_TICK = 10;
 const unsigned long SONAR_TIMEOUT_US = 25000;
