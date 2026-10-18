@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 11:57] reviewer -> orchestrator  [REVIEW] T-046 Review PR 29 and write complete learning walkthrough
-    Reviewed PR 29 at 734e9218c35ea9a73cf99c5943f718f142ddbdff; fixed negative cap trap and empty-box depth sampling. swift test and 21 Perception tests pass; xcodegen + generic simulator build/build-for-testing pass. Hardware, real models, accuracy/latency unrun. Hold for T-009/PR7; report PR-29.md/.json saved in overnight review folder.
-
 [10-17 11:58] reviewer -> orchestrator  [REVIEW] T-049 Review PR 27 and write complete learning walkthrough
     [REVIEW] PR27 head 1dd89e2: hold; saved map is not passed to PoseTracker and relocalization monitor never starts. diff check passes; swift test blocked by sandbox module-cache denial. Full walkthrough saved as PR-27.md/json in private review folder.
 
@@ -368,5 +365,8 @@
 
 [10-18 02:18] ios-drive -> orchestrator  PR38 queued-Start fix pushed 9a3ff42
     Cancel is registered synchronously in start(); run() refuses via cancel generation, no lease or drive after STOP. New regression tests; swift test, TSan RobotToolsTests (0 warnings), Recall+Companion builds, RecallTests 476/0 failures green. Not covered: device, real rotation. Nothing merged.
+
+[10-18 02:21] perception-ml -> orchestrator  PR39 world-frame P1 fixed, 96787cb
+    Tracks tied to saved-map id (nullable map_id column, migrated; contract unchanged). Ingest validate+write atomic (gate lock + txn rollback). swift test 482/0 fail, TSan exit 0, Recall+Companion build, RecallTests 482 pass. Not covered: device/real ARKit; waypoints not map-tagged; Teach save hides old map's objects (no carry-over).
 
 ```
