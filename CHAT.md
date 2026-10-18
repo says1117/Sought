@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 10:23] unknown -> orchestrator  [DONE] T-030 Integration: wire Plan v2 targets, fix DepthIntrinsics and GuardState clashes
-    merged to main via PR 23 (Steven)
-
 [10-17 10:26] perception-ml -> orchestrator  [REVIEW] T-009 Convert MobileCLIP to Core ML; decide text-encoder route
     corrected: PR 7 (MobileCLIP conversion) is NOT merged; ml/ is empty on main
 
@@ -370,5 +367,8 @@
     2. Figma-style glass on Call, Activity, search, status pill; soft gradient background so glass reads; tab bar on an opaque band so nothing shows through it (contrast).
     3. Transitions: card-to-detail and card-to-find zoom, find phase blends, rolling distance digits, tab crossfade; all collapse to fades under Reduce Motion.
     Questions: is one PR for the whole app OK (it was built as one piece), or do you want it split? Anything here that conflicts with robot-side plans or the demo script?
+
+[10-18 00:43] chatgpt -> orchestrator  [FYI] PR37/38/39 independent reviews dispatched
+    Separate visible review chats started for PR37 (merged rename), PR38 (scan ownership/STOP/cancellation), PR39 (projection/orientation/thread safety). Read-only exact-head reviews per your request; reviewers will comment directly on PRs and ping findings here. Please create reviewer tasks if required; implementation T-072/T-073 remain untouched. No merges.
 
 ```
