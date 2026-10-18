@@ -32,7 +32,7 @@ enum ControllerTuning {
     static let doneTicks = 3                    // plan: for 3 consecutive ticks
     static let timeout = 30.0                   // plan: fail on 30 s timeout
     static let trackingLossLimit = 1.0          // plan: stop if tracking != normal for > 1 s
-    static let rotateToleranceDeg = 5.0         // PLACEHOLDER rotateBy is done inside this
+    static let rotateToleranceDeg = 10.0        // rotateBy is done inside this (or once past the target). 5 hunted on the rover
     static let rotateTimeout = 15.0             // PLACEHOLDER
 }
 
@@ -101,6 +101,9 @@ struct TickInput {
     var tracking: TrackingKind
     var guardState: GuardState
     var now: Double            // seconds, any monotonic clock
+    /// Guard used by rotateBy instead of `guardState` when set. A turn in place has no forward motion, so a caller
+    /// can pass a guard that only stops on stale sensors (Scan here). nil = rotateBy obeys `guardState`.
+    var turnGuardState: GuardState? = nil
 }
 
 struct TickOutput: Equatable {
@@ -120,6 +123,7 @@ struct ControlSession {
     private var trackingBadSince: Double?
     private var doneStreak = 0
     private var rotateTargetYaw: Double?
+    private var rotateStartSign: Double?
     private(set) var status: ControlStatus = .running
 
     init(goal: Goal) { self.goal = goal }
@@ -160,18 +164,19 @@ struct ControlSession {
             return TickOutput(command: ControllerMath.wheels(linear: lin, angular: ang), status: .running)
 
         case .rotateBy(let deg):
-            if input.guardState == .stop {
+            if (input.turnGuardState ?? input.guardState) == .stop {
                 doneStreak = 0
                 return TickOutput(command: .zero, status: .running)
             }
             if rotateTargetYaw == nil { rotateTargetYaw = PoseMath.normalizeDegrees(pose.yawDeg + deg) }
             let err = PoseMath.shortestDelta(from: pose.yawDeg, to: rotateTargetYaw!)
-            if abs(err) < ControllerTuning.rotateToleranceDeg {
-                doneStreak += 1
-                if doneStreak >= ControllerTuning.doneTicks { return finish(.done) }
-                return TickOutput(command: .zero, status: .running)
-            }
-            doneStreak = 0
+            if rotateStartSign == nil { rotateStartSign = err < 0 ? -1 : 1 }
+            // Done inside the tolerance, or as soon as the heading has passed the target. On the rover the minimum
+            // turn command plus BLE/ARKit lag overshoots a few degrees per tick, and reversing to chase a tight
+            // window made it swing left-right until the timeout. A small overshoot is fine for a turn in place.
+            // |err| < 90 keeps a ±180 wrap (far from the target) from looking like a crossing.
+            let crossed = (err < 0 ? -1.0 : 1.0) != rotateStartSign! && abs(err) < 90
+            if abs(err) < ControllerTuning.rotateToleranceDeg || crossed { return finish(.done) }
             return TickOutput(command: ControllerMath.wheels(linear: 0, angular: ControllerMath.turnCommand(errDeg: err)),
                               status: .running)
         }

@@ -28,10 +28,14 @@ final class AppRuntime: ObservableObject {
     let trackProvider: TrackProviding
     var scanPoses: ExplorePoseSource { poseBox }
     /// Scan here drives only through the coordinator's drive lease and its serialized sink, so global STOP,
-    /// pause and backgrounding revoke it exactly like a coordinator task.
+    /// pause and backgrounding revoke it exactly like a coordinator task. Its turns in place skip the 35 cm
+    /// forward stops but hold on the ESP32 close flags, missing sonar and stale readings (see TurnGuard).
     func makeScanController() -> Controller {
-        Controller(poses: poseBox, sink: LeasedDriveSink(base: driveSink, lease: driveLease), guardState: { [cache] in cache.guardState() })
+        Controller(poses: poseBox, sink: LeasedDriveSink(base: driveSink, lease: driveLease),
+                   guardState: { [cache] in cache.guardState() }, turnGuard: { [cache] in cache.turnGuardState() })
     }
+    /// Live forward-guard text for the Scan here screen.
+    func guardReadout() -> String { cache.readout() }
     /// Start preconditions for a scan, and the lease it drives under. Registers the scan for runtime cancellation.
     func makeScanGate() -> ScanHereGate {
         LeaseScanGate(lease: driveLease, coordinatorBusy: { [coordinator] in coordinator.isBusy || coordinator.hasPending },
@@ -252,6 +256,20 @@ final class SensorCache {
         lock.lock(); let c = corridor, s = sonar, t = stamp; lock.unlock()
         if ProcessInfo.processInfo.systemUptime - t > Self.maxAgeS { return .stop }
         return GuardStateMapper.state(corridor: c, sonar: s)
+    }
+
+    /// Guard for Scan here's turns in place: drops the 35 cm forward stops, keeps the ESP32 close-range flags,
+    /// missing sonar and stale readings as holds (see TurnGuard).
+    func turnGuardState() -> GuardState {
+        lock.lock(); let s = sonar, t = stamp; lock.unlock()
+        let stale = ProcessInfo.processInfo.systemUptime - t > Self.maxAgeS
+        return TurnGuard.hold(sonar: s, stale: stale) == nil ? .clear : .stop
+    }
+
+    /// What the forward guard sees now, as text for the Scan here debug line.
+    func readout() -> String {
+        lock.lock(); let c = corridor, s = sonar, t = stamp; lock.unlock()
+        return GuardReadout.text(corridor: c, sonar: s, ageS: ProcessInfo.processInfo.systemUptime - t, staleAfterS: Self.maxAgeS)
     }
 }
 
