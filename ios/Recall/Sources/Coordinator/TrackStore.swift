@@ -67,15 +67,30 @@ enum EmbeddingCodec {
 /// with bit operations so no `Float16` type is needed on Intel simulators. A row whose BLOB length is not
 /// `2 * embedding_dim` is skipped with a logged error rather than decoded into a wrong-sized vector.
 /// Pass ":memory:" for tests. Can share the Teach database file (separate connection, busy timeout set).
+///
+/// MAP IDENTITY (PR 39 review, world-frame P1): x/z only mean something in the ARKit world map that produced them,
+/// so every row carries `map_id`, the id of the saved world map it was recorded in (`WorldMapStore.currentMapId`).
+/// `map_id` is a phone-local nullable column added by migration (`ALTER TABLE ... ADD COLUMN`); the contract's
+/// `tracks` columns and the backend sync are unchanged. Reads return only rows whose `map_id` equals the scope, so
+/// tracks of another map are invisible; rows with a NULL `map_id` (written before this column existed, map unknown)
+/// match nothing. `purgeOtherMaps(keeping:)` deletes rows of other maps once a map is loaded; they can never become
+/// valid again because their map archive was replaced.
 final class TrackStore: TrackProviding {
+    /// Map id used when no scope is supplied (tests, `TrustedFrame`). The app always supplies the gate's active map id.
+    static let defaultMapId = "default"
+
     private var db: OpaquePointer?
-    private let lock = NSLock()
+    /// Recursive: `transaction` holds it across `upsert` / `recordMatch` calls.
+    private let lock = NSRecursiveLock()
+    /// The map id `allTracks()` reads. nil matches nothing (no map identity known).
+    private let scope: () -> String?
     /// Rows skipped because their embedding BLOB did not match `embedding_dim`.
     private(set) var invalidRowCount = 0
     var onInvalidRow: (String) -> Void = { NSLog("TrackStore: %@", $0) }
     private static let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
-    init(path: String) throws {
+    init(path: String, scope: @escaping () -> String? = { TrackStore.defaultMapId }) throws {
+        self.scope = scope
         if path != ":memory:" {
             try FileManager.default.createDirectory(at: URL(fileURLWithPath: path).deletingLastPathComponent(),
                                                     withIntermediateDirectories: true)
@@ -85,6 +100,20 @@ final class TrackStore: TrackProviding {
         }
         sqlite3_busy_timeout(db, 2000)
         for s in MemorySchema.statements where s.contains("EXISTS tracks") { try exec(s) }
+        try migrateMapId()
+    }
+
+    /// Databases created before map identity have no `map_id` column. Add it (nullable) and index it.
+    private func migrateMapId() throws {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "PRAGMA table_info(tracks)", -1, &stmt, nil) == SQLITE_OK else { throw TrackStoreError.sqlite(msg()) }
+        var has = false
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let n = sqlite3_column_text(stmt, 1), String(cString: n) == "map_id" { has = true }
+        }
+        sqlite3_finalize(stmt)
+        if !has { try exec("ALTER TABLE tracks ADD COLUMN map_id TEXT") }
+        try exec("CREATE INDEX IF NOT EXISTS idx_tracks_map_id ON tracks(map_id)")
     }
     deinit { sqlite3_close(db) }
 
@@ -93,13 +122,21 @@ final class TrackStore: TrackProviding {
         return "obj_" + String((0..<10).map { _ in alphabet.randomElement()! })
     }
 
+    /// Tracks of the current scope's map only.
     func allTracks() throws -> [Track] {
+        guard let id = scope() else { return [] }
+        return try allTracks(mapId: id)
+    }
+
+    /// Tracks recorded in the map `mapId`; every other map's rows (and rows with an unknown map) stay invisible.
+    func allTracks(mapId: String) throws -> [Track] {
         lock.lock(); defer { lock.unlock() }
         var out: [Track] = []
         var stmt: OpaquePointer?
-        let sql = "SELECT id,x,y,z,embedding,sightings,persistence,last_seen,embedding_dim FROM tracks WHERE active = 1"
+        let sql = "SELECT id,x,y,z,embedding,sightings,persistence,last_seen,embedding_dim FROM tracks WHERE active = 1 AND map_id = ?1"
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { throw TrackStoreError.sqlite(msg()) }
         defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, mapId, -1, Self.transient)
         while sqlite3_step(stmt) == SQLITE_ROW {
             guard let idc = sqlite3_column_text(stmt, 0) else { continue }
             let id = String(cString: idc)
@@ -122,14 +159,45 @@ final class TrackStore: TrackProviding {
         return out
     }
 
-    /// Insert or update one track. `height` is metres above the floor; `at` stamps first/last seen.
-    func upsert(_ t: Track, height: Float = 0, at date: Date = Date()) throws {
+    /// Delete every track not recorded in `mapId` (other maps, unknown map). Returns how many rows went.
+    @discardableResult
+    func purgeOtherMaps(keeping mapId: String) throws -> Int {
+        lock.lock(); defer { lock.unlock() }
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "DELETE FROM tracks WHERE map_id IS NULL OR map_id <> ?1", -1, &stmt, nil) == SQLITE_OK else {
+            throw TrackStoreError.sqlite(msg())
+        }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, mapId, -1, Self.transient)
+        guard sqlite3_step(stmt) == SQLITE_DONE else { throw TrackStoreError.sqlite(msg()) }
+        return Int(sqlite3_changes(db))
+    }
+
+    /// Runs `body` in one SQLite transaction. Just before COMMIT, `commitIf` is asked whether the writes are still
+    /// valid (the frame / map did not change meanwhile); if not, everything is rolled back and nil returned.
+    /// A throwing body also rolls back. The store lock is held throughout, so other store calls wait.
+    func transaction<T>(commitIf: () -> Bool = { true }, _ body: () throws -> T) throws -> T? {
+        lock.lock(); defer { lock.unlock() }
+        try exec("BEGIN IMMEDIATE")
+        do {
+            let r = try body()
+            guard commitIf() else { try? exec("ROLLBACK"); return nil }
+            try exec("COMMIT")
+            return r
+        } catch {
+            try? exec("ROLLBACK")
+            throw error
+        }
+    }
+
+    /// Insert or update one track in map `mapId`. `height` is metres above the floor; `at` stamps first/last seen.
+    func upsert(_ t: Track, height: Float = 0, at date: Date = Date(), mapId: String = TrackStore.defaultMapId) throws {
         lock.lock(); defer { lock.unlock() }
         let iso = ISO8601DateFormatter().string(from: date)
         let sql = """
-        INSERT INTO tracks (id,label,label_source,description,x,y,z,height_above_floor,embedding,embedding_dim,first_seen,last_seen,sightings,persistence,media_id,active)
-        VALUES (?1,NULL,'none',NULL,?2,?3,?4,?5,?6,?7,?8,?8,?9,?10,NULL,1)
-        ON CONFLICT(id) DO UPDATE SET x=?2,y=?3,z=?4,height_above_floor=?5,embedding=?6,embedding_dim=?7,last_seen=?8,sightings=?9,persistence=?10
+        INSERT INTO tracks (id,label,label_source,description,x,y,z,height_above_floor,embedding,embedding_dim,first_seen,last_seen,sightings,persistence,media_id,active,map_id)
+        VALUES (?1,NULL,'none',NULL,?2,?3,?4,?5,?6,?7,?8,?8,?9,?10,NULL,1,?11)
+        ON CONFLICT(id) DO UPDATE SET x=?2,y=?3,z=?4,height_above_floor=?5,embedding=?6,embedding_dim=?7,last_seen=?8,sightings=?9,persistence=?10,map_id=?11
         """
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { throw TrackStoreError.sqlite(msg()) }
@@ -145,19 +213,21 @@ final class TrackStore: TrackProviding {
         sqlite3_bind_text(stmt, 8, iso, -1, Self.transient)
         sqlite3_bind_int(stmt, 9, Int32(t.sightings))
         sqlite3_bind_double(stmt, 10, Double(t.persistence))
+        sqlite3_bind_text(stmt, 11, mapId, -1, Self.transient)
         guard sqlite3_step(stmt) == SQLITE_DONE else { throw TrackStoreError.sqlite(msg()) }
     }
 
     /// Persist a matched observation, honouring the Memory `UpdatePlan`. `last_seen`, `sightings` and
     /// `persistence` are always written; position/height and the embedding only when the plan says so.
     /// (The thumbnail is not stored in this table.) Falls back to a full insert if the row is missing.
-    func recordMatch(_ t: Track, plan: UpdatePlan, height: Float = 0, at date: Date = Date()) throws {
+    func recordMatch(_ t: Track, plan: UpdatePlan, height: Float = 0, at date: Date = Date(),
+                     mapId: String = TrackStore.defaultMapId) throws {
         lock.lock(); defer { lock.unlock() }
         var sets = ["last_seen=?", "sightings=?", "persistence=?"]
         if plan.rewritePosition { sets += ["x=?", "y=?", "z=?", "height_above_floor=?"] }
         if plan.rewriteEmbedding { sets += ["embedding=?", "embedding_dim=?"] }
         var stmt: OpaquePointer?
-        let sql = "UPDATE tracks SET \(sets.joined(separator: ",")) WHERE id=?"
+        let sql = "UPDATE tracks SET \(sets.joined(separator: ",")) WHERE id=? AND map_id=?"
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { throw TrackStoreError.sqlite(msg()) }
         defer { sqlite3_finalize(stmt) }
         var i: Int32 = 1
@@ -177,11 +247,9 @@ final class TrackStore: TrackProviding {
             sqlite3_bind_int(stmt, next(), Int32(t.embedding.count))
         }
         sqlite3_bind_text(stmt, next(), t.id, -1, Self.transient)
+        sqlite3_bind_text(stmt, next(), mapId, -1, Self.transient)
         guard sqlite3_step(stmt) == SQLITE_DONE else { throw TrackStoreError.sqlite(msg()) }
-        if sqlite3_changes(db) == 0 {
-            lock.unlock(); defer { lock.lock() }
-            try upsert(t, height: height, at: date)
-        }
+        if sqlite3_changes(db) == 0 { try upsert(t, height: height, at: date, mapId: mapId) }
     }
 
     private func msg() -> String { db.map { String(cString: sqlite3_errmsg($0)) } ?? "no db" }

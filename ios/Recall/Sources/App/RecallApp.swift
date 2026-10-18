@@ -10,6 +10,7 @@ struct RecallApp: App {
     @State private var showSelfTest = false
     @State private var showTeach = false
     @State private var showDrive = false
+    @State private var showRobotTools = false
 
     init() {
         let link = DriveLink()
@@ -41,6 +42,7 @@ struct RecallApp: App {
                             Menu {
                                 Button("Manual drive") { runtime.beginManualControl("drive"); showDrive = true }
                                 Button("Teach (waypoints, map)") { runtime.beginManualControl("teach"); showTeach = true }
+                                Button("Robot tools") { showRobotTools = true }
                                 Button("Self-test") { runtime.beginManualControl("selftest"); showSelfTest = true }
                             } label: {
                                 HStack(spacing: 6) {
@@ -63,6 +65,9 @@ struct RecallApp: App {
                 }
             }
             .sheet(isPresented: $showTeach, onDismiss: { runtime.endManualControl("teach") }) { TeachContainer(link: link, tracker: pose) }
+            .sheet(isPresented: $showRobotTools, onDismiss: { runtime.stopEverything() }) {
+                NavigationStack { RobotToolsView(runtime: runtime) { showRobotTools = false } }
+            }
             .sheet(isPresented: $showSelfTest, onDismiss: { runtime.endManualControl("selftest") }) { SelfTestContainer(link: link, tracker: pose) }
             .onAppear {
                 UIApplication.shared.isIdleTimerDisabled = true

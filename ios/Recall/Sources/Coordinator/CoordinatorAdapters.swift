@@ -144,12 +144,14 @@ final class FindRunnerAdapter: CoordinatorFinding {
     private let config: FindConfig
     private let stopMotion: () -> Void
     private let frame: CoordinatorFrameValidity
+    /// Called with the trace of every find that ran the executor, aborted ones included, so a viewer can show it.
+    private let onTrace: ((FindTrace) -> Void)?
 
     init(tracks: TrackProviding, encoders: EncoderProvider, driver: ApproachDriver, speaker: CoordinatorSpeaking,
          config: FindConfig = FindConfig(), frame: CoordinatorFrameValidity = TrustedFrame(),
-         stopMotion: @escaping () -> Void) {
+         onTrace: ((FindTrace) -> Void)? = nil, stopMotion: @escaping () -> Void) {
         self.tracks = tracks; self.encoders = encoders; self.driver = driver; self.speaker = speaker
-        self.config = config; self.stopMotion = stopMotion; self.frame = frame
+        self.config = config; self.stopMotion = stopMotion; self.frame = frame; self.onTrace = onTrace
     }
 
     func find(description: String) async throws -> CoordinatorTaskResult {
@@ -164,6 +166,7 @@ final class FindRunnerAdapter: CoordinatorFinding {
         if !known.isEmpty && !frame.relocalized { return .refused(spoken: CoordinatorConfig.notRecognisedSpoken) }
         let executor = FindExecutor(retriever: Retriever(encoder: set.text), driver: driver, images: set.images, config: config)
         let result = await executor.find(phrase: description, tracks: known)
+        onTrace?(result.trace)
         if Task.isCancelled || result.outcome == .aborted { return .cancelled }
         speaker.say(result.spoken)
         return .completed(summary: "\(result.outcome.rawValue): \(result.spoken)")
@@ -217,16 +220,20 @@ struct CoordinatorWiring {
     var waypointsPersistent = true
     /// Which stored coordinates are valid in the current ARKit frame.
     var frame: CoordinatorFrameValidity = WorldFrameGate()
+    /// Receives each find's trace, aborted ones included (the app connects the Robot tools viewer here).
+    var onFindTrace: ((FindTrace) -> Void)? = nil
+    /// The drive lease the coordinator and any other motion producer (Scan here) share. Defaults to a fresh one.
+    var lease = DriveLease()
 
     /// `drive` must be a serialized sink (see `SerialDriveSink`) and `poses` a snapshot reader
     /// (see `PoseSnapshotBox`): the coordinator and Controller run off the main thread.
     func makeCoordinator() -> RobotCoordinator {
-        let lease = DriveLease()
+        let lease = self.lease
         let controller = Controller(poses: poses, sink: LeasedDriveSink(base: drive, lease: lease), guardState: guardState,
                                     clock: controllerClock, sleep: controllerSleep)
         let driver = ControllerApproachDriver(controller: controller, poses: poses)
         let finder = FindRunnerAdapter(tracks: trackStore, encoders: encoders, driver: driver, speaker: speaker, frame: frame,
-                                       stopMotion: { controller.stop() })
+                                       onTrace: onFindTrace, stopMotion: { controller.stop() })
         var cfg = config
         cfg.features = features
         return RobotCoordinator(

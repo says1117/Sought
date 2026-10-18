@@ -5,6 +5,9 @@ import Retrieval
 #if canImport(FindExecutor)
 import FindExecutor
 #endif
+#if canImport(MLEncoders)
+import MLEncoders
+#endif
 
 /// The CLIP-style encoders the find path needs, or an explanation of why they are missing.
 struct EncoderSet {
@@ -14,6 +17,10 @@ struct EncoderSet {
     var isAvailable: Bool
     /// Spoken when `isAvailable` is false.
     var unavailableMessage: String?
+    /// The Core ML image model behind `images`, for the perception loop (nil for placeholder and fake sets).
+    var imageModel: CoreMLImageEmbedder? = nil
+    /// Long form of why the set is unavailable, for logs (not spoken).
+    var diagnostic: String? = nil
 }
 
 protocol EncoderProvider {
@@ -32,9 +39,11 @@ struct ModelsMissingEncoder: TextEncoder, ImageEmbedder {
 
 struct ModelsMissingEncoderProvider: EncoderProvider {
     static let spoken = "The image models are not installed, so I can't look for objects yet. I can still go to saved places."
+    var message = Self.spoken
+    var diagnostic: String? = nil
     func encoders() -> EncoderSet {
         let m = ModelsMissingEncoder()
-        return EncoderSet(text: m, images: m, isAvailable: false, unavailableMessage: Self.spoken)
+        return EncoderSet(text: m, images: m, isAvailable: false, unavailableMessage: message, diagnostic: diagnostic)
     }
 }
 
@@ -44,9 +53,54 @@ struct StaticEncoderProvider: EncoderProvider {
     func encoders() -> EncoderSet { set }
 }
 
-/// THE seam for PR 32 (CoreMLTextEncoder, ModelLocator). After merging it, change the body of `makeDefault`
-/// (App/AppRuntime.swift calls only this) to try `ModelLocator().locateAll()` and build `CoreMLTextEncoder` +
-/// `CoreMLLookEmbedder`, falling back to `ModelsMissingEncoderProvider()` when the locator throws.
 enum EncoderProviders {
-    static func makeDefault() -> EncoderProvider { ModelsMissingEncoderProvider() }
+    /// Builds the text encoder and image model from located files. Injectable so selection is testable without models.
+    typealias Builder = (ModelLocations) throws -> (text: TextEncoder, image: CoreMLImageEmbedder)
+
+    /// The real Core ML encoders when every model and tokenizer file is found and loads; otherwise the models-missing
+    /// provider, whose spoken message names what is missing. `frames` feeds the arrival check (the ARKit session).
+    static func makeDefault(locator: ModelLocator = ModelLocator(),
+                            frames: CameraFrameSource = NoCameraFrameSource(),
+                            debugSink: ArrivalCropDebugSink = NoOpArrivalCropDebugSink(),
+                            trackLookup: @escaping (SIMD3<Float>) -> String? = { _ in nil },
+                            build: Builder = realBuilder) -> EncoderProvider {
+        do {
+            let locations = try locator.locateAll()
+            let built = try build(locations)
+            let looker = ArrivalCropEmbedder(frames: frames, embedder: built.image, debugSink: debugSink, trackLookup: trackLookup)
+            return StaticEncoderProvider(set: EncoderSet(text: built.text, images: looker, isAvailable: true,
+                                                        unavailableMessage: nil, imageModel: built.image))
+        } catch let e as ModelLocatorError {
+            let names = e.missing.map(\.spokenName).joined(separator: ", ")
+            let spoken = e.missing.isEmpty ? ModelsMissingEncoderProvider.spoken : "\(e.spokenMessage) Missing: \(names)."
+            return ModelsMissingEncoderProvider(message: spoken, diagnostic: e.description)
+        } catch {
+            return ModelsMissingEncoderProvider(
+                message: "My vision models are installed but would not load, so I can't look for objects yet.",
+                diagnostic: "Model load failed: \(error)")
+        }
+    }
+
+    /// Validated CLIP tokenizer + compiled Core ML text and image models. Goes through `CoreMLEncoderFactory.build` so the
+    /// located `ModelConfig` (image size, embedding dimension) reaches both encoders and the image model's input size is
+    /// checked against it; building the encoders here by hand ignored the config and fed a 224 px model 256 px crops.
+    static let realBuilder: Builder = { loc in
+        #if canImport(CoreML)
+        let built = try CoreMLEncoderFactory.build(loc)
+        return (built.text, built.image)
+        #else
+        throw ModelsMissingError.modelsMissing
+        #endif
+    }
+}
+
+extension ModelAsset {
+    var spokenName: String {
+        switch self {
+        case .textModel: return "text model"
+        case .imageModel: return "image model"
+        case .vocab: return "tokenizer vocabulary"
+        case .merges: return "tokenizer merges"
+        }
+    }
 }

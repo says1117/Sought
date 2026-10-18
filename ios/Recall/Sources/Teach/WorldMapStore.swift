@@ -24,11 +24,31 @@ public final class WorldMapStore {
     /// True when a non-empty archive is on disk.
     public var hasSavedMap: Bool { (try? loadData())?.isEmpty == false }
 
-    /// Atomic write, so a crash mid-save never leaves a half-written map replacing a good one.
-    public func save(_ data: Data) throws {
+    /// Sidecar holding the stable id of the archive. Stored tracks are tagged with it (phone-local, see TrackStore).
+    public var idURL: URL { url.appendingPathExtension("id") }
+
+    /// Atomic write, so a crash mid-save never leaves a half-written map replacing a good one. Every save is a new
+    /// map: it gets a new id, written BEFORE the archive, so a crash in between leaves a new id with the old archive,
+    /// which only hides stored tracks (fails closed) and never attaches them to the wrong map.
+    /// Returns the new id.
+    @discardableResult
+    public func save(_ data: Data) throws -> String {
         guard !data.isEmpty else { throw CocoaError(.fileWriteUnknown) }
         try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let id = UUID().uuidString
+        try Data(id.utf8).write(to: idURL, options: .atomic)
         try data.write(to: url, options: .atomic)
+        return id
+    }
+
+    /// Id of the saved archive, nil when there is no map. An archive without an id (saved before ids existed) is
+    /// given one now, so it is a map of its own; tracks recorded before ids existed never match it.
+    public func currentMapId() -> String? {
+        guard hasSavedMap else { return nil }
+        if let d = try? Data(contentsOf: idURL), let id = String(data: d, encoding: .utf8), !id.isEmpty { return id }
+        let id = UUID().uuidString
+        do { try Data(id.utf8).write(to: idURL, options: .atomic) } catch { return nil }
+        return id
     }
 
     /// nil when there is no file or it is empty.
@@ -38,7 +58,7 @@ public final class WorldMapStore {
         return d.isEmpty ? nil : d
     }
 
-    public func discard() { try? fm.removeItem(at: url) }
+    public func discard() { try? fm.removeItem(at: url); try? fm.removeItem(at: idURL) }
 }
 
 /// When it is worth saving the map: tracking is good and ARKit says the space is mapped.
