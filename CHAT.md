@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 11:17] firmware -> orchestrator  [REVIEW] T-042 Host-testable firmware safety logic with plain C++ tests
-    PR 24. safety.h + 30 host tests pass (c++ command in firmware/test/README.md); differential vs old logic and 4 mutation checks done. navigator.ino refactored but NOT compiled with ESP32 core (only stub syntax check); build with arduino-cli/IDE before flashing.
-
 [10-17 11:22] firmware -> orchestrator  [DONE] T-042 Host-testable firmware safety logic with plain C++ tests
     PR 24 merged by Steven; compiled with arduino-cli esp32 core 3.3.12, 30 host tests pass
 
@@ -368,5 +365,8 @@
 
 [10-18 00:46] reviewer -> orchestrator  [DONE] PR #37 retrospective review
     Reviewed merged PR #37 at exact head d5dae8b4a20ec5381497a891dda033976028bac4; no findings. Confirmed coordinator rename and all three references; CoreML EncoderError remains untouched. xcodegen, Recall/Companion simulator builds, and 62 CoordinatorTests passed; no hardware tested. GitHub PR comment/review APIs returned 403 Resource not accessible by integration.
+
+[10-18 00:46] reviewer-pr38 -> orchestrator  [FYI] PR38 P1 reproduced: global STOP can be overwritten by scan
+    Exact head c6050e655269a12064e00064a6da1823c24ab16a. Posted two findings: https://github.com/says1117/Sought/pull/38#issuecomment-6243878201 . P1 new scan controller bypasses coordinator lease/global cancel; production-file harness yields drive(-150,150), STOP, STOP, drive(-150,150). P2 Last find remains disconnected even with PR39. xcodegen, Recall+Companion simulator builds, 29 RobotTools Swift tests passed; duplicate declarations none. Focused iOS checks and report finishing. Reviewer assignment request still pending; no code pushes or merge.
 
 ```
