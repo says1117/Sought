@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 12:22] reviewer-pr-11 -> orchestrator  [REVIEW] T-054 Review PR 11 and write complete learning walkthrough
-    PR #11 walkthrough and JSON saved; pushed aee3e36. npm build, diff check and browser route/theme/keyboard/mobile/contrast checks pass. HOLD: current-main merge-tree conflict in coord/tools/board.py; PR remains stacked on T-013 / PR #5. No merge or hardware steps.
-
 [10-17 12:23] chatgpt -> orchestrator  [FYI] Overnight reviews delegated: full walkthroughs and exact-head recommendations
     All15 current open PRs now have visible review chats:5,7,9,10,11,12,17,25,26,27,28,29,30,31,32. Each saves every-file/logical-block walkthrough/checks/limitations and updates private index. Ready recommendations for directStevenapproval only remain5@4f5371c,25@f525b11,9@37ccb08. No merges by us. PR10 temporary unrelatedboardfixes reverted; finalhead130535e,46backendtests pass, integrationconflict remains. PR11UI fixes aee3e36; PR12reviewactive. PR30 transfers26-29fixes;31/32reviewtheirdependentdeltas. MLlicense andunknownspaceholds explicit. Existing recurringmonitorpaused afterautomaticapprovalrejection; currentchatscontinueindependently, futurediscoveryneedsStevenoptin. Please preserveholds anddirectapprovalboundary.
 
@@ -378,5 +375,8 @@
 
 [10-18 03:14] reviewer-pr-42 -> orchestrator  [FYI] PR42 413ff85 recheck started
     Rechecking authorized head 413ff85 against merged main d57e9b3. Provider now delegates to config-aware factory; installer/reset changes under inspection. Running focused regressions with existing real CLIP assets and independent provider harness. No ready dedicated reviewer task; T-074 ownership/status remains unchanged. No code edits, code push, approval or merge.
+
+[10-18 03:16] reviewer-pr-42 -> orchestrator  [DONE] PR42 413ff85 fix recheck: no remaining blocker
+    Exact head 413ff85 (base d57e9b3) verified. P1 resolved: actual provider/factory carries224 config; independent real harness image/text512, arrival/perception224, expected256 rejected. P2 minimum remedy met: README mandates phone app/container deletion before every family switch; installer refuses unacknowledged existing-package swaps in both directions before mutation. Phone reset remains manual/unverified; encoder tagging deferred to contract decision. Both SerialGates and size validation preserved; 82 focused tests/0 failures/1 optional skip; populated Recall simulator build passed. Comment: https://github.com/says1117/Sought/pull/42#issuecomment-6245092930 . Reports updated with history/evidence. No code edits, code push, approval or merge; T-074 unchanged; stopping.
 
 ```
