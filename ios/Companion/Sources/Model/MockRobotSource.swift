@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import UIKit
 
 // SAMPLE DATA. Objects, photos and times come from the Figma Item Log so the app matches the design.
@@ -69,6 +70,13 @@ final class MockRobotSource: RobotSource {
 
     override func start() {
         guard heartbeat == nil else { return }
+        // Mimic the first fetch so the loading placeholders are visible. `-mockLoadDelay 5` holds them longer.
+        let delay = UserDefaults.standard.object(forKey: "mockLoadDelay") != nil ? UserDefaults.standard.double(forKey: "mockLoadDelay") : 0.9
+        isLoading = delay > 0
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            withAnimation(Motion.spring) { self.isLoading = false }
+        }
         heartbeat = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.tick() }
         }

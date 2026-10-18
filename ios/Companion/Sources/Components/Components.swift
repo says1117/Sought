@@ -71,6 +71,8 @@ struct StatusLine: View {
                 Circle().fill(p.signal).frame(width: 6, height: 6).accessibilityHidden(true)
             }
             Text(StatusCopy.line(robot.status, now: robot.now))
+                .contentTransition(.interpolate)
+                .animation(Motion.fade, value: StatusCopy.line(robot.status, now: robot.now))
                 .font(SoughtFont.status)
                 .foregroundStyle(p.text)
                 .lineLimit(singleLine ? 1 : 3)
@@ -110,7 +112,10 @@ struct SearchBar: View {
     @Binding var text: String
     var placeholder: String
     var hero = false
+    /// Zoom source id for the find flow this search opens ("search-home", "search-items").
+    var heroKey: String? = nil
     var onSubmit: (String) -> Void
+    @EnvironmentObject private var router: Router
     @StateObject private var speech = SpeechInput()
     @Environment(\.palette) private var p
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -153,6 +158,7 @@ struct SearchBar: View {
         .padding(.trailing, 6)
         .frame(height: height)
         .soughtGlass(.search, in: Capsule())
+        .modifier(OptionalHero(id: heroKey))
         .onChange(of: speech.transcript) { _, t in if !t.isEmpty { text = t } }
         .onChange(of: speech.isListening) { was, now in
             if was && !now && !speech.transcript.isEmpty { submit() }
@@ -168,6 +174,7 @@ struct SearchBar: View {
         let q = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty else { return }
         focused = false
+        router.pendingHero = heroKey
         onSubmit(q)
     }
 }
@@ -198,22 +205,28 @@ struct FindItButton: View {
 struct ItemCard: View {
     let item: TrackedObject
     var width: CGFloat = 169
+    /// Where this card lives ("home", a row title), so its zoom source id is unique on screen.
+    var heroPrefix = "card"
     var onFind: (TrackedObject) -> Void
     var onOpen: (TrackedObject) -> Void
     @EnvironmentObject private var robot: RobotSource
+    @EnvironmentObject private var router: Router
+    private var heroKey: String { "\(heroPrefix)-\(item.id)" }
     @Environment(\.palette) private var p
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s) {
-            Button { onOpen(item) } label: {
-                ShadedPhoto(photo: item.photo).frame(width: width, height: width * 141 / 169).softShadow()
+            Button { router.pendingHero = heroKey; onOpen(item) } label: {
+                ShadedPhoto(photo: item.photo).frame(width: width, height: width * 141 / 169)
+                    .heroSource(heroKey)
+                    .softShadow()
             }
             .buttonStyle(.plain)
             VStack(alignment: .leading, spacing: Space.xs) {
                 Text(item.label).font(SoughtFont.cardTitle).foregroundStyle(p.text).lineLimit(2)
                 Text("\(item.whereText): \(StatusCopy.ago(item.lastSeen, now: robot.now))")
                     .font(SoughtFont.cardMeta).foregroundStyle(p.text).lineLimit(2)
-                FindItButton { onFind(item) }.padding(.top, Space.xs)
+                FindItButton { router.pendingHero = heroKey; onFind(item) }.padding(.top, Space.xs)
             }
             .frame(width: width - 11, alignment: .leading)
         }
@@ -248,7 +261,7 @@ struct ItemRow: View {
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(alignment: .top, spacing: Space.l) {
-                        ForEach(items) { ItemCard(item: $0, onFind: onFind, onOpen: onOpen) }
+                        ForEach(items) { ItemCard(item: $0, heroPrefix: title, onFind: onFind, onOpen: onOpen) }
                     }
                     .padding(.horizontal, Space.margin)
                     .padding(.vertical, Space.s)
@@ -269,16 +282,23 @@ struct SampleBanner: View {
 
     var body: some View {
         if robot.isSample {
-            HStack(spacing: 6) {
-                Image(systemName: "flask").imageScale(.small)
-                Text("SAMPLE DATA").font(SoughtFont.readout).tracking(1)
+            HStack(spacing: 4) {
+                Image(systemName: "flask").font(.system(size: 10, weight: .bold))
+                Text("SAMPLE DATA").font(SoughtFont.badge).tracking(0.6)
             }
             .foregroundStyle(p.onPrimary)
-            .padding(.horizontal, 10).padding(.vertical, 4)
+            .padding(.horizontal, 8).padding(.vertical, 4)
             .background(Capsule().fill(p.searching))
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Sample data. This is not from the robot.")
             .accessibilityIdentifier("sampleBanner")
         }
+    }
+}
+
+private struct OptionalHero: ViewModifier {
+    let id: String?
+    func body(content: Content) -> some View {
+        if let id { content.heroSource(id, radius: 28) } else { content }
     }
 }

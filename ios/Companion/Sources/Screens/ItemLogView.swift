@@ -15,13 +15,24 @@ struct ItemLogView: View {
                 VStack(alignment: .leading, spacing: Space.m) {
                     SampleBanner()
                     ScreenHeader(title: "Item Log")
-                    SearchBar(text: $query, placeholder: "Try typing \u{201C}Backpack\u{201D}") { q in router.search(q, in: robot) }
+                    SearchBar(text: $query, placeholder: "Try typing \u{201C}Backpack\u{201D}", heroKey: "search-items") { q in router.search(q, in: robot) }
                 }
                 .padding(.horizontal, Space.margin)
                 .padding(.top, Space.l)
                 .padding(.bottom, Space.s)
 
-                if robot.objects.isEmpty {
+                if robot.isLoading {
+                    VStack(alignment: .leading, spacing: Space.l) {
+                        ForEach(0..<2, id: \.self) { _ in
+                            VStack(alignment: .leading, spacing: Space.s) {
+                                Capsule().fill(p.surface.opacity(0.7)).frame(width: 160, height: 18).shimmer()
+                                HStack(spacing: Space.l) { SkeletonCard(); SkeletonCard() }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, Space.margin).padding(.top, Space.l)
+                    .accessibilityElement().accessibilityLabel("Loading items")
+                } else if robot.objects.isEmpty {
                     empty
                 } else if !query.trimmingCharacters(in: .whitespaces).isEmpty {
                     let hits = filtered

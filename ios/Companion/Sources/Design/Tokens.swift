@@ -108,6 +108,7 @@ enum SoughtFont {
     static let callButton = Font.custom("JetBrainsMono-Bold", size: 16, relativeTo: .callout)
     static let mapLabel = Font.custom("JetBrainsMono-BoldItalic", size: 24, relativeTo: .title2)
     static let readout = Font.custom("JetBrainsMono-Bold", size: 13, relativeTo: .footnote)
+    static let badge = Font.custom("JetBrainsMono-Bold", size: 11, relativeTo: .caption2)
     static let bigReadout = Font.custom("JetBrainsMono-Bold", size: 56, relativeTo: .largeTitle)
     static let button = Font.custom("JetBrainsMono-Bold", size: 17, relativeTo: .body)
 }

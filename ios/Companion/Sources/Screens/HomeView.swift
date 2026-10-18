@@ -80,7 +80,7 @@ struct HomeView: View {
     /// Pinned header. A wash of the page color sits behind the glass bar once it pins, so scrolled content
     /// under it is softened rather than fighting the placeholder text.
     private var searchHeader: some View {
-        SearchBar(text: $query, placeholder: "Find my charger", hero: true) { q in
+        SearchBar(text: $query, placeholder: "Find my charger", hero: true, heroKey: "search-home") { q in
             router.search(q, in: robot)
             query = ""
         }
@@ -113,14 +113,16 @@ struct HomeView: View {
                 Button("See all") { router.tab = .items }
                     .font(SoughtFont.findIt).foregroundStyle(p.text).frame(minHeight: 44)
             }
-            if robot.recentFinds.isEmpty {
+            if robot.isLoading {
+                HStack(spacing: Space.l) { SkeletonCard(width: col); SkeletonCard(width: col) }
+            } else if robot.recentFinds.isEmpty {
                 Text("Soughtbot has not found anything yet. Items appear here once it has looked around.")
                     .font(SoughtFont.body).foregroundStyle(p.text)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(alignment: .top, spacing: Space.l) {
                         ForEach(robot.recentFinds.prefix(8)) { o in
-                            ItemCard(item: o, width: col, onFind: router.find, onOpen: router.open)
+                            ItemCard(item: o, width: col, heroPrefix: "home", onFind: router.find, onOpen: router.open)
                         }
                     }
                     .padding(.vertical, Space.s)

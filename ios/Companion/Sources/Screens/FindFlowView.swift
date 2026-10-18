@@ -34,14 +34,30 @@ struct FindFlowView: View {
                 VStack(spacing: Space.xl) {
                     if !started { confirm } else { phaseView }
                 }
+                .id(phaseKey)
+                .transition(reduceMotion ? AnyTransition.opacity : AnyTransition(.blurReplace))
                 .padding(Space.margin)
                 .frame(maxWidth: .infinity)
             }
         }
         .background(Color.clear)
+        .animation(reduceMotion ? Motion.fade : Motion.spring, value: phaseKey)
         .onAppear { if request.confirmed { start() } }
         .onChange(of: robot.find?.phase) { _, phase in react(to: phase) }
         .onDisappear { pulseTask?.cancel() }
+    }
+
+    /// Changes once per step (not per distance tick), so each step blends into the next exactly once.
+    private var phaseKey: String {
+        guard started else { return "confirm" }
+        switch robot.find?.phase ?? .searching {
+        case .searching: return "searching"
+        case .driving: return "driving"
+        case .arrived: return "arrived"
+        case .notFound: return "notFound"
+        case .failed: return "failed"
+        case .cancelled: return "cancelled"
+        }
     }
 
     private var isActive: Bool {
@@ -82,6 +98,8 @@ struct FindFlowView: View {
             if let m = request.match { photo(m.photo).frame(maxHeight: 220) }
             if let d {
                 Text(String(format: "%.1f m", d)).font(SoughtFont.bigReadout).foregroundStyle(p.text).monospacedDigit()
+                    .contentTransition(.numericText(value: d))
+                    .animation(reduceMotion ? nil : .snappy, value: d)
                     .accessibilityLabel(String(format: "%.1f meters away", d))
                     .accessibilityIdentifier("distance")
             }
@@ -189,6 +207,7 @@ struct FindFlowView: View {
 
     private func icon(_ name: String, color: Color) -> some View {
         Image(systemName: name).font(.system(size: 64)).foregroundStyle(color).accessibilityHidden(true)
+            .symbolEffect(.bounce.up, options: .nonRepeating, value: reduceMotion ? "" : phaseKey)
     }
 
     private func primary(_ s: String, id: String, _ action: @escaping () -> Void) -> some View {

@@ -12,6 +12,8 @@ class RobotSource: ObservableObject {
     @Published var map: MapSnapshot?
     @Published var liveFrame: UIImage?          // nil when no live frames (fallback: latest thumbnail)
     @Published var find: FindProgress?
+    /// True until the first data arrives. Screens show shimmering placeholders, not an empty state.
+    @Published var isLoading = false
     /// Ticks so "N min ago" and the offline check refresh without new data.
     @Published var now = Date()
 

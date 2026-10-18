@@ -55,6 +55,7 @@ struct RootView: View {
     @EnvironmentObject private var router: Router
     @EnvironmentObject private var settings: AppSettings
     @State private var lastSpokenState: RobotState?
+    @Namespace private var hero
 
     private var palette: Palette { settings.highContrast ? .highContrast : .standard }
     private var mood: BackgroundMood {
@@ -69,13 +70,14 @@ struct RootView: View {
             .overlay(alignment: .top) { StatusBarScrim() }
         .environment(\.palette, palette)
         .environment(\.backgroundMood, mood)
+        .environment(\.heroNamespace, hero)
         .preferredColorScheme(settings.highContrast ? .dark : .light)
         .tint(palette.text)
         .sheet(item: $router.detail) { o in
-            ItemDetailView(itemId: o.id).background(SoughtBackground()).environment(\.palette, palette).environment(\.backgroundMood, mood).presentationDragIndicator(.visible)
+            ItemDetailView(itemId: o.id).heroDestination(router.heroID).background(SoughtBackground()).environment(\.palette, palette).environment(\.backgroundMood, mood).environment(\.heroNamespace, hero).presentationDragIndicator(.visible)
         }
         .fullScreenCover(item: $router.findRequest) { r in
-            FindFlowView(request: r).background(SoughtBackground()).environment(\.palette, palette).environment(\.backgroundMood, mood)
+            FindFlowView(request: r).heroDestination(router.heroID).background(SoughtBackground()).environment(\.palette, palette).environment(\.backgroundMood, mood).environment(\.heroNamespace, hero)
         }
         .onChange(of: robot.status.state) { _, s in announce(s) }
         .onChange(of: settings.haptics) { _, v in Haptics.shared.enabled = v }
