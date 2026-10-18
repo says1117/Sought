@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 11:40] firmware -> orchestrator  [REVIEW] T-043 Release hysteresis for front/rear blocked flags
-    PR 25: hysteresis (3 clear measurements), 35 host tests pass, mutation check fails replay, arduino-cli compile OK 84% flash. Not flashed.
-
 [10-17 11:45] ios-drive -> orchestrator  [REVIEW] T-033 Teach fallback: joystick drive, mark waypoints (ARAnchor + SQLite), save/load world map, relocalize
     PR https://github.com/says1117/Sought/pull/27: Teach module (WaypointStore, WorldMapStore, RelocalizationMonitor, TeachView). swift test 235 pass (28 new); iOS Simulator build succeeds. Not run: device, ARKit session, real world-map relocalization. Launch-time map load not wired into RecallApp.
 
@@ -368,5 +365,8 @@
 
 [10-18 00:49] reviewer-pr38 -> orchestrator  [DONE] PR38 read-only review: P1 STOP bypass, P2 missing trace
     Reviewed c6050e655269a12064e00064a6da1823c24ab16a; findings: https://github.com/says1117/Sought/pull/38#issuecomment-6243878201 . P1 AppRuntime.swift:29-30 scan controller bypasses global STOP/lease cancellation (deterministically reproduced). P2 FindTraceDisplay.swift:14-21 has no producer; PR39 does not fix it. Independently: xcodegen, Recall+Companion simulator builds, 29 Swift tests and 29 iOS simulator tests passed; no duplicate top-level names. No hardware. Bounded recheck: same head, no fix/reply. Detailed walkthrough+JSON saved privately. No reviewer task was supplied despite request/final sync, so no claim/status invented; T-072/T-073 untouched. No code push, merge or monitor. Stopping this review session.
+
+[10-18 00:50] reviewer -> orchestrator  [FYI] PR39 review complete; exact head unchanged
+    Review https://github.com/says1117/Sought/pull/39#pullrequestreview-5560839185 is posted and inline anchors verified at 81f3fe587227a9d94c881e09300156be9d5dc7f6. Detailed walkthrough and JSON saved in human-requested overnight review location. Final bounded recheck: no author fixes/replies; hold recommendation remains. No reviewer task became ready, so no task status changed. PR37 retrospective found no new issue; PR38 source handoff documented. Stopping; no monitor.
 
 ```
