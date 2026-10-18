@@ -25,6 +25,10 @@
 	<string>Finds and talks to Soughtbot on your home network and over Bluetooth.</string>
 	<key>NSBonjourServices</key>
 	<array><string>_recall-ni._tcp</string><string>_recall-ni._udp</string></array>
+	<key>BACKEND_BASE_URL</key><string>$(BACKEND_BASE_URL)</string>
+	<key>RECALL_TOKEN</key><string>$(RECALL_TOKEN)</string>
+	<key>NSAppTransportSecurity</key>
+	<dict><key>NSAllowsLocalNetworking</key><true/></dict>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Lets you say what you are looking for.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>

@@ -54,6 +54,7 @@ struct FindFlowView: View {
         case .searching: return "searching"
         case .driving: return "driving"
         case .arrived: return "arrived"
+        case .remembered: return "remembered"
         case .notFound: return "notFound"
         case .failed: return "failed"
         case .cancelled: return "cancelled"
@@ -112,6 +113,15 @@ struct FindFlowView: View {
             title("Found your \(label)")
             body(request.match.map { "\($0.whereText). Soughtbot is waiting next to it." } ?? "Soughtbot is waiting next to it.")
             primary("Done", id: "findDone") { close() }
+        case .remembered:
+            if let m = request.match {
+                photo(m.photo).frame(maxHeight: 200)
+                title("Last seen \(m.whereText.lowercased())")
+                body("Soughtbot saw your \(label) there \(StatusCopy.ago(m.lastSeen, now: robot.now)). \(m.certaintyWord).")
+                if let map = robot.map { MiniMoveMap(map: map, object: m, from: nil, to: nil) }
+                Text("Sending Soughtbot from this app is not connected yet.").font(SoughtFont.cardMeta).foregroundStyle(p.text)
+            }
+            primary("Done", id: "findDone") { close() }
         case .notFound:
             icon("magnifyingglass.circle", color: p.searching)
             title("Soughtbot could not find your \(label)")
@@ -163,6 +173,9 @@ struct FindFlowView: View {
             pulseTask?.cancel()
             Haptics.shared.success()
             say("Soughtbot found your \(label)" + (request.match.map { ", \($0.whereText.lowercased())." } ?? "."))
+        case .remembered:
+            Haptics.shared.success()
+            say("Soughtbot last saw your \(label)" + (request.match.map { ", \($0.whereText.lowercased())." } ?? "."))
         case .notFound:
             pulseTask?.cancel(); Haptics.shared.warning()
             say("Soughtbot could not find your \(label).")

@@ -41,6 +41,8 @@ class RobotSource: ObservableObject {
 
     // Commands. Subclasses override.
     func start() {}
+    /// Stop timers and network loops (called when Settings switches the data source).
+    func stop() { clock?.invalidate() }
     func startFind(_ query: String, match: TrackedObject?) {}
     func cancelFind() { if var f = find { f.phase = .cancelled; find = f } }
     func clearFind() { find = nil }

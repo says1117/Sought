@@ -72,6 +72,11 @@ final class MockRobotSource: RobotSource {
                              lastHeartbeat: now)
     }
 
+    override func stop() {
+        super.stop()
+        heartbeat?.invalidate(); findTask?.cancel(); comeTask?.cancel()
+    }
+
     override func start() {
         guard heartbeat == nil else { return }
         // Mimic the first fetch so the loading placeholders are visible. `-mockLoadDelay 5` holds them longer.

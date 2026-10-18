@@ -36,7 +36,16 @@ glass and custom fonts (the file says how each was checked by hand). Large text:
 
 ## Data
 
-Mock only for now, always labeled SAMPLE DATA. Real data comes through a Backend source once the robot uploads objects (board task T-071). Peer-link messages (`robot_status`, `objects_digest`, `find`) are a documented future option, not built, per the orchestrator.
+Two sources behind one `RobotSource`:
+
+- `MockRobotSource`: sample data from the Figma, always labeled SAMPLE DATA. Used when no server is configured or when Settings > Use sample data is on.
+- `BackendRobotSource`: reads `GET /api/robot/status` (2 s), `/api/objects`, `/api/waypoints`, `/api/map`, `/api/metadata` (10 s) and `/media/{id}.jpg`. Keeps the SAMPLE DATA badge on when the server reports `mock: true`. Read-only: a find shows where Soughtbot last saw the item, since there is no command route yet (T-070).
+
+Configure with the same keys as the robot app (`BACKEND_BASE_URL`, `RECALL_TOKEN` in the gitignored `Config/Secrets.xcconfig`), or type the address and token in Settings > Connection (token goes to the Keychain).
+
+Test locally against backend PR 12: run it with `RECALL_TOKEN=dev-local-token`, `python -m backend.seed`, `tools/mock_robot.py`, then launch the app with `-backendURL http://127.0.0.1:8765 -backendToken dev-local-token`.
+
+Peer-link messages (`robot_status`, `objects_digest`, `find`) are a documented future option, not built, per the orchestrator.
 
 ## Not done or not verified
 

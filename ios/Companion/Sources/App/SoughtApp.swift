@@ -5,18 +5,42 @@ import SwiftUI
 
 @main
 struct SoughtApp: App {
-    @StateObject private var robot: RobotSource = MockRobotSource()
+    @StateObject private var sources = SourceHolder()
     @StateObject private var router = Router()
     @StateObject private var settings = AppSettings()
 
     var body: some Scene {
         WindowGroup {
             RootView()
-                .environmentObject(robot)
+                .id(ObjectIdentifier(sources.robot))   // fresh screens when the data source changes
+                .environmentObject(sources.robot)
+                .environmentObject(sources)
                 .environmentObject(router)
                 .environmentObject(settings)
-                .onAppear { robot.start(); router.applyLaunchArguments(robot: robot) }
+                .onAppear { sources.robot.start(); router.applyLaunchArguments(robot: sources.robot) }
         }
+    }
+}
+
+/// Picks the data source: the Soughtbot server when one is configured and the person has not chosen sample data,
+/// otherwise MockRobotSource. Settings can switch at any time.
+@MainActor
+final class SourceHolder: ObservableObject {
+    @Published private(set) var robot: RobotSource
+
+    init() { robot = Self.make() }
+
+    static var wantsSample: Bool { UserDefaults.standard.bool(forKey: "useSampleData") }
+
+    static func make() -> RobotSource {
+        if !wantsSample, let c = BackendConfig.current() { return BackendRobotSource(config: c) }
+        return MockRobotSource()
+    }
+
+    func reload() {
+        robot.stop()
+        robot = Self.make()
+        robot.start()
     }
 }
 

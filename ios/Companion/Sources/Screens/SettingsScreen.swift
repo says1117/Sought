@@ -4,9 +4,13 @@ import SwiftUI
 
 struct SettingsScreen: View {
     @EnvironmentObject private var robot: RobotSource
+    @EnvironmentObject private var sources: SourceHolder
     @EnvironmentObject private var settings: AppSettings
     @Environment(\.palette) private var p
     @State private var showComeToMeTest = false
+    @AppStorage("useSampleData") private var useSample = false
+    @AppStorage("backendURL") private var backendURL = ""
+    @State private var token = Keychain.read("backendToken") ?? ""
 
     var body: some View {
         NavigationStack {
@@ -14,11 +18,32 @@ struct SettingsScreen: View {
                 Section {
                     LabeledContent("Data", value: robot.sourceName)
                     LabeledContent("Status", value: StatusCopy.line(robot.status, now: robot.now))
+                    if let b = robot as? BackendRobotSource, let problem = b.connectionProblem {
+                        Label(problem, systemImage: "exclamationmark.triangle").font(SoughtFont.cardMeta).foregroundStyle(p.text)
+                    }
                     if robot.isSample {
                         Text("Sought is showing sample data. Real items appear once Soughtbot shares what it has seen.")
                             .font(SoughtFont.cardMeta)
                     }
                 } header: { Text("Soughtbot").foregroundStyle(p.text) }
+                .listRowBackground(p.surface)
+
+                Section {
+                    Toggle("Use sample data", isOn: $useSample)
+                        .onChange(of: useSample) { _, _ in sources.reload() }
+                    if !useSample {
+                        TextField("Server address", text: $backendURL, prompt: Text("https://…"))
+                            .textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
+                        SecureField("Token", text: $token)
+                        Button("Connect") {
+                            Keychain.write("backendToken", token)
+                            sources.reload()
+                        }
+                        .disabled(BackendConfig.clean(backendURL) == nil && BackendConfig.current() == nil)
+                    }
+                } header: { Text("Connection").foregroundStyle(p.text) } footer: {
+                    Text("Sought reads Soughtbot\u{2019}s status, items and map from its server. The token is kept in this iPhone\u{2019}s Keychain.")
+                }
                 .listRowBackground(p.surface)
 
                 Section {

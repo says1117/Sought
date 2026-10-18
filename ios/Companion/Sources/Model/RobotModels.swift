@@ -119,6 +119,8 @@ enum FindPhase: Equatable {
     case searching               // robot is checking memory / planning
     case driving(distanceM: Double?)
     case arrived
+    /// Backend source: no way to send Soughtbot yet, so the app shows where it last saw the item.
+    case remembered
     case notFound
     case failed(reason: String)
     case cancelled

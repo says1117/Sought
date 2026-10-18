@@ -26,7 +26,14 @@ final class Router: ObservableObject {
         if let t = d.string(forKey: "tab"), let tab = AppTab(rawValue: t) { self.tab = tab }
         if let q = d.string(forKey: "search") { search(q, in: robot) }
         if let id = d.string(forKey: "detail"), let o = robot.objects.first(where: { $0.id == id }) { detail = o }
-        if let id = d.string(forKey: "find"), let o = robot.objects.first(where: { $0.id == id }) { find(o) }
+        if let id = d.string(forKey: "find") {
+            Task { @MainActor in   // server data arrives after launch: wait up to 6 s for the item
+                for _ in 0..<30 {
+                    if let o = robot.objects.first(where: { $0.id == id }) { self.find(o); return }
+                    try? await Task.sleep(nanoseconds: 200_000_000)
+                }
+            }
+        }
         // `-demoOpen obj_x` / `-demoFind obj_x`: after Home settles, open or find from its Recent Finds card (zoom demo).
         for (key, open) in [("demoOpen", true), ("demoFind", false)] {
             guard let id = d.string(forKey: key), let o = robot.objects.first(where: { $0.id == id }) else { continue }
