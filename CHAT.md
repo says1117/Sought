@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 23:20] orchestrator -> ALL  [DECISION] Web lead's plan wins; docs/FRONTEND_PLAN.md is advisory
-    Steven says the web lead's own frontend plan is correct for his design. docs/FRONTEND_PLAN.md (PR 35) is now advisory: use it only for robot-side facts (what the phone sends, what is cut, what may be claimed). Do not impose its page list, design, hosting or timeline on the web lead. Where they differ, his plan wins.
-
 [10-17 23:54] orchestrator -> ALL  [DECISION] Come to me v2 revived as a stretch after the first real find (T-064 to T-070)
     Steven revived come-to-me with a new design. Full text: docs/COME_TO_ME_PLAN.md (on the PR 17 branch, steven-plan-v2).
     Two phones: the rover phone and the user phone. On request only, the user phone relocalizes against the shared saved map and sends its position and the map id (or picks a taught waypoint). The rover refuses on map mismatch, drives along taught waypoints and free space, and stops about 1 m short.
@@ -406,5 +403,14 @@
 
 [10-18 07:51] reviewer -> orchestrator  [DONE] PR52 b736efc review: one P2 arrival-veto bypass
     Reviewed exact b736efc5fb65f0b226cf9dcf1675c6a4b7fcda20; one P2 at FindExecutor.swift:155: unrelated crop positive margin rescues person crop, false Found bottle. Each crop fails alone; pair succeeds. Couple margin to qualifying arrival crop. Posted https://github.com/says1117/Sought/pull/52#pullrequestreview-5561999013 . Focused Swift: 259 executed, 5 skipped, 0 failures; XcodeGen/simulator app build passed; combined iOS tests blocked by unchanged GuardReadoutTests.swift:5 import. Turn boundary/STOP tests passed; local real CLIP ranking exercised, no person/bottle calibration dataset. Walkthrough MD/JSON saved as requested. No code/hardware/approval/merge. No ready reviewer task existed; request sent, no implementation claim touched. Stopping.
+
+[10-18 07:51] reviewer-pr-49 -> orchestrator  [DONE] PR49 6500769: HOLD, three P2 findings posted
+    Exact head 650076956532b9ed5e57bef102300152af592aaf; review: https://github.com/says1117/Sought/pull/49#pullrequestreview-5562002900
+    P2 api.py:191: synchronous handlers publish into asyncio queues from worker threads; waiting reader fails in asyncio debug.
+    P2 api.py:208: publication after unlock allows running then stale queued SSE snapshots.
+    P2 models.py:158: accepted ID next collides with dequeue, so get-by-ID can claim another command.
+    61 backend tests pass; same-Store 16-request probe claims once. Two processes duplicate a claim; explicit one-worker deployment restriction recorded separately.
+    No source edits/push/merge/approve/contracts/hardware/simulator actions. Private full walkthrough PR-49.md + PR-49.json saved; HOLD for focused author fixes and bounded recheck.
+    No dedicated reviewer task available after request; backend implementation task not claimed.
 
 ```
