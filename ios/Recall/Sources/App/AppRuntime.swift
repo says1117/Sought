@@ -2,6 +2,7 @@ import SwiftUI
 import ARKit
 import CoreImage
 import Combine
+import os
 
 /// Builds and owns the real robot stack: DriveLink, PoseTracker, stores, the coordinator, the heartbeat, and the
 /// perception loop. Everything with logic lives in Sources/Coordinator and is unit tested; this file is wiring.
@@ -37,12 +38,22 @@ final class AppRuntime: ObservableObject {
     private var perception: PerceptionLoop?
     private var scheduler = PerceptionScheduler()
 
+    /// What the robot looked at during recent arrival checks (JPEG crops), newest last. For a future viewer.
+    let arrivalCrops: ArrivalCropRingBuffer
+    private static let log = Logger(subsystem: "com.recall", category: "encoders")
+
+    /// `encoders` defaults to the real Core ML set when the models are installed (arrival check reads the shared
+    /// ARSession), else the models-missing set. `cropEmbedder` overrides the perception loop's embedder (tests).
     init(link: DriveLink, pose: PoseTracker,
-         encoders: EncoderProvider = EncoderProviders.makeDefault(),
+         encoders: EncoderProvider? = nil,
          cropEmbedder: (([CIImage]) throws -> [[Float]])? = nil) {
         self.link = link
         self.pose = pose
+        let crops = ArrivalCropRingBuffer(capacity: 12)
+        self.arrivalCrops = crops
+        let encoders = encoders ?? EncoderProviders.makeDefault(frames: ARKitFrameSource(session: pose.session), debugSink: crops)
         self.encoderSet = encoders.encoders()
+        if let why = encoderSet.diagnostic { Self.log.error("Image models unavailable: \(why, privacy: .public)") }
 
         let dir = WorldMapStore.defaultURL().deletingLastPathComponent()
         let dbPath = dir.appendingPathComponent("recall.sqlite").path
@@ -69,11 +80,13 @@ final class AppRuntime: ObservableObject {
         self.coordinator = coordinator
         self.storageWarning = warning
 
-        if let embed = cropEmbedder, encoderSet.isAvailable {
+        let embed = cropEmbedder ?? encoderSet.imageModel.map(Self.perceptionEmbedder)
+        if let embed, encoderSet.isAvailable {
             perception = PerceptionLoop(session: pose.session, ingestor: MemoryIngestor(store: tracks), embed: embed,
                                         floorY: { [weak pose] in pose?.floorY })
         }
         perceptionNote = perception == nil ? "Memory is not filling: image models not installed" : "Memory fills while parked"
+        if perception == nil { Self.log.notice("Perception loop not started: image models not installed") }
 
         let box = poseBox
         poseSubscription = Publishers.CombineLatest(pose.$pose, pose.$tracking)
@@ -91,6 +104,17 @@ final class AppRuntime: ObservableObject {
         }
         if let cfg = SyncConfig.fromBundle() {
             heartbeat = HeartbeatPublisher(transport: URLSessionTransport(config: cfg), provider: { hb.snapshot() })
+        }
+    }
+
+    /// Perception crops are CIImages; the Core ML image model takes preprocessed RGBA, so convert and embed one by one.
+    private static func perceptionEmbedder(_ model: CoreMLImageEmbedder) -> ([CIImage]) throws -> [[Float]] {
+        let context = CIContext()
+        return { crops in
+            try crops.map { crop in
+                guard let raw = CIImageRaw.rawImage(from: crop, context: context) else { throw ArrivalCropError.cropUnavailable }
+                return try model.embedOne(raw)
+            }
         }
     }
 
