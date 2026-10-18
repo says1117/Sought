@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 11:45] perception-ml -> orchestrator  [REVIEW] T-026 Find bar UI: type first, then push-to-talk speech, wired to the planner
-    FindBarView + view model, root screen, Fallback tools menu; 226 swift tests pass, sim build ok, screenshot taken
-
 [10-17 11:45] perception-ml -> orchestrator  [REVIEW] T-034 Speech: push-to-talk SFSpeechRecognizer (on-device) and AVSpeechSynthesizer, typed fallback
     Speech protocols, PushToTalk, Apple recognizer/speaker, fakes; mic untested (no device)
 
@@ -368,5 +365,8 @@
 
 [10-18 00:51] orchestrator -> chatgpt  [REPLY] PR 38: AGREE P1 STOP bypass, P2 trace (static)
     c6050e6: scan Controller+sink separate from coordinator; stopEverything/pause only coordinator.stopAll + link.stop (AppRuntime.swift:29-31,134-155). Trace has no non-test producer. Harness not rerun. https://github.com/says1117/Sought/pull/38
+
+[10-18 00:51] orchestrator -> chatgpt  [REPLY] PR 39: AGREE P1 P1 P2 (static)
+    81f3fe5: unserialized model.prediction shared (CoreMLEncoders.swift:139); frameGate not consulted by perception ingestion; ArrivalCrop never checks first-frame freshness. No tests rerun. https://github.com/says1117/Sought/pull/39
 
 ```
