@@ -15,6 +15,13 @@ protocol CoordinatorFrameValidity: AnyObject {
     var relocalized: Bool { get }
     /// True for a target recorded at `isoTimestamp` inside the current frame (no relocalization needed).
     func isInCurrentFrame(createdAt isoTimestamp: String) -> Bool
+    /// Changes whenever the coordinate frame may have changed (new ARKit run, tracking lost). Observations carry the
+    /// generation they were captured in, so a result from an earlier frame is never written next to a later one.
+    var generation: Int { get }
+}
+
+extension CoordinatorFrameValidity {
+    var generation: Int { 0 }
 }
 
 /// Test and legacy default: every stored position is trusted. The app wiring always supplies `WorldFrameGate`.
@@ -32,6 +39,7 @@ final class WorldFrameGate: CoordinatorFrameValidity {
     private let now: () -> Date
     private var frameStart: Date
     private var latched = false
+    private var gen = 0
 
     init(now: @escaping () -> Date = { Date() }, monitor: RelocalizationMonitor = RelocalizationMonitor()) {
         self.now = now; self.monitor = monitor; self.frameStart = now()
@@ -43,17 +51,19 @@ final class WorldFrameGate: CoordinatorFrameValidity {
         lock.lock(); defer { lock.unlock() }
         frameStart = now()
         latched = false
+        gen += 1
         monitor.start(hasSavedMap: loadedSavedMap)
     }
 
     /// Feed every tracking/mapping change. Losing tracking entirely drops the recognition (ARKit may re-anchor).
     func update(tracking: TrackingKind, mapping: MappingKind) {
         lock.lock(); defer { lock.unlock() }
-        if tracking == .notAvailable { latched = false; return }
+        if tracking == .notAvailable { if latched { gen += 1 }; latched = false; return }
         if monitor.update(tracking: tracking, mapping: mapping) == .relocalized { latched = true }
     }
 
     var relocalized: Bool { lock.lock(); defer { lock.unlock() }; return latched }
+    var generation: Int { lock.lock(); defer { lock.unlock() }; return gen }
 
     func isInCurrentFrame(createdAt isoTimestamp: String) -> Bool {
         lock.lock(); let start = frameStart; lock.unlock()

@@ -29,16 +29,18 @@ struct FL73Pixels: FrameCropping {
     }
 }
 
-/// Fixed pinhole camera at the origin looking down -z; every call is a new frame 0.25 s later.
+/// Fixed pinhole camera at the origin looking down -z; every call is a new frame 0.25 s later, on the same
+/// clock (system uptime) the arrival check uses to reject stale frames.
 final class FL73Frames: CameraFrameSource {
     var calls = 0
     var red: Bool
     var cameraToWorld = matrix_identity_float4x4
+    let epoch = ProcessInfo.processInfo.systemUptime
     init(red: Bool) { self.red = red }
     func latestFrame() -> CameraFrame? {
         calls += 1
         let g = CameraGeometry(cameraToWorld: cameraToWorld, fx: 1000, fy: 1000, cx: 960, cy: 720,
-                               imageWidth: 1920, imageHeight: 1440, timestamp: Double(calls) * 0.25)
+                               imageWidth: 1920, imageHeight: 1440, timestamp: epoch + Double(calls) * 0.25)
         return CameraFrame(geometry: g, pixels: FL73Pixels(red: red))
     }
 }

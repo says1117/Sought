@@ -82,7 +82,7 @@ final class AppRuntime: ObservableObject {
 
         let embed = cropEmbedder ?? encoderSet.imageModel.map(Self.perceptionEmbedder)
         if let embed, encoderSet.isAvailable {
-            perception = PerceptionLoop(session: pose.session, ingestor: MemoryIngestor(store: tracks), embed: embed,
+            perception = PerceptionLoop(session: pose.session, ingestor: MemoryIngestor(store: tracks, frame: frameGate), embed: embed,
                                         floorY: { [weak pose] in pose?.floorY })
         }
         perceptionNote = perception == nil ? "Memory is not filling: image models not installed" : "Memory fills while parked"
@@ -175,6 +175,10 @@ final class AppRuntime: ObservableObject {
     private func tick() {
         refreshSensors()
         guard let perception else { return }
+        // Persistent memory is only written in the saved map's frame (see MemoryIngestor), so wait for it.
+        let note = perception.ingestor.canIngest ? "Memory fills while parked" : "Not recognised yet, not saving objects"
+        if perceptionNote != note { perceptionNote = note }
+        guard perception.ingestor.canIngest else { return }
         let ok = scheduler.decide(now: ProcessInfo.processInfo.systemUptime, robotStationary: link.isRobotStationary,
                                   trackingNormal: pose.tracking == .normal, modelsAvailable: true)
         if ok { perception.capture() }
@@ -229,7 +233,7 @@ final class PerceptionLoop {
         func embed(_ crops: [CIImage]) throws -> [[Float]] { try f(crops) }
     }
     private let session: ARSession
-    private let ingestor: MemoryIngestor
+    let ingestor: MemoryIngestor
     private let pipeline: PerceptionPipeline<Embed>
     private let floorY: () -> Double?
     private let lock = NSLock()
@@ -245,12 +249,13 @@ final class PerceptionLoop {
         guard let frame = session.currentFrame, let floor = floorY(),
               let (geometry, depth) = ARKitKeyframeAdapter.extract(from: frame, floorY: Float(floor)) else { finish(); return }
         let buffer = frame.capturedImage
+        let generation = ingestor.generation          // the frame this keyframe belongs to
         Task.detached(priority: .utility) { [self] in
             defer { finish() }
             let source = CIFrameCropSource(pixelBuffer: buffer)
             let lists = [SaliencyProposalSource().proposals(in: buffer), ProposalMath.gridBackstop()]
             if let objects = try? pipeline.process(frame: source, depth: depth, geometry: geometry, proposalLists: lists) {
-                _ = try? ingestor.ingest(objects)
+                _ = try? ingestor.ingest(objects, generation: generation)
             }
         }
     }

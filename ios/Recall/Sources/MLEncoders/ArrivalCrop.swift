@@ -63,6 +63,8 @@ public struct NoCameraFrameSource: CameraFrameSource {
 /// Why a look failed. FindExecutor records any error from the embedder as "no view" for the candidate.
 public enum ArrivalCropError: Error, Equatable, CustomStringConvertible {
     case noFrame
+    /// The camera only offered frames captured before this look began (frozen or stale camera).
+    case noFreshFrame
     case behindCamera(depth: Float)
     case outsideImage(u: Float, v: Float)
     case cropUnavailable
@@ -70,6 +72,7 @@ public enum ArrivalCropError: Error, Equatable, CustomStringConvertible {
     public var description: String {
         switch self {
         case .noFrame: return "no camera frame available"
+        case .noFreshFrame: return "not visible: no fresh camera frame (only stale frames)"
         case .behindCamera(let d): return "not visible: point is behind the camera (depth \(d) m)"
         case .outsideImage(let u, let v): return "not visible: point projects outside the image (\(u), \(v))"
         case .cropUnavailable: return "could not read pixels for the crop"
@@ -188,6 +191,9 @@ public struct ArrivalCropConfig: Equatable {
     /// Extra waiting allowed beyond `count * frameSpacingS` for frames to arrive.
     public var extraWaitS = 2.0
     public var pollIntervalS = 0.05
+    /// A frame is usable only if captured no earlier than this long before the look began (same clock as `now`,
+    /// which is `ProcessInfo.systemUptime`, as is `ARFrame.timestamp`). Rejects a frozen or pre-arrival frame.
+    public var freshnessWindowS = 0.5
     /// Clockwise quarter turns applied to each crop before embedding. 0 matches how Memory crops were embedded.
     public var outputQuarterTurns = 0
     public init() {}
@@ -223,10 +229,11 @@ public struct ArrivalCropEmbedder: ImageEmbedder {
     }
 
     /// Returns up to `count` unit embeddings, one per frame at least `frameSpacingS` apart. Throws when nothing could be
-    /// captured: `outsideImage`/`behindCamera` when the point is not in view, `noFrame` when the camera gave nothing.
+    /// captured: `outsideImage`/`behindCamera` when the point is not in view, `noFrame` when the camera gave nothing, `noFreshFrame` when it only gave frames older than the look.
     public func captureEmbeddings(around position: SIMD3<Float>, count: Int, cropScale: Float) async throws -> [[Float]] {
         guard count > 0 else { return [] }
-        let deadline = now() + Double(count) * config.frameSpacingS + config.extraWaitS
+        let start = now()
+        let deadline = start + Double(count) * config.frameSpacingS + config.extraWaitS
         var out: [[Float]] = []
         var lastStamp: Double?
         var lastError: ArrivalCropError = .noFrame
@@ -235,6 +242,7 @@ public struct ArrivalCropEmbedder: ImageEmbedder {
             try Task.checkCancellation()
             guard let frame = frames.latestFrame() else { lastError = .noFrame; await sleep(config.pollIntervalS); continue }
             let g = frame.geometry
+            if g.timestamp < start - config.freshnessWindowS { lastError = .noFreshFrame; await sleep(config.pollIntervalS); continue }
             if let last = lastStamp, g.timestamp - last < config.frameSpacingS { await sleep(config.pollIntervalS); continue }
 
             let rect: PixelRect

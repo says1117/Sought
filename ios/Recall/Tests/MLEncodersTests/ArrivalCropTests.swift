@@ -63,6 +63,17 @@ struct AC73ImageRunner: ImageModelRunning {
     }
 }
 
+/// Wraps a source, shifting every frame timestamp by `offset` (so early frames are stale for a late clock).
+final class AC73OffsetSource: CameraFrameSource {
+    let base: AC73FrameSource, offset: Double
+    init(base: AC73FrameSource, offset: Double) { self.base = base; self.offset = offset }
+    func latestFrame() -> CameraFrame? {
+        guard var f = base.latestFrame() else { return nil }
+        f.geometry.timestamp += offset
+        return f
+    }
+}
+
 final class AC73Clock {
     var t = 0.0
     var slept: [Double] = []
@@ -208,6 +219,37 @@ final class ArrivalCropTests: XCTestCase {
         let out = try await embedder(src, clock: clock).captureEmbeddings(around: SIMD3(0, 0, -2), count: 3, cropScale: 1.5)
         XCTAssertEqual(out.count, 1, "returns what it has once the deadline passes")
         XCTAssertGreaterThanOrEqual(clock.t, 0.6 + 2.0 - 0.1)
+    }
+
+    /// PR 39 review P2: a frozen camera whose newest frame predates the look must NOT yield an embedding.
+    func testStaleFirstFrameBeforeCaptureStartProducesNoEmbedding() async {
+        let src = AC73FrameSource(step: 0)         // timestamp stays 0 forever
+        let clock = AC73Clock(); clock.t = 100     // the look begins at t = 100
+        do {
+            let out = try await embedder(src, clock: clock).captureEmbeddings(around: SIMD3(0, 0, -2), count: 3, cropScale: 1.5)
+            XCTFail("embedded a stale frame: \(out.count)")
+        } catch let e as ArrivalCropError {
+            XCTAssertEqual(e, .noFreshFrame)
+        } catch { XCTFail("\(error)") }
+        XCTAssertTrue(src.pixels.rects.isEmpty, "never even cropped the stale frame")
+    }
+
+    func testStaleFramesAreSkippedUntilAFreshOneArrives() async throws {
+        let src = AC73FrameSource(step: 0.25)
+        let clock = AC73Clock(); clock.t = 10
+        // Frames at 0.25, 0.5 ... are stale until the timestamps pass 9.5 (the 0.5 s freshness window).
+        let late = AC73OffsetSource(base: src, offset: 9.0)
+        let sink = ArrivalCropRingBuffer()
+        let out = try await embedder(late, sink: sink, clock: clock).captureEmbeddings(around: SIMD3(0, 0, -2), count: 1, cropScale: 1.5)
+        XCTAssertEqual(out.count, 1)
+        XCTAssertGreaterThanOrEqual(try XCTUnwrap(sink.recent().first).timestamp, 9.5)
+    }
+
+    func testFrameJustInsideFreshnessWindowIsAccepted() async throws {
+        let src = AC73FrameSource(step: 0)
+        let clock = AC73Clock(); clock.t = 0.4        // frame stamp 0 is 0.4 s old: within 0.5 s
+        let out = try await embedder(src, clock: clock).captureEmbeddings(around: SIMD3(0, 0, -2), count: 1, cropScale: 1.5)
+        XCTAssertEqual(out.count, 1)
     }
 
     func testPointNotInViewThrowsTypedErrorImmediately() async {
