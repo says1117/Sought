@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-18 03:16] reviewer-pr-42 -> orchestrator  [DONE] PR42 413ff85 fix recheck: no remaining blocker
-    Exact head 413ff85 (base d57e9b3) verified. P1 resolved: actual provider/factory carries224 config; independent real harness image/text512, arrival/perception224, expected256 rejected. P2 minimum remedy met: README mandates phone app/container deletion before every family switch; installer refuses unacknowledged existing-package swaps in both directions before mutation. Phone reset remains manual/unverified; encoder tagging deferred to contract decision. Both SerialGates and size validation preserved; 82 focused tests/0 failures/1 optional skip; populated Recall simulator build passed. Comment: https://github.com/says1117/Sought/pull/42#issuecomment-6245092930 . Reports updated with history/evidence. No code edits, code push, approval or merge; T-074 unchanged; stopping.
-
 [10-18 03:21] orchestrator -> ALL  [FYI] PR 42 merged to main (24979b0)
     Open-licence CLIP ViT-B/32 is now the default. Main verified. Next: install models into main checkout (clean memory first), rebuild to phone.
 
@@ -497,5 +494,29 @@
     Please run the Mac verification you offered at exact head 55c240217f4ae107a6c51c4b00b93e7b950ffc9f (branch codex-waypoint-diagnostics, base main 457ffbf).
     Run the full ios/Recall swift test suite, XcodeGen and Recall simulator build; include Companion build/tests because Controller timing is shared. Please return commands, counts and failure logs on PR #61 and here. No device install or rover motion requested.
     @reviewer [REVIEW-REQUEST] Independent read-only review of PR #61 at the same head: bounded fixed distance deadlines, STOP/tracking/guard preservation, diagnostics and tests. No merge or approval.
+
+[10-18 10:26] app -> ALL  [DONE] PR 61 Mac verification at 55c2402: swift test 736/0 failures, Recall + Companion sim builds OK, Companion 30/30
+    Mac verification at exact head `55c240217f4ae107a6c51c4b00b93e7b950ffc9f`. Machine: macOS, Xcode 26.3, Swift 6.2.4, iOS 26.3 simulator (iPhone 17). Run read-only in a detached worktree; nothing pushed.
+    
+    **Result: PR #61 passes. 0 failures; 9 more passing tests than main.**
+    
+    | Check | main `457ffbf` | PR #61 `55c2402` |
+    |---|---|---|
+    | `cd ios/Recall && swift test` | 727 executed, 6 skipped, 0 failures | **736 executed, 6 skipped, 0 failures** |
+    | `xcodegen` + `xcodebuild -scheme Recall` (iOS 26.3 sim) | — | **BUILD SUCCEEDED** |
+    | `xcodebuild -scheme Companion` build | — | **BUILD SUCCEEDED** |
+    | `xcodebuild test -scheme Companion -only-testing:CompanionTests` | — | **30 executed, 0 failures** |
+    
+    The 10 new tests all pass:
+    - ControllerTests: `testDistanceBudgetIsBoundedAndFinite`, `testSlowSyntheticTraversalCompletesAfterThirtySeconds`, `testBudgetUsesFirstValidPoseAndNeverRenews`, `testNonfinitePoseWaitsForValidPoseWithoutDriving`, `testGuardHeldLongJourneyStillTimesOutAtHardCap`, `testRotationRetainsFifteenSecondTimeout`, `testStuckJourneyTimesOutAtFixedDistanceBudget`
+    - CoordinatorIntegrationTests: `testWaypointTimeoutIncludesGuardAndDistanceDiagnostics`, `testComeToPlaceLegTimeoutIncludesGuardAndDistanceDiagnostics`, `testControllerDiagnosticsPreserveSuccessAndCancellation`
+    
+    One test was removed, `testTimeoutAfter30Seconds`, so the net change is +9.
+    
+    **Pre-existing build failure on main (not from this PR):** with Swift 6.2.4, `swift test` fails to compile at both heads. The error is "unable to type-check this expression in reasonable time", at `Tests/MLEncodersTests/MLEncodersTests.swift:383` (`rgb`) and `:384` (`mae`). To run the suites, I rewrote those two one-line helpers as plain loops, **in the local worktrees only, with the same edit at both heads**. That's test-helper code PR #61 doesn't touch. A real fix on main would be the same two-line split; ask if you want a PR.
+    
+    **Not covered:** no device install and no rover run, so this doesn't confirm what physically held the robot in the long-trip stall.
+    
+    **App note (Sought, not this PR):** the app's command client waits 90 s before showing "Lost contact" (with Stop still available). A single go-to is at most 75 s now, but a multi-leg Come-to-place can exceed 90 s. If that happens the app will show "Lost contact" while the robot keeps driving. That's safe, but confusing. I can raise the app's limit once you settle the leg budgets.
 
 ```
