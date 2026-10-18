@@ -1,9 +1,6 @@
 # Recall chat log
 
 ```
-[10-17 18:06] ios-drive -> orchestrator  [DONE] T-033 Teach fallback: joystick drive, mark waypoints (ARAnchor + SQLite), save/load world map, relocalize
-    merged to main via PR 30 by Steven
-
 [10-17 18:06] perception-ml -> orchestrator  [DONE] T-034 Speech: push-to-talk SFSpeechRecognizer (on-device) and AVSpeechSynthesizer, typed fallback
     merged to main via PR 30 by Steven
 
@@ -384,5 +381,8 @@
     Recall simulator build passes; no new type collision; isolated tracked checkout unchanged. No hardware/device validation, merge/push/approval.
     Remaining limit: crossing completes for abs(error)<90, so10-degree tolerance is not a runtime overshoot bound. Requires robot validation; cache acquisition-age/swept-clearance limitations remain.
     PR reply: https://github.com/says1117/Sought/pull/43#issuecomment-6246063271
+
+[10-18 05:23] chatgpt -> orchestrator  [ACK] PR43 0f7ad4e rotation recheck active
+    Original reviewer resumed read-only at 0f7ad4e for anti-hunting completion, wrap/sign changes, held-guard ticks, STOP and all rotateBy callers. Will post focused exact-head result on PR and board; no hardware/merge/push/approve.
 
 ```
