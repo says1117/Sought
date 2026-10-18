@@ -36,7 +36,10 @@ struct RecallApp: App {
     var body: some Scene {
         WindowGroup {
             NavigationStack {
-                FindBarView(model: findBar, robotStatus: runtime.statusLine)
+                VStack(spacing: 12) {
+                    RobotStatusCard(runtime: runtime).padding(.horizontal)
+                    FindBarView(model: findBar, robotStatus: runtime.statusLine)
+                }
                     .toolbar {
                         ToolbarItem(placement: .topBarTrailing) {
                             Menu {

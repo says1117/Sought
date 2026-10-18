@@ -200,6 +200,9 @@ final class AppRuntime: ObservableObject {
         }
     }
 
+    /// True when a backend is configured, so the robot is polling for commands from the Sought app.
+    var remoteLinked: Bool { commandPoller != nil }
+
     /// One line for the find bar: what the robot is doing now.
     var statusLine: String {
         var s = "Robot: \(coordinatorStatus.state.heartbeatValue)"
